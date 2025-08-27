@@ -34,10 +34,21 @@ cd mcp-ai-companion-demo
 ## 项目结构
 
 ### web
-该目录下为前端代码，包含了 MCP 服务的实现，以及前端交互代码
+
+智能体前端界面，提供用户交互界面和设备控制功能。基于 React + TypeScript + Vite + Tailwind CSS + shadcn/ui + MQTT.js，实现 MCP over MQTT 协议通信。
+
+**要求**: Node.js >= 22.0.0
+
+```bash
+cd web
+pnpm install
+pnpm dev
+```
 
 ### app
+
 该目录下为 Agent 的代码，包含了跟多媒体服务交互，与 LLM、VLM 调用和交互的实现
 
 ## 联系我们
+
 如果您对该演示项目或解决方案感兴趣，想了解商业化的产品和服务，请[联系我们](https://www.emqx.com/zh/contact)。
