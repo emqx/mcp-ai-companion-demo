@@ -3,6 +3,7 @@ import { RiveAnimation } from './RiveAnimation';
 import { EmotionSelector } from './EmotionSelector';
 import { ChatMessages } from './ChatMessages';
 import { useWebRTC } from '@/hooks/useWebRTC';
+import { useAudioPlaying } from '@/hooks/useAudioPlaying';
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface ChatInterfaceProps {
@@ -12,16 +13,19 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ selectedEmotion, onEmotionSelect }: ChatInterfaceProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [signalingId] = useState('abcd');
   const [showVideo, setShowVideo] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const handleASRResponse = useCallback(() => {
+  const isSpeaking = useAudioPlaying(audioRef, 1000);
+  const handleASRResponse = useCallback((results: string) => {
+    console.log('ASR Response received:', results);
+    console.log('ASR Response type:', typeof results);
     setIsRecording(false);
   }, []);
   
   const {
     remoteStream,
-    connectionState,
     isConnecting,
     isConnected,
     error,
@@ -36,13 +40,19 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect }: ChatInterfac
   });
 
   useEffect(() => {
-    if (remoteStream && videoRef.current && showVideo) {
-      videoRef.current.srcObject = remoteStream;
+    if (remoteStream) {
+      if (audioRef.current) {
+        audioRef.current.srcObject = remoteStream;
+      }
+      
+      if (showVideo && videoRef.current) {
+        videoRef.current.srcObject = remoteStream;
+      }
     }
   }, [remoteStream, showVideo]);
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-16 relative">
+    <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">
       <div className="fixed top-4 right-4">
         <EmotionSelector 
           selectedEmotion={selectedEmotion}
@@ -54,21 +64,27 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect }: ChatInterfac
         <RiveAnimation emotion={selectedEmotion} />
       </div>
 
-      <ChatMessages 
-        botText=""
-        isLoading={isRecording}
+      <ChatMessages
+        isLoading={isConnected && !isSpeaking}
+        isSpeaking={isSpeaking}
       />
 
+      <audio
+        ref={audioRef}
+        autoPlay
+        playsInline
+        className="hidden"
+      />
       
       {showVideo && (
-        <div className="mb-4 w-full max-w-2xl">
+        <div className="mb-8 w-full max-w-xl">
           <div className="bg-gray-200 rounded-lg overflow-hidden relative">
             <video
               ref={videoRef}
               autoPlay
               playsInline
               controls={false}
-              className="w-full h-96 object-cover"
+              className="w-full h-80 object-cover"
             />
             {!isConnected && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50">
@@ -79,10 +95,10 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect }: ChatInterfac
               </div>
             )}
           </div>
-          <div className="mt-2 text-center text-sm text-gray-500">
+          {/* <div className="mt-2 text-center text-sm text-gray-500">
             <div>连接状态: {connectionState}</div>
             <div className="text-xs">ID: {signalingId}</div>
-          </div>
+          </div> */}
         </div>
       )}
 
@@ -105,16 +121,18 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect }: ChatInterfac
                 console.log('Start recording');
               }
             }}
-            className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-colors ${
+            className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
               isRecording 
-                ? 'bg-red-500 hover:bg-red-600' 
+                ? 'bg-red-500 hover:bg-red-600 shadow-lg scale-110' 
+                : isConnecting
+                ? 'bg-yellow-500 animate-pulse'
                 : isConnected && isAudioEnabled
-                ? 'bg-green-500 hover:bg-green-600' 
+                ? 'bg-blue-500 hover:bg-blue-600 shadow-md' 
                 : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
-            title={isRecording ? "停止录音" : isConnected ? "开始录音" : "点击连接"}
+            title={isRecording ? "停止录音" : isConnecting ? "连接中..." : isConnected ? "开始录音" : "点击连接"}
           >
-            <Mic className={`w-6 h-6 ${isRecording ? 'text-white' : 'text-[#343741]'}`} />
+            <Mic className={`w-6 h-6 ${isRecording || isConnecting || (isConnected && isAudioEnabled) ? 'text-white' : 'text-[#343741]'}`} />
           </button>
           
           <button 
@@ -123,14 +141,14 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect }: ChatInterfac
                 toggleVideo();
               }
             }}
-            className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-colors ${
+            className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
               isConnected && isVideoEnabled 
-                ? 'bg-green-500 hover:bg-green-600' 
+                ? 'bg-orange-500 hover:bg-orange-600 shadow-md' 
                 : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
             title="扬声器控制"
           >
-            <Volume2 className="w-6 h-6 text-[#343741]" />
+            <Volume2 className={`w-6 h-6 ${isConnected && isVideoEnabled ? 'text-white' : 'text-[#343741]'}`} />
           </button>
           
           <button 
@@ -144,9 +162,9 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect }: ChatInterfac
                 setShowVideo(false);
               }
             }}
-            className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-colors ${
+            className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
               showVideo 
-                ? 'bg-blue-500 hover:bg-blue-600' 
+                ? 'bg-purple-500 hover:bg-purple-600 shadow-md' 
                 : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
             title={showVideo ? "关闭视频聊天" : "开启视频聊天"}

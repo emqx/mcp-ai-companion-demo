@@ -2,9 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Code Can Not Use Chinese Comment!!!!!!
+
 ## Commands
 
 ### Development
+
 ```bash
 # Start development server with hot reload
 pnpm dev
@@ -20,6 +23,7 @@ pnpm lint
 ```
 
 ### shadcn/ui Components
+
 ```bash
 # Add new shadcn/ui components
 pnpm dlx shadcn@latest add <component-name>
@@ -31,8 +35,10 @@ pnpm dlx shadcn@latest add card
 ## Related Projects
 
 ### Backend API Server
+
 The backend for this frontend is located at:
-- **Path Pattern**: Look for `emqx-multimedia-proxy` in sibling or parent directories
+
+- **Path Pattern**: Look for `emqx-multimedia-proxy` in sibling or parent directories (Not Current Project, Current Project is `mcp-ai-companion-demo` !!!!!!!)
 - **Current Known Path**: `/Users/ysfscream/Workspace/EMQ/emqx-multimedia-proxy`
 - **Project Type**: Elixir/Phoenix umbrella application
 - **Description**: Multimedia proxy server with WebRTC, RTP processing, ASR/TTS capabilities
@@ -44,6 +50,7 @@ This frontend calls the backend API for multimedia processing features.
 This is a Vite + React + TypeScript application with Tailwind CSS v4 and shadcn/ui components.
 
 ### Core Stack
+
 - **React 19.1.1** - UI framework
 - **TypeScript 5.8.3** - Type safety
 - **Vite 7.1.2** - Build tool and dev server
@@ -52,6 +59,7 @@ This is a Vite + React + TypeScript application with Tailwind CSS v4 and shadcn/
 - **pnpm** - Package manager
 
 ### Project Structure
+
 - `src/main.tsx` - Application entry point
 - `src/App.tsx` - Main React component
 - `src/components/ui/` - shadcn/ui components
@@ -64,6 +72,7 @@ This is a Vite + React + TypeScript application with Tailwind CSS v4 and shadcn/
 - `components.json` - shadcn/ui configuration
 
 ### Key Configuration Notes
+
 - **Path Aliases**: Use `@/*` to import from `src/` (e.g., `import { Button } from '@/components/ui/button'`)
 - **Tailwind CSS v4**: Uses `@tailwindcss/vite` plugin, no config file needed
 - **shadcn/ui**: Configured with Neutral base color theme

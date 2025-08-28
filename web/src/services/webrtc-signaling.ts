@@ -177,9 +177,12 @@ export class WebRTCSignaling {
     }
 
     this.pc.ontrack = (event) => {
+      console.log('Received track:', event.track.kind, event.track.readyState, event.track.enabled)
+      
       if (this.remoteStream) {
         this.remoteStream.addTrack(event.track)
         this.callbacks.onRemoteStream?.(this.remoteStream)
+        
       }
     }
   }
@@ -188,6 +191,7 @@ export class WebRTCSignaling {
     if (!this.channel) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.channel.on(this.signalingId, async (payload: any) => {
+      console.log('Received signaling message:', payload)
       const { type, data } = payload
 
       switch (type) {
@@ -243,6 +247,7 @@ export class WebRTCSignaling {
           console.log('Received ASR response:', data)
           this.callbacks.onASRResponse?.(data.results || data)
           break
+          
           
       }
     })
