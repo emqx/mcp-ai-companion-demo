@@ -46,9 +46,18 @@ export type ConnectionState =
   | 'failed'
   | 'closed'
 
+// Message types from backend
+export interface ASRResponse {
+  type: 'asr_response'
+  results: string
+}
+
+export type ConversationMessage = ASRResponse
+
 export interface WebRTCCallbacks {
   onConnectionStateChange?: (state: ConnectionState) => void
   onLocalStream?: (stream: MediaStream) => void
   onRemoteStream?: (stream: MediaStream) => void
   onError?: (error: Error) => void
+  onASRResponse?: (results: string) => void
 }

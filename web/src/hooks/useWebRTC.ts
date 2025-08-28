@@ -7,6 +7,7 @@ interface UseWebRTCOptions {
   config?: Partial<WebRTCConfig>
   mediaConstraints?: Partial<MediaConstraints>
   autoConnect?: boolean
+  onASRResponse?: (results: string) => void
 }
 
 interface UseWebRTCReturn {
@@ -38,7 +39,8 @@ export function useWebRTC({
       channelCount: 2
     }
   },
-  autoConnect = false
+  autoConnect = false,
+  onASRResponse
 }: UseWebRTCOptions): UseWebRTCReturn {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
@@ -66,7 +68,8 @@ export function useWebRTC({
           onConnectionStateChange: setConnectionState,
           onLocalStream: setLocalStream,
           onRemoteStream: setRemoteStream,
-          onError: setError
+          onError: setError,
+          onASRResponse: onASRResponse
         }
       )
 
@@ -75,7 +78,7 @@ export function useWebRTC({
       setError(err as Error)
       setConnectionState('failed')
     }
-  }, [signalingId, config, mediaConstraints])
+  }, [signalingId, config, mediaConstraints, onASRResponse])
 
   const disconnect = useCallback(() => {
     if (signalingRef.current) {
@@ -111,6 +114,7 @@ export function useWebRTC({
         signalingRef.current.disconnect()
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoConnect])
 
   return {

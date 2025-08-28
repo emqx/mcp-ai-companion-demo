@@ -7,6 +7,7 @@ export class WebRTCSignaling {
   private channel: Channel | null = null
   private pc: RTCPeerConnection | null = null
   private localStream: MediaStream | null = null
+  private remoteStream: MediaStream | null = null
   private config: WebRTCConfig
   private mediaConstraints: MediaConstraints
   private callbacks: WebRTCCallbacks
@@ -93,6 +94,9 @@ export class WebRTCSignaling {
     // Create peer connection
     this.pc = new RTCPeerConnection({ iceServers: this.config.iceServers })
 
+    // Initialize remote stream
+    this.remoteStream = new MediaStream()
+
     // Add local tracks
     for (const track of this.localStream.getTracks()) {
       this.pc.addTrack(track, this.localStream)
@@ -173,9 +177,10 @@ export class WebRTCSignaling {
     }
 
     this.pc.ontrack = (event) => {
-      const remoteStream = new MediaStream()
-      remoteStream.addTrack(event.track)
-      this.callbacks.onRemoteStream?.(remoteStream)
+      if (this.remoteStream) {
+        this.remoteStream.addTrack(event.track)
+        this.callbacks.onRemoteStream?.(this.remoteStream)
+      }
     }
   }
 
@@ -233,6 +238,12 @@ export class WebRTCSignaling {
             await this.pc.addIceCandidate(candidate)
           }
           break
+          
+        case 'asr_response':
+          console.log('Received ASR response:', data)
+          this.callbacks.onASRResponse?.(data.results || data)
+          break
+          
       }
     })
   }
@@ -260,6 +271,12 @@ export class WebRTCSignaling {
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => track.stop())
       this.localStream = null
+    }
+
+    // Clear remote stream
+    if (this.remoteStream) {
+      this.remoteStream.getTracks().forEach(track => track.stop())
+      this.remoteStream = null
     }
 
     // Close peer connection
