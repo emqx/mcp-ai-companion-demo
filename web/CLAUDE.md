@@ -28,6 +28,17 @@ pnpm dlx shadcn@latest add <component-name>
 pnpm dlx shadcn@latest add card
 ```
 
+## Related Projects
+
+### Backend API Server
+The backend for this frontend is located at:
+- **Path Pattern**: Look for `emqx-multimedia-proxy` in sibling or parent directories
+- **Current Known Path**: `/Users/ysfscream/Workspace/EMQ/emqx-multimedia-proxy`
+- **Project Type**: Elixir/Phoenix umbrella application
+- **Description**: Multimedia proxy server with WebRTC, RTP processing, ASR/TTS capabilities
+
+This frontend calls the backend API for multimedia processing features.
+
 ## Architecture
 
 This is a Vite + React + TypeScript application with Tailwind CSS v4 and shadcn/ui components.
