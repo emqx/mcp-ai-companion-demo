@@ -30,8 +30,7 @@ export class WebRTCSignaling {
       this.updateConnectionState('connecting')
       
       // Create Phoenix socket
-      this.socket = new Socket(this.config.signalingUrl, { 
-         
+      this.socket = new Socket(this.config.signalingUrl, {
         params: { token: (window as any).userToken },
         logger: (kind, msg, data) => {
           console.log(`Phoenix Socket [${kind}]:`, msg, data)
@@ -73,12 +72,10 @@ export class WebRTCSignaling {
 
       this.channel
         .join()
-         
         .receive('ok', (resp: any) => {
           console.log('Joined successfully to signaling socket', resp)
           resolve()
         })
-         
         .receive('error', (resp: any) => {
           console.error('Unable to join signaling socket', resp)
           reject(new Error('Failed to join signaling channel'))
@@ -189,7 +186,6 @@ export class WebRTCSignaling {
 
   private setupChannelHandlers(): void {
     if (!this.channel) return
-     
     this.channel.on(this.signalingId, async (payload: any) => {
       console.log('Received signaling message:', payload)
       const { type, data } = payload

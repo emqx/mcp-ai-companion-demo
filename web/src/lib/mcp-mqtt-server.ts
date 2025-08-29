@@ -388,6 +388,8 @@ export class McpMqttServer {
     }
     
     const responseTopic = `$mcp-rpc/${clientId}/${this.serverId}/${this.serverName}`
+    console.debug(`[MCP Server] Sending tools list response to: ${responseTopic}`)
+    console.debug(`[MCP Server] Tools count: ${response.result.tools.length}`)
     await this.publish(responseTopic, JSON.stringify(response))
   }
 
