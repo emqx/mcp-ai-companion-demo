@@ -1,5 +1,5 @@
 import { Mic, Volume2, Camera } from 'lucide-react';
-import { RiveAnimation } from './RiveAnimation';
+import { EmotionAnimation } from './EmotionAnimation';
 import { EmotionSelector } from './EmotionSelector';
 import { ChatMessages } from './ChatMessages';
 import { useWebRTC } from '@/hooks/useWebRTC';
@@ -68,7 +68,7 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect, showVideo: ext
       </div>
 
       <div className="mb-2">
-        <RiveAnimation emotion={selectedEmotion} />
+        <EmotionAnimation emotion={selectedEmotion} />
       </div>
 
       <ChatMessages

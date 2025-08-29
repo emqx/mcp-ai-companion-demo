@@ -21,6 +21,9 @@ export default tseslint.config([
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+  // Disallow semicolons
+  semi: ['error', 'never'],
+  '@typescript-eslint/semi': ['error', 'never'],
     },
   },
 ])
