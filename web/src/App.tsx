@@ -1,10 +1,21 @@
 import { useMcpMqttServer } from '@/hooks/useMcpMqttServer'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { ChatInterface } from '@/components/ChatInterface'
 
 function App() {
   const [selectedEmotion, setSelectedEmotion] = useState('happy');
   const [showVideo, setShowVideo] = useState(false);
+
+  const callbacks = useMemo(() => ({
+    onCameraControl: (enabled: boolean) => {
+      console.log('[App] Camera control:', enabled);
+      setShowVideo(enabled);
+    },
+    onEmotionChange: (emotion: string) => {
+      console.log('[App] Emotion change:', emotion);
+      setSelectedEmotion(emotion);
+    }
+  }), []);
 
   const { 
     isConnected,
@@ -14,16 +25,7 @@ function App() {
     autoConnect: true,
     serverId: 'web-ui-hardware-server',
     serverName: 'web-ui-hardware-controller',
-    callbacks: {
-      onCameraControl: (enabled: boolean) => {
-        console.log('[App] Camera control:', enabled);
-        setShowVideo(enabled);
-      },
-      onEmotionChange: (emotion: string) => {
-        console.log('[App] Emotion change:', emotion);
-        setSelectedEmotion(emotion);
-      }
-    }
+    callbacks
   })
 
   useEffect(() => {
