@@ -65,7 +65,9 @@ async def on_mcp_disconnect(client, server_name):
 
 
 client = None
-api_key = "sk-zqfstppriuodtmyyamkkynwebzccykxjyhqepguyuomiugky"
+import os
+
+api_key = os.environ.get("DASHSCOPE_API_KEY")
 
 
 def build_fn_schema_from_input_schema(model_name: str, input_schema: dict):
