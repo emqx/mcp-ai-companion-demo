@@ -1,13 +1,25 @@
 import { useState, useEffect, useRef } from 'react'
-import { McpMqttClient } from '@/lib/mcp-over-mqtt'
-import type { MqttConnectionOptions, MqttMessage } from '@/types/mqtt'
+import { McpMqttServer } from '@/lib/mcp-mqtt-server'
+import type { 
+  MqttConnectionOptions, 
+  MqttMessage,
+  McpClientInfo
+} from '@/types/mqtt'
 
 export interface UseMqttOptions extends MqttConnectionOptions {
   autoConnect?: boolean
+  serverId?: string
+  serverName?: string
+  autoInitializeMcp?: boolean
+  clientInfo?: McpClientInfo
+  callbacks?: {
+    onCameraControl?: (enabled: boolean) => void
+    onEmotionChange?: (emotion: string) => void
+  }
 }
 
-export interface UseMqttReturn {
-  client: McpMqttClient | null
+export interface UseMqttServerReturn {
+  client: McpMqttServer | null
   isConnected: boolean
   isConnecting: boolean
   error: Error | null
@@ -18,22 +30,43 @@ export interface UseMqttReturn {
   subscribe: (topic: string | string[], qos?: 0 | 1 | 2) => Promise<void>
   unsubscribe: (topic: string | string[]) => Promise<void>
   messages: MqttMessage[]
+  // MCP Server state
+  isMcpInitialized: boolean
 }
 
-export function useMcpOverMqtt(options: UseMqttOptions = {}): UseMqttReturn {
-  const { autoConnect = true, ...mqttOptions } = options
+export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerReturn {
+  const { 
+    autoConnect = true, 
+    autoInitializeMcp = false,
+    serverId,
+    serverName,
+    clientInfo,
+    callbacks,
+    ...mqttOptions 
+  } = options
   
-  const [client, setClient] = useState<McpMqttClient | null>(null)
+  const [client, setClient] = useState<McpMqttServer | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [connectionState, setConnectionState] = useState('disconnected')
   const [messages, setMessages] = useState<MqttMessage[]>([])
-  
-  const clientRef = useRef<McpMqttClient | null>(null)
+  const [isMcpInitialized, setIsMcpInitialized] = useState(false)
+
+  const clientRef = useRef<McpMqttServer | null>(null)
+  const mqttOptionsRef = useRef(mqttOptions)
 
   useEffect(() => {
-    const mqttClient = new McpMqttClient(mqttOptions)
+    mqttOptionsRef.current = mqttOptions
+  }, [mqttOptions])
+
+  useEffect(() => {
+    const mqttClient = new McpMqttServer({ 
+      ...mqttOptionsRef.current, 
+      serverId, 
+      serverName,
+      callbacks
+    })
     clientRef.current = mqttClient
     setClient(mqttClient)
 
@@ -42,6 +75,9 @@ export function useMcpOverMqtt(options: UseMqttOptions = {}): UseMqttReturn {
       setIsConnecting(false)
       setError(null)
       setConnectionState('connected')
+      
+      // Server is initialized when connected
+      setIsMcpInitialized(true)
     })
 
     mqttClient.onDisconnect(() => {
@@ -73,7 +109,7 @@ export function useMcpOverMqtt(options: UseMqttOptions = {}): UseMqttReturn {
         clientRef.current.disconnect()
       }
     }
-  }, [])
+  }, [autoConnect, autoInitializeMcp, serverId, serverName, clientInfo, callbacks])
 
   const connect = async () => {
     if (!client) return
@@ -120,6 +156,7 @@ export function useMcpOverMqtt(options: UseMqttOptions = {}): UseMqttReturn {
     return client.unsubscribe(topic)
   }
 
+
   return {
     client,
     isConnected,
@@ -131,8 +168,10 @@ export function useMcpOverMqtt(options: UseMqttOptions = {}): UseMqttReturn {
     publish,
     subscribe,
     unsubscribe,
-    messages
+    messages,
+    // MCP Server state
+    isMcpInitialized
   }
 }
 
-export default useMcpOverMqtt
+export default useMcpMqttServer

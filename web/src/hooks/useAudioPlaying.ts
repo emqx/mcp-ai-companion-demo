@@ -8,7 +8,7 @@ export function useAudioPlaying(audioRef: React.RefObject<HTMLAudioElement | nul
       const audio = audioRef.current
       if (audio) {
         const playing = !audio.paused && !audio.ended && audio.currentTime > 0 && audio.readyState > 2
-        console.log('Audio playing:', playing)
+        // console.log('Audio playing:', playing)
         setIsPlaying(playing)
       }
     }, interval)
