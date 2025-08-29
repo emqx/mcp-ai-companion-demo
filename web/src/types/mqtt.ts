@@ -12,6 +12,7 @@ export interface MqttMessage {
   payload: string
   qos: MqttQoS
   retain: boolean
+  userProperties?: Record<string, string | string[]>
 }
 
 // JSON-RPC 2.0 Types
