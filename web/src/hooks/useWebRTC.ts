@@ -1,29 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { WebRTCSignaling } from '@/services/webrtc-signaling'
-import type { ConnectionState, WebRTCConfig, MediaConstraints } from '@/types/webrtc'
-
-interface UseWebRTCOptions {
-  signalingId: string
-  config?: Partial<WebRTCConfig>
-  mediaConstraints?: Partial<MediaConstraints>
-  autoConnect?: boolean
-  onASRResponse?: (results: string) => void
-}
-
-interface UseWebRTCReturn {
-  localStream: MediaStream | null
-  remoteStream: MediaStream | null
-  connectionState: ConnectionState
-  isConnecting: boolean
-  isConnected: boolean
-  error: Error | null
-  connect: () => Promise<void>
-  disconnect: () => void
-  toggleAudio: (enabled?: boolean) => void
-  toggleVideo: (enabled?: boolean) => void
-  isAudioEnabled: boolean
-  isVideoEnabled: boolean
-}
+import type { ConnectionState, UseWebRTCOptions, UseWebRTCReturn } from '@/types/webrtc'
 
 export function useWebRTC({
   signalingId,

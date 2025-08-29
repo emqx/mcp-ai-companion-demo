@@ -61,3 +61,26 @@ export interface WebRTCCallbacks {
   onError?: (error: Error) => void
   onASRResponse?: (results: string) => void
 }
+
+export interface UseWebRTCOptions {
+  signalingId: string
+  config?: Partial<WebRTCConfig>
+  mediaConstraints?: Partial<MediaConstraints>
+  autoConnect?: boolean
+  onASRResponse?: (results: string) => void
+}
+
+export interface UseWebRTCReturn {
+  localStream: MediaStream | null
+  remoteStream: MediaStream | null
+  connectionState: ConnectionState
+  isConnecting: boolean
+  isConnected: boolean
+  error: Error | null
+  connect: () => Promise<void>
+  disconnect: () => void
+  toggleAudio: (enabled?: boolean) => void
+  toggleVideo: (enabled?: boolean) => void
+  isAudioEnabled: boolean
+  isVideoEnabled: boolean
+}
