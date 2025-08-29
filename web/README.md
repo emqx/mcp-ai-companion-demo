@@ -1,69 +1,122 @@
-# React + TypeScript + Vite
+# MCP AI Companion Demo - Web UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React-based Web UI that implements an **MCP Server** over MQTT, providing hardware control capabilities (camera and emotion control) for AI agents to interact with.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 🤖 **MCP Server Implementation** - Provides hardware control tools via MCP over MQTT protocol
+- 📹 **Camera Control** - Enable/disable video feed through MCP tool calls
+- 😊 **Emotion Control** - Change avatar emotions via MCP commands  
+- 🎨 **Interactive UI** - Rive animations with emotion selector
+- 🔊 **Audio Detection** - Real-time audio playing detection and UI feedback
+- 📡 **WebRTC Support** - Video chat capabilities with signaling server
 
-## Expanding the ESLint configuration
+## Architecture
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+This Web UI acts as an **MCP Server** that exposes hardware control functionality to MCP Clients (like AI agents) over MQTT transport:
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```shell
+┌─────────────────┐    MQTT over WebSocket    ┌──────────────────┐
+│   AI Agent      │ ──────────────────────────► │   Web UI         │
+│   (MCP Client)  │ ◄────────────────────────── │   (MCP Server)   │
+└─────────────────┘                            └──────────────────┘
+         │                                              │
+         └────────────────── MQTT Broker ──────────────┘
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Available MCP Tools
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `control_camera` | Enable/disable video feed | `enabled: boolean` |
+| `change_emotion` | Change avatar emotion | `emotion: string` |
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Tech Stack
+
+- **React 19.1.1** with TypeScript
+- **Vite 7.1.2** for build tooling
+- **Tailwind CSS 4.1.12** for styling
+- **MQTT.js** for MCP over MQTT protocol
+- **Rive** for avatar animations
+- **WebRTC** for real-time communication
+
+## Setup
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start development server
+pnpm dev
+
+# Build for production  
+pnpm build
 ```
+
+## MCP over MQTT Integration
+
+### Server Implementation
+
+The Web UI implements an MCP Server using `McpMqttServer` class:
+
+```typescript
+// Initialize MCP Server with hardware control callbacks
+const { isConnected, isMcpInitialized } = useMcpMqttServer({
+  brokerUrl: 'ws://localhost:8083/mqtt',
+  serverId: 'web-ui-hardware-server', 
+  serverName: 'web-ui-hardware-controller',
+  callbacks: {
+    onCameraControl: (enabled: boolean) => setShowVideo(enabled),
+    onEmotionChange: (emotion: string) => setSelectedEmotion(emotion)
+  }
+});
+```
+
+### Protocol Flow
+
+1. **Service Discovery** - Server publishes presence notification
+2. **Initialization** - Client sends initialize request  
+3. **Tool Listing** - Client requests available tools
+4. **Tool Execution** - Client calls hardware control tools
+
+### Testing
+
+Use the included test client to verify MCP functionality:
+
+```bash
+cd src/server
+npm install
+npm test
+
+# Enable debug logging
+DEBUG=true npm test
+```
+
+## Requirements
+
+- **MQTT Broker** - EMQ X or compatible running on `ws://localhost:8083/mqtt`
+- **Node.js ≥18.0.0** (for test client)
+- **Modern Browser** with WebRTC support
+
+## Development
+
+```bash
+# Start with hot reload
+pnpm dev
+
+# Run linting
+pnpm lint
+
+# Add shadcn/ui components
+pnpm dlx shadcn@latest add <component-name>
+```
+
+## Related Projects
+
+- **Backend API**: `/Users/ysfscream/Workspace/EMQ/emqx-multimedia-proxy` - Elixir/Phoenix multimedia processing server
+- **MCP Client Test**: `src/server/` - Node.js reference implementation for testing
+
+## Documentation
+
+- [MCP over MQTT Implementation Guide](docs/mcp-over-mqtt-implementation.md) - Comprehensive implementation details
+- [Test Client Documentation](src/server/README.md) - Node.js MCP Client reference and SDK design patterns
