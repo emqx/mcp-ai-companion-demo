@@ -1,5 +1,5 @@
 import { Mic, Volume2, Camera } from 'lucide-react';
-import { RiveAnimation } from './RiveAnimation';
+import { EmotionAnimation } from './EmotionAnimation';
 import { EmotionSelector } from './EmotionSelector';
 import { ChatMessages } from './ChatMessages';
 import { useWebRTC } from '@/hooks/useWebRTC';
@@ -9,13 +9,20 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 interface ChatInterfaceProps {
   selectedEmotion: string;
   onEmotionSelect: (emotion: string) => void;
+  showVideo?: boolean;
 }
 
-export function ChatInterface({ selectedEmotion, onEmotionSelect }: ChatInterfaceProps) {
+export function ChatInterface({ selectedEmotion, onEmotionSelect, showVideo: externalShowVideo }: ChatInterfaceProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [signalingId] = useState('abcd');
   const [showVideo, setShowVideo] = useState(false);
+  
+  useEffect(() => {
+    if (externalShowVideo !== undefined) {
+      setShowVideo(externalShowVideo);
+    }
+  }, [externalShowVideo]);
   const [isRecording, setIsRecording] = useState(false);
   const isSpeaking = useAudioPlaying(audioRef, 1000);
   const handleASRResponse = useCallback((results: string) => {
@@ -61,7 +68,7 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect }: ChatInterfac
       </div>
 
       <div className="mb-2">
-        <RiveAnimation emotion={selectedEmotion} />
+        <EmotionAnimation emotion={selectedEmotion} />
       </div>
 
       <ChatMessages
