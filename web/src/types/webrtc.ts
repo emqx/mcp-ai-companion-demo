@@ -79,8 +79,8 @@ export interface UseWebRTCReturn {
   error: Error | null
   connect: () => Promise<void>
   disconnect: () => void
-  toggleAudio: (enabled?: boolean) => void
-  toggleVideo: (enabled?: boolean) => void
+  toggleAudio: (enabled?: boolean) => Promise<void>
+  toggleVideo: (enabled?: boolean) => Promise<void>
   isAudioEnabled: boolean
   isVideoEnabled: boolean
 }

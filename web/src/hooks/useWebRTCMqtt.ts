@@ -181,19 +181,45 @@ export function useWebRTCMqtt({
     }
   }, [localStream, remoteStream])
 
-  const toggleAudio = useCallback((enabled?: boolean) => {
-    if (signalingRef.current) {
-      signalingRef.current.toggleAudio(enabled)
-      setIsAudioEnabled(enabled !== undefined ? enabled : !isAudioEnabled)
+  const toggleAudio = useCallback(async (enabled?: boolean) => {
+    const shouldEnable = enabled !== undefined ? enabled : !isAudioEnabled
+    
+    if (shouldEnable) {
+      // If enabling and not connected, reconnect
+      if (!isAudioEnabled && connectionState !== 'connected') {
+        webrtcLogger.info('🎤 Reconnecting for audio...')
+        await connect()
+      } else if (signalingRef.current) {
+        signalingRef.current.toggleAudio(true)
+      }
+      setIsAudioEnabled(true)
+    } else {
+      // If disabling, disconnect the connection
+      webrtcLogger.info('🎤 Disconnecting audio...')
+      disconnect()
+      setIsAudioEnabled(false)
     }
-  }, [isAudioEnabled])
+  }, [isAudioEnabled, connectionState, connect, disconnect])
 
-  const toggleVideo = useCallback((enabled?: boolean) => {
-    if (signalingRef.current) {
-      signalingRef.current.toggleVideo(enabled)
-      setIsVideoEnabled(enabled !== undefined ? enabled : !isVideoEnabled)
+  const toggleVideo = useCallback(async (enabled?: boolean) => {
+    const shouldEnable = enabled !== undefined ? enabled : !isVideoEnabled
+    
+    if (shouldEnable) {
+      // If enabling and not connected, reconnect  
+      if (!isVideoEnabled && connectionState !== 'connected') {
+        webrtcLogger.info('🎥 Reconnecting for video...')
+        await connect()
+      } else if (signalingRef.current) {
+        signalingRef.current.toggleVideo(true)
+      }
+      setIsVideoEnabled(true)
+    } else {
+      // If disabling, disconnect the connection
+      webrtcLogger.info('🎥 Disconnecting video...')
+      disconnect()
+      setIsVideoEnabled(false)
     }
-  }, [isVideoEnabled])
+  }, [isVideoEnabled, connectionState, connect, disconnect])
 
   useEffect(() => {
     if (autoConnect && !hasConnectedRef.current) {
