@@ -45,6 +45,15 @@ The backend for this frontend is located at:
 
 This frontend calls the backend API for multimedia processing features.
 
+## Documentation
+
+### Protocol Implementation Guides
+
+- **MCP over MQTT**: `docs/mcp-over-mqtt-implementation.md` - Complete implementation guide for MCP Server functionality
+- **WebRTC over MQTT**: `docs/webrtc-mqtt-integration.md` - Integration guide for WebRTC signaling via MQTT
+
+**IMPORTANT**: When working with MQTT connections, WebRTC signaling, or MCP protocol implementations, ALWAYS refer to these documentation files first to understand the current architecture and implementation patterns.
+
 ## Architecture
 
 This is a Vite + React + TypeScript application with Tailwind CSS v4 and shadcn/ui components.
@@ -61,11 +70,19 @@ This is a Vite + React + TypeScript application with Tailwind CSS v4 and shadcn/
 ### Project Structure
 
 - `src/main.tsx` - Application entry point
-- `src/App.tsx` - Main React component
+- `src/App.tsx` - Main React component with MCP and WebRTC integration
 - `src/components/ui/` - shadcn/ui components
-- `src/lib/utils.ts` - Utility functions (cn helper)
-- `src/assets/` - Static assets
-- `index.html` - HTML template entry point
+- `src/components/ChatInterface.tsx` - Main chat interface with WebRTC controls
+- `src/hooks/useMcpMqttServer.ts` - MCP over MQTT server hook
+- `src/hooks/useWebRTCMqtt.ts` - WebRTC over MQTT client hook
+- `src/lib/mcp-mqtt-server.ts` - MCP MQTT server implementation
+- `src/services/mqtt-webrtc-signaling.ts` - WebRTC signaling service
+- `src/config/mqtt.ts` - Unified MQTT configuration
+- `src/config/webrtc.ts` - WebRTC configuration
+- `src/utils/logger.ts` - Logging system with categorized loggers
+- `src/types/mqtt.ts` - MQTT and MCP type definitions
+- `src/types/webrtc.ts` - WebRTC type definitions
+- `docs/` - Protocol implementation documentation
 - `vite.config.ts` - Vite configuration with Tailwind plugin and path aliases
 - `tsconfig.app.json` - Application TypeScript config with @/* path mapping
 - `eslint.config.js` - Linting rules
