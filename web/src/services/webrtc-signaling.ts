@@ -302,7 +302,7 @@ export class WebRTCSignaling {
   }
 
   // Utility methods
-  toggleAudio(enabled?: boolean): void {
+  async toggleAudio(enabled?: boolean): Promise<void> {
     if (!this.localStream) return
     
     const audioTracks = this.localStream.getAudioTracks()
