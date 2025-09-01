@@ -1,10 +1,11 @@
 import { useMcpMqttServer } from '@/hooks/useMcpMqttServer'
 import { useWebRTCMqtt } from '@/hooks/useWebRTCMqtt'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ChatInterface } from '@/components/ChatInterface'
 import { appLogger } from '@/utils/logger'
 
 function App() {
+  const [aiReplyText, setAiReplyText] = useState<string>('')
 
   const { 
     isConnected: isMqttConnected,
@@ -26,7 +27,17 @@ function App() {
     isAudioEnabled,
     isVideoEnabled
   } = useWebRTCMqtt({
-    autoConnect: false
+    autoConnect: false,
+    onASRResponse: (results: string) => {
+      console.log('🎤 ASR Response received:', results)
+      // Clear AI reply text when user starts speaking
+      setAiReplyText('')
+    },
+    onTTSText: (text: string) => {
+      console.log('🔊 TTS Text received:', text)
+      console.log('Setting aiReplyText to:', text)
+      setAiReplyText(text)
+    }
   })
 
   useEffect(() => {
@@ -60,6 +71,7 @@ function App() {
         toggleVideo
       }}
       isMqttConnected={isMqttConnected}
+      aiReplyText={aiReplyText}
     />
   )
 }

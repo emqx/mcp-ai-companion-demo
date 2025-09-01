@@ -60,6 +60,7 @@ export interface WebRTCCallbacks {
   onRemoteStream?: (stream: MediaStream) => void
   onError?: (error: Error) => void
   onASRResponse?: (results: string) => void
+  onTTSText?: (text: string) => void
 }
 
 export interface UseWebRTCOptions {
@@ -68,6 +69,7 @@ export interface UseWebRTCOptions {
   mediaConstraints?: Partial<MediaConstraints>
   autoConnect?: boolean
   onASRResponse?: (results: string) => void
+  onTTSText?: (text: string) => void
 }
 
 export interface UseWebRTCReturn {

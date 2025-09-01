@@ -31,7 +31,8 @@ export function useWebRTCMqtt({
     }
   },
   autoConnect = true,
-  onASRResponse
+  onASRResponse,
+  onTTSText
 }: UseWebRTCMqttOptions): UseWebRTCReturn & { mqttConnected: boolean } {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
@@ -121,7 +122,8 @@ export function useWebRTCMqtt({
           onLocalStream: setLocalStream,
           onRemoteStream: setRemoteStream,
           onError: setError,
-          onASRResponse: onASRResponse
+          onASRResponse: onASRResponse,
+          onTTSText: onTTSText
         }
       })
 

@@ -64,7 +64,7 @@ sequenceDiagram
 
 #### MCP over MQTT 协议栈
 
-```
+```shell
 应用层: 硬件控制命令 (Camera ON/OFF, Emotion Change)
 协议层: MCP (Model Context Protocol) 
 传输层: MQTT 5.0 with User Properties
@@ -73,7 +73,7 @@ sequenceDiagram
 
 #### WebRTC over MQTT 协议栈  
 
-```
+```shell
 应用层: 音视频数据流
 协议层: WebRTC (SDP/ICE signaling)
 传输层: MQTT 5.0 (纯消息传递)
@@ -188,7 +188,7 @@ await Promise.race([operation, timeoutPromise])
 
 ### 系统组件
 
-```
+```shell
 Frontend (React)
 ├── MCP MQTT Client (useMcpMqttServer)
 │   ├── 主题: $mcp-server/{server-id}/{server-name}
@@ -367,7 +367,7 @@ appLogger.info('✅ System ready')
 
 WebRTC 连接会显示详细的步骤日志：
 
-```
+```shell
 📡 WebRTC: Step 1/2 - Establishing MQTT connection
 ✅ WebRTC: MQTT connected (ClientID: webrtc_client_abc123)
 🎥 WebRTC: Step 2/2 - Starting WebRTC signaling

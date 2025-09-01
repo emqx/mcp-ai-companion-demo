@@ -12,11 +12,12 @@ interface MqttWebRTCSignalingOptions {
 }
 
 interface SignalingMessage {
-  type: 'sdp_offer' | 'sdp_answer' | 'ice_candidate' | 'webrtc_terminated' | 'asr_response' | 'tts_text' | 'chat'
+  type: 'sdp_offer' | 'sdp_answer' | 'ice_candidate' | 'webrtc_terminated' | 'asr_response' | 'tts_begin' | 'tts_text' | 'tts_complete' | 'tts_terminate' | 'chat'
   data?: any
   reason?: string
   results?: string
   text?: string
+  task_id?: string
 }
 
 export class MqttWebRTCSignaling {
@@ -157,9 +158,24 @@ export class MqttWebRTCSignaling {
           this.callbacks.onASRResponse?.(message.results || '')
           break
 
+        case 'tts_begin':
+          webrtcLogger.info('🔊 TTS begin:', message.task_id)
+          this.ttsText = '' // Clear previous TTS text
+          break
+
         case 'tts_text':
-          this.ttsText += message.text || ''
-          webrtcLogger.info('🔊 TTS text received')
+          const newText = message.text || ''
+          this.ttsText += newText
+          webrtcLogger.info('🔊 TTS text received:', newText)
+          this.callbacks.onTTSText?.(this.ttsText)
+          break
+
+        case 'tts_complete':
+          webrtcLogger.info('🔊 TTS complete:', message.task_id)
+          break
+
+        case 'tts_terminate':
+          webrtcLogger.info('🔊 TTS terminated:', message.task_id)
           break
       }
     }

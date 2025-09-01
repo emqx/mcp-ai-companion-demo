@@ -24,12 +24,16 @@ interface WebRTCActions {
 interface ChatInterfaceProps {
   webrtc: WebRTCState & WebRTCActions;
   isMqttConnected: boolean;
+  aiReplyText?: string;
 }
 
 export function ChatInterface({ 
   webrtc,
-  isMqttConnected
+  isMqttConnected,
+  aiReplyText
 }: ChatInterfaceProps) {
+  console.log('ChatInterface render - aiReplyText:', aiReplyText)
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [selectedEmotion, setSelectedEmotion] = useState('happy');
@@ -66,6 +70,7 @@ export function ChatInterface({
       <ChatMessages
         isLoading={webrtc.isConnected && !isSpeaking}
         isSpeaking={isSpeaking}
+        aiReplyText={aiReplyText}
       />
 
       <audio
