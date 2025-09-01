@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { McpMqttServer } from '@/lib/mcp-mqtt-server'
+import { mcpServerConfig } from '@/config/mqtt'
 import type { 
   MqttConnectionOptions, 
   MqttMessage,
@@ -61,12 +62,15 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
   }, [mqttOptions])
 
   useEffect(() => {
-    const mqttClient = new McpMqttServer({ 
-      ...mqttOptionsRef.current, 
-      serverId, 
-      serverName,
+    const config = {
+      ...mcpServerConfig,
+      ...mqttOptionsRef.current,
+      serverId: serverId || mcpServerConfig.serverId,
+      serverName: serverName || mcpServerConfig.serverName,
       callbacks
-    })
+    }
+    
+    const mqttClient = new McpMqttServer(config)
     clientRef.current = mqttClient
     setClient(mqttClient)
 

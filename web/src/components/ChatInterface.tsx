@@ -2,68 +2,60 @@ import { Mic, Volume2, Camera } from 'lucide-react';
 import { EmotionAnimation } from './EmotionAnimation';
 import { EmotionSelector } from './EmotionSelector';
 import { ChatMessages } from './ChatMessages';
-import { useWebRTC } from '@/hooks/useWebRTC';
 import { useAudioPlaying } from '@/hooks/useAudioPlaying';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-interface ChatInterfaceProps {
-  selectedEmotion: string;
-  onEmotionSelect: (emotion: string) => void;
-  showVideo?: boolean;
+interface WebRTCState {
+  remoteStream: MediaStream | null;
+  isConnecting: boolean;
+  isConnected: boolean;
+  error: Error | null;
+  isAudioEnabled: boolean;
+  isVideoEnabled: boolean;
 }
 
-export function ChatInterface({ selectedEmotion, onEmotionSelect, showVideo: externalShowVideo }: ChatInterfaceProps) {
+interface WebRTCActions {
+  connect: () => void;
+  disconnect: () => void;
+  toggleAudio: (enabled?: boolean) => void;
+  toggleVideo: (enabled?: boolean) => void;
+}
+
+interface ChatInterfaceProps {
+  webrtc: WebRTCState & WebRTCActions;
+  isMqttConnected: boolean;
+}
+
+export function ChatInterface({ 
+  webrtc,
+  isMqttConnected
+}: ChatInterfaceProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [signalingId] = useState('abcd');
+  const [selectedEmotion, setSelectedEmotion] = useState('happy');
   const [showVideo, setShowVideo] = useState(false);
-  
-  useEffect(() => {
-    if (externalShowVideo !== undefined) {
-      setShowVideo(externalShowVideo);
-    }
-  }, [externalShowVideo]);
   const [isRecording, setIsRecording] = useState(false);
-  const isSpeaking = useAudioPlaying(audioRef, 1000);
-  const handleASRResponse = useCallback((results: string) => {
-    console.log('ASR Response received:', results);
-    console.log('ASR Response type:', typeof results);
-    setIsRecording(false);
-  }, []);
   
-  const {
-    remoteStream,
-    isConnecting,
-    isConnected,
-    error,
-    connect,
-    toggleAudio,
-    toggleVideo,
-    isAudioEnabled,
-    isVideoEnabled
-  } = useWebRTC({
-    signalingId,
-    onASRResponse: handleASRResponse
-  });
+  const isSpeaking = useAudioPlaying(audioRef, 1000);
 
   useEffect(() => {
-    if (remoteStream) {
+    if (webrtc.remoteStream) {
       if (audioRef.current) {
-        audioRef.current.srcObject = remoteStream;
+        audioRef.current.srcObject = webrtc.remoteStream;
       }
       
       if (showVideo && videoRef.current) {
-        videoRef.current.srcObject = remoteStream;
+        videoRef.current.srcObject = webrtc.remoteStream;
       }
     }
-  }, [remoteStream, showVideo]);
+  }, [webrtc.remoteStream, showVideo]);
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">
       <div className="fixed top-4 right-4">
         <EmotionSelector 
           selectedEmotion={selectedEmotion}
-          onEmotionSelect={onEmotionSelect}
+          onEmotionSelect={setSelectedEmotion}
         />
       </div>
 
@@ -72,7 +64,7 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect, showVideo: ext
       </div>
 
       <ChatMessages
-        isLoading={isConnected && !isSpeaking}
+        isLoading={webrtc.isConnected && !isSpeaking}
         isSpeaking={isSpeaking}
       />
 
@@ -93,11 +85,11 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect, showVideo: ext
               controls={false}
               className="w-full h-80 object-cover"
             />
-            {!isConnected && (
+            {!webrtc.isConnected && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50">
                 <div className="text-white text-center">
-                  <p className="mb-2">{isConnecting ? '连接中...' : '未连接'}</p>
-                  {error && <p className="text-sm text-red-300">{error.message}</p>}
+                  <p className="mb-2">{webrtc.isConnecting ? '连接中...' : '未连接'}</p>
+                  {webrtc.error && <p className="text-sm text-red-300">{webrtc.error.message}</p>}
                 </div>
               </div>
             )}
@@ -113,57 +105,57 @@ export function ChatInterface({ selectedEmotion, onEmotionSelect, showVideo: ext
         <div className="bg-white rounded-[48px] border border-[#EAEAEA] flex items-center gap-8 px-12 py-4" style={{boxShadow: '0 6px 12px 0 rgba(125, 125, 125, 0.15)'}}>
           <button 
             onClick={() => {
-              if (!isConnected) {
-                connect();
+              if (!webrtc.isConnected && !webrtc.isConnecting && isMqttConnected) {
+                webrtc.connect();
                 return;
               }
-              
+
               if (isRecording) {
                 setIsRecording(false);
-                toggleAudio(false);
+                webrtc.toggleAudio(false);
                 console.log('Stop recording');
               } else {
                 setIsRecording(true);
-                toggleAudio(true);
+                webrtc.toggleAudio(true);
                 console.log('Start recording');
               }
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
               isRecording 
                 ? 'bg-red-500 hover:bg-red-600 shadow-lg scale-110' 
-                : isConnecting
+                : webrtc.isConnecting
                 ? 'bg-yellow-500 animate-pulse'
-                : isConnected && isAudioEnabled
+                : webrtc.isConnected && webrtc.isAudioEnabled
                 ? 'bg-blue-500 hover:bg-blue-600 shadow-md' 
                 : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
-            title={isRecording ? "停止录音" : isConnecting ? "连接中..." : isConnected ? "开始录音" : "点击连接"}
+            title={isRecording ? "停止录音" : webrtc.isConnecting ? "连接中..." : !webrtc.isConnected ? "点击连接" : "开始录音"}
           >
-            <Mic className={`w-6 h-6 ${isRecording || isConnecting || (isConnected && isAudioEnabled) ? 'text-white' : 'text-[#343741]'}`} />
+            <Mic className={`w-6 h-6 ${isRecording || webrtc.isConnecting || (webrtc.isConnected && webrtc.isAudioEnabled) ? 'text-white' : 'text-[#343741]'}`} />
           </button>
           
           <button 
             onClick={() => {
-              if (isConnected) {
-                toggleVideo();
+              if (webrtc.isConnected) {
+                webrtc.toggleVideo();
               }
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
-              isConnected && isVideoEnabled 
+              webrtc.isConnected && webrtc.isVideoEnabled 
                 ? 'bg-orange-500 hover:bg-orange-600 shadow-md' 
                 : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
             title="扬声器控制"
           >
-            <Volume2 className={`w-6 h-6 ${isConnected && isVideoEnabled ? 'text-white' : 'text-[#343741]'}`} />
+            <Volume2 className={`w-6 h-6 ${webrtc.isConnected && webrtc.isVideoEnabled ? 'text-white' : 'text-[#343741]'}`} />
           </button>
           
           <button 
             onClick={() => {
               if (!showVideo) {
                 setShowVideo(true);
-                if (!isConnected && !isConnecting) {
-                  connect();
+                if (isMqttConnected && !webrtc.isConnected && !webrtc.isConnecting) {
+                  webrtc.connect();
                 }
               } else {
                 setShowVideo(false);

@@ -5,6 +5,7 @@ import type {
   JsonRpcRequest,
   McpToolsCallResult,
 } from '@/types/mqtt'
+import { mcpLogger, mqttLogger } from '@/utils/logger'
 
 export class McpMqttServer {
   private mqttClient: BaseMqttClient | null = null
@@ -86,11 +87,11 @@ export class McpMqttServer {
         
         this.mqttClient.on('connect', () => {
           this.connectionState = 'connected'
-          console.debug(`[MQTT] Connected to ${this.connectionOptions.brokerUrl}`)
-          console.debug(`[MQTT] Client ID: ${this.connectionOptions.clientId}`)
+          mqttLogger.info(`✅ Step 1/3: Connected to broker (${this.connectionOptions.clientId})`)
           
           // Use setTimeout to avoid race condition with subscriptions
           setTimeout(() => {
+            mqttLogger.info(`📡 Step 2/3: Starting MCP topic subscriptions...`)
             this.subscribeToMcpTopics()
           }, 100)
           
@@ -100,7 +101,7 @@ export class McpMqttServer {
 
         this.mqttClient.on('disconnect', () => {
           this.connectionState = 'disconnected'
-          console.debug('[MQTT] Disconnected from broker')
+          mqttLogger.warn('🔌 Disconnected from broker')
           this.eventListeners.onDisconnect?.()
         })
 
@@ -112,7 +113,7 @@ export class McpMqttServer {
             retain: packet.retain,
             userProperties: packet.properties?.userProperties
           }
-          console.debug(`[MQTT] Received message on topic "${topic}":`, message.payload)
+          // Don't log every message, too noisy
           
           // Handle MCP messages on $mcp-server and $mcp-rpc topics
           if (topic.startsWith('$mcp-server/') || topic.startsWith('$mcp-rpc/')) {
@@ -124,13 +125,13 @@ export class McpMqttServer {
 
         this.mqttClient.on('error', (error) => {
           this.connectionState = 'error'
-          console.debug('[MQTT] Connection error:', error)
+          mqttLogger.error('❌ Connection error:', error.message)
           this.eventListeners.onError?.(error)
           reject(error)
         })
 
         this.mqttClient.on('reconnect', () => {
-          console.debug('[MQTT] Attempting to reconnect...')
+          mqttLogger.info('🔄 Reconnecting...')
         })
 
       } catch (error) {
@@ -145,7 +146,7 @@ export class McpMqttServer {
       if (this.mqttClient) {
         this.mqttClient.end(false, {}, () => {
           this.connectionState = 'disconnected'
-          console.debug('[MQTT] Connection closed')
+          mqttLogger.warn('🔌 Connection closed')
           resolve()
         })
       } else {
@@ -171,10 +172,10 @@ export class McpMqttServer {
         }
       }, (error) => {
         if (error) {
-          console.debug(`[MQTT] Failed to publish to topic "${topic}":`, error)
+          mqttLogger.error(`❌ Publish failed to "${topic}"`)
           reject(error)
         } else {
-          console.debug(`[MQTT] Published to topic "${topic}"`, message)
+          // Success publish is too noisy, skip logging
           resolve()
         }
       })
@@ -188,12 +189,13 @@ export class McpMqttServer {
         return
       }
 
-      this.mqttClient.subscribe(topic, { qos }, (error, granted) => {
+      this.mqttClient.subscribe(topic, { qos }, (error, _granted) => {
         if (error) {
-          console.debug(`[MQTT] Failed to subscribe to topic "${topic}":`, error)
+          mqttLogger.error(`❌ Subscribe failed to "${topic}" (ClientID: ${this.connectionOptions.clientId}):`, error.message)
           reject(error)
         } else {
-          console.debug(`[MQTT] Subscribed to:`, granted)
+          const topics = Array.isArray(topic) ? topic : [topic]
+          mqttLogger.info(`✅ Subscribed to: ${topics.join(', ')} (ClientID: ${this.connectionOptions.clientId})`)
           resolve()
         }
       })
@@ -209,10 +211,10 @@ export class McpMqttServer {
 
       this.mqttClient.unsubscribe(topic, {}, (error) => {
         if (error) {
-          console.debug(`[MQTT] Failed to unsubscribe from topic "${topic}":`, error)
+          mqttLogger.error(`Failed to unsubscribe from "${topic}":`, error)
           reject(error)
         } else {
-          console.debug(`[MQTT] Unsubscribed from topic "${topic}"`)
+          mqttLogger.info(`Unsubscribed from "${topic}"`)
           resolve()
         }
       })
@@ -243,25 +245,36 @@ export class McpMqttServer {
     return this.connectionState === 'connected'
   }
 
+  getMqttClient(): BaseMqttClient | null {
+    return this.mqttClient
+  }
+
+  getClientId(): string | undefined {
+    return this.connectionOptions.clientId
+  }
+
   // MCP Server Protocol Methods
   private async subscribeToMcpTopics(): Promise<void> {
     if (!this.mqttClient || this.connectionState !== 'connected') {
-      console.warn('[MCP Server] Cannot subscribe - client not connected')
+      mcpLogger.warn('Cannot subscribe - client not connected')
       return
     }
     
     try {
       // Subscribe to server control topic to receive initialize requests
       const controlTopic = `$mcp-server/${this.serverId}/${this.serverName}`
+      mcpLogger.info(`📡 Subscribing to control topic for initialize requests: ${controlTopic} (ClientID: ${this.connectionOptions.clientId})`)
       await this.subscribe(controlTopic)
-      console.debug(`[MCP Server] Subscribed to control topic: ${controlTopic}`)
       
       // Subscribe to RPC topic to receive tools/list and tools/call requests
       const rpcTopic = `$mcp-rpc/+/${this.serverId}/${this.serverName}`
+      mcpLogger.info(`📡 Subscribing to RPC topic for tools/list and tools/call: ${rpcTopic} (ClientID: ${this.connectionOptions.clientId})`)
       await this.subscribe(rpcTopic)
-      console.debug(`[MCP Server] Subscribed to RPC topic: ${rpcTopic}`)
+      
+      mcpLogger.info(`📡 Step 2/3 Complete: MCP Server ready to receive commands (ClientID: ${this.connectionOptions.clientId})`)
       
       // Publish server online notification with RETAIN flag
+      mcpLogger.info(`📢 Step 3/3: Publishing server online notification...`)
       const presenceTopic = `$mcp-server/presence/${this.serverId}/${this.serverName}`
       const onlineNotification = {
         jsonrpc: '2.0',
@@ -271,11 +284,12 @@ export class McpMqttServer {
           description: 'Web UI hardware controller for camera and emotion control'
         }
       }
+      mcpLogger.info(`📢 Publishing to presence topic: ${presenceTopic} (ClientID: ${this.connectionOptions.clientId})`)
       await this.publish(presenceTopic, JSON.stringify(onlineNotification), { retain: true })
-      console.debug(`[MCP Server] Published online notification to: ${presenceTopic}`)
+      mcpLogger.info(`✅ Step 3/3 Complete: MCP Server online (ServerID: ${this.serverId}, ServerName: ${this.serverName})`)
       
     } catch (error) {
-      console.debug('[MCP Server] Failed to subscribe to topics:', error)
+      mcpLogger.error(`❌ Failed to subscribe to MCP topics (ClientID: ${this.connectionOptions.clientId}):`, error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -309,17 +323,18 @@ export class McpMqttServer {
           this.handleToolsCallRequest(data, clientId)
           break
         default:
-          console.debug(`[MCP Server] Unknown method: ${data.method}`)
+          mcpLogger.warn(`❓ Unknown tool: ${data.params?.name}`)
       }
     } catch (error) {
-      console.debug('[MCP Server] Failed to handle message:', error)
+      const err = error as unknown as Error
+      mcpLogger.error('❌ Message handling failed:', err.message)
     }
   }
 
 
   // MCP Server Methods - Handle incoming requests
   private async handleInitializeRequest(request: JsonRpcRequest, clientId: string): Promise<void> {
-    console.log(`[MCP Server] Handling initialize from client: ${clientId}`)
+    mcpLogger.info(`🚀 Initialize request from ClientID: ${clientId} (ServerID: ${this.serverId})`)
     
     const response = {
       jsonrpc: '2.0',
@@ -339,15 +354,14 @@ export class McpMqttServer {
     }
     
     const responseTopic = `$mcp-rpc/${clientId}/${this.serverId}/${this.serverName}`
-    console.debug(`[MCP Server] Sending initialize response to: ${responseTopic}`)
+    mcpLogger.info(`📤 Sending initialize response to topic: ${responseTopic} (ClientID: ${clientId})`)
     await this.publish(responseTopic, JSON.stringify(response))
     this.isInitialized = true
-    console.debug(`[MCP Server] Initialize completed for client: ${clientId}`)
+    mcpLogger.info(`✅ MCP Server initialized and ready for ClientID: ${clientId}`)
   }
 
   private async handleToolsListRequest(request: JsonRpcRequest, clientId: string): Promise<void> {
-    console.log(`[MCP Server] Handling tools/list from client: ${clientId}`)
-    console.debug(`[MCP Server] Request ID: ${request.id}`)
+    mcpLogger.info(`🔧 Tools/list request from ClientID: ${clientId} (ServerID: ${this.serverId})`)
     
     const response = {
       jsonrpc: '2.0',
@@ -388,20 +402,20 @@ export class McpMqttServer {
     }
     
     const responseTopic = `$mcp-rpc/${clientId}/${this.serverId}/${this.serverName}`
-    console.debug(`[MCP Server] Sending tools list response to: ${responseTopic}`)
-    console.debug(`[MCP Server] Tools count: ${response.result.tools.length}`)
+    mcpLogger.info(`📤 Sending tools list to topic: ${responseTopic} (ClientID: ${clientId})`)
+    mcpLogger.info(`✅ Sent ${response.result.tools.length} tools to ClientID: ${clientId}`)
     await this.publish(responseTopic, JSON.stringify(response))
   }
 
   private async handleToolsCallRequest(request: JsonRpcRequest, clientId: string): Promise<void> {
-    console.log(`[MCP Server] Handling tools/call from client: ${clientId}`)
-    
     const { name, arguments: args } = request.params || {}
+    mcpLogger.info(`🛠️ Tools/call request: "${name}" from ClientID: ${clientId} (ServerID: ${this.serverId})`)
     let result: McpToolsCallResult
     
     try {
       switch (name) {
         case 'control_camera':
+          mcpLogger.info(`📷 Camera ${args?.enabled ? 'ON' : 'OFF'}`)
           if (this.callbacks.onCameraControl) {
             this.callbacks.onCameraControl(args?.enabled)
           }
@@ -414,6 +428,7 @@ export class McpMqttServer {
           break
           
         case 'change_emotion':
+          mcpLogger.info(`😊 Emotion: ${args?.emotion}`)
           if (this.callbacks.onEmotionChange) {
             this.callbacks.onEmotionChange(args?.emotion)
           }
@@ -436,6 +451,7 @@ export class McpMqttServer {
       }
       
       const responseTopic = `$mcp-rpc/${clientId}/${this.serverId}/${this.serverName}`
+      mcpLogger.info(`📤 Sending tool result to topic: ${responseTopic} (ClientID: ${clientId})`)
       await this.publish(responseTopic, JSON.stringify(response))
       
     } catch (error) {
@@ -449,6 +465,7 @@ export class McpMqttServer {
       }
       
       const responseTopic = `$mcp-rpc/${clientId}/${this.serverId}/${this.serverName}`
+      mcpLogger.error(`📤 Sending error response to topic: ${responseTopic} (ClientID: ${clientId}):`, error instanceof Error ? error.message : String(error))
       await this.publish(responseTopic, JSON.stringify(errorResponse))
     }
   }

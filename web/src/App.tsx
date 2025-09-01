@@ -1,44 +1,65 @@
 import { useMcpMqttServer } from '@/hooks/useMcpMqttServer'
-import { useEffect, useState, useMemo } from 'react'
+import { useWebRTCMqtt } from '@/hooks/useWebRTCMqtt'
+import { useEffect } from 'react'
 import { ChatInterface } from '@/components/ChatInterface'
+import { appLogger } from '@/utils/logger'
 
 function App() {
-  const [selectedEmotion, setSelectedEmotion] = useState('happy');
-  const [showVideo, setShowVideo] = useState(false);
-
-  const callbacks = useMemo(() => ({
-    onCameraControl: (enabled: boolean) => {
-      console.log('[App] Camera control:', enabled);
-      setShowVideo(enabled);
-    },
-    onEmotionChange: (emotion: string) => {
-      console.log('[App] Emotion change:', emotion);
-      setSelectedEmotion(emotion);
-    }
-  }), []);
 
   const { 
-    isConnected,
+    isConnected: isMqttConnected,
     isMcpInitialized
   } = useMcpMqttServer({
-    brokerUrl: 'ws://localhost:8083/mqtt',
-    autoConnect: true,
-    serverId: 'web-ui-hardware-server',
-    serverName: 'web-ui-hardware-controller',
-    callbacks
+    autoConnect: true
+  })
+
+  const {
+    remoteStream,
+    mqttConnected: isWebRTCMqttConnected,
+    isConnecting: isWebRTCConnecting,
+    isConnected: isWebRTCConnected,
+    error: webRTCError,
+    connect: connectWebRTC,
+    disconnect: disconnectWebRTC,
+    toggleAudio,
+    toggleVideo,
+    isAudioEnabled,
+    isVideoEnabled
+  } = useWebRTCMqtt({
+    autoConnect: false
   })
 
   useEffect(() => {
-    if (isConnected && isMcpInitialized) {
-      console.log('[App] MCP Server ready to receive commands')
+    if (isMqttConnected && isMcpInitialized) {
+      appLogger.info('🚀 MCP Server ready to receive commands')
     }
-  }, [isConnected, isMcpInitialized])
+  }, [isMqttConnected, isMcpInitialized])
+
+  useEffect(() => {
+    if (isWebRTCMqttConnected) {
+      appLogger.info('📡 WebRTC MQTT connected')
+    }
+    if (isWebRTCConnected) {
+      appLogger.info('🎥 WebRTC connected successfully')
+    }
+  }, [isWebRTCMqttConnected, isWebRTCConnected])
+
 
   return (
     <ChatInterface 
-      selectedEmotion={selectedEmotion}
-      onEmotionSelect={setSelectedEmotion}
-      showVideo={showVideo}
+      webrtc={{
+        remoteStream,
+        isConnecting: isWebRTCConnecting,
+        isConnected: isWebRTCConnected,
+        error: webRTCError,
+        isAudioEnabled,
+        isVideoEnabled,
+        connect: connectWebRTC,
+        disconnect: disconnectWebRTC,
+        toggleAudio,
+        toggleVideo
+      }}
+      isMqttConnected={isMqttConnected}
     />
   )
 }
