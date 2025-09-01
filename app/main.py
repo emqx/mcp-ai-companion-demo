@@ -5,7 +5,7 @@ import threading
 import queue
 
 import asyncio
-from mcp_client_init import initialize_mcp_client
+from mcp_client_init import create_mcp_client
 from lamindex import ConversationalAgent
 from lamindex import FuncCallEvent, MessageEvent
 
@@ -19,6 +19,7 @@ inflight_requests: dict[int, dict] = {}
 next_request_id: int = 1
 
 agent: ConversationalAgent = None
+main_loop = None  # 主线程的事件循环引用
 
 
 def read_message():
@@ -26,8 +27,17 @@ def read_message():
     line = sys.stdin.readline()
     if not line:
         return None
-    else:
+
+    # Strip whitespace and check if line is empty after stripping
+    line = line.strip()
+    if not line:
+        return None
+
+    try:
         return json.loads(line)
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {e}, line: '{line}'", file=sys.stderr)
+        return None
 
 
 def send_message(message):
@@ -91,6 +101,7 @@ def asr_worker():
     global next_request_id
     global inflight_requests
     global agent
+    global main_loop
     while True:
         tts_msg = asr_queue.get()
 
@@ -98,48 +109,38 @@ def asr_worker():
             handler = agent.run(user_input=tts_msg)
             async for ev in handler.stream_events():
                 if isinstance(ev, FuncCallEvent):
-                    # obj = {
-                    #     "tool_name": ev.tool_name,
-                    #     "tool_kwargs": ev.tool_kwargs,
-                    # }
-                    # if ev.tool_output is not None:
-                    #     obj["tool_output"] = ev.tool_output
-                    # self.send_to_server(
-                    #     {
-                    #         "jsonrpc": "2.0",
-                    #         "id": self.unique_id,
-                    #         "method": "mcp_tool_calling",
-                    #         "obj": {
-                    #             "tool_name": ev.tool_name,
-                    #             "tool_kwargs": ev.tool_kwargs,
-                    #         },
-                    #     }
-                    # )
+                    # INSERT_YOUR_CODE
                     pass
                 elif isinstance(ev, MessageEvent):
-                    tts_queue.put(ev.message)
+                    if ev.message:
+                        tts_queue.put(ev.message)
 
-        asyncio.run(_run_and_consume())
-
-
-def create_agent():
-    async def init_mcp_and_agent():
-        # 初始化 MCP 客户端
-        client_name = "stdio_client"
-        host = "localhost"
-        mcp_client = await initialize_mcp_client(
-            client_name=client_name, host=host, wait_time=3.0
-        )
-
-        agent = ConversationalAgent(mcp_client=mcp_client)
-        return agent
-
-    # 在主线程中初始化（阻塞直到完成）
-    agent = asyncio.run(init_mcp_and_agent())
-    return agent
+        # 将异步任务提交到主线程事件循环执行
+        if main_loop and main_loop.is_running():
+            asyncio.run_coroutine_threadsafe(_run_and_consume(), main_loop)
+        else:
+            print("Warning: main_loop not running; dropping ASR task")
 
 
-def main():
+async def init_mcp_and_agent():
+    # 使用 async with 风格的手工进入/退出，保证全局存活
+    mcp_client = await create_mcp_client(client_name="example_client", host="localhost")
+    await mcp_client.__aenter__()
+    try:
+        await mcp_client.start()
+        import anyio
+
+        await anyio.sleep(3.0)
+        return ConversationalAgent(mcp_client=mcp_client)
+    except Exception:
+        await mcp_client.__aexit__(None, None, None)
+        raise
+
+
+async def main():
+    global main_loop
+    main_loop = asyncio.get_event_loop()
+
     tts_thread = threading.Thread(target=tts_worker, daemon=True)
     tts_thread.start()
 
@@ -147,7 +148,7 @@ def main():
     asr_thread.start()
 
     global agent
-    agent = create_agent()
+    agent = await init_mcp_and_agent()
 
     send_message(
         {
@@ -160,23 +161,47 @@ def main():
             },
         }
     )
-    result = read_message()
+    result = await asyncio.to_thread(read_message)
     if not result:
         print("No more input, exiting.")
         sys.exit(1)
-    elif result["result"] != "ok" or result["id"] != next_request_id:
+
+    # Handle JSON decode errors gracefully
+    if not isinstance(result, dict):
+        print(f"Invalid response format: {result}")
+        sys.exit(1)
+
+    if result["result"] != "ok" or result["id"] != next_request_id:
         print(f"Failed to initialize agent, got: {result}")
         sys.exit(1)
 
-    while True:
-        msg = read_message()
-        if msg is None:
-            print("No more input, exiting.")
-            break
-        if isinstance(msg, list):
-            handle_batch(msg)
-        if isinstance(msg, dict):
-            handle_single(msg)
+    # 将主循环放到后台任务中，让主事件循环保持活跃
+    async def main_loop_task():
+        while True:
+            msg = await asyncio.to_thread(read_message)
+            if msg is None:
+                # Skip None messages (empty lines, JSON decode errors, etc.)
+                # Add small delay to prevent busy waiting
+                await asyncio.sleep(0.01)
+                continue
+            if isinstance(msg, list):
+                handle_batch(msg)
+            if isinstance(msg, dict):
+                handle_single(msg)
+
+    # 创建后台任务，不阻塞主协程
+    main_task = asyncio.create_task(main_loop_task())
+
+    # 主协程现在可以处理其他异步任务
+    try:
+        # 等待主循环任务完成
+        await main_task
+    except KeyboardInterrupt:
+        print("\nReceived interrupt, exiting...")
+        main_task.cancel()
+    except Exception as e:
+        print(f"Main loop error: {e}")
+        main_task.cancel()
 
 
 def handle_single(msg):
@@ -209,4 +234,4 @@ def handle_batch(msgs):
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
