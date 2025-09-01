@@ -17,8 +17,8 @@ interface WebRTCState {
 interface WebRTCActions {
   connect: () => void;
   disconnect: () => void;
-  toggleAudio: (enabled?: boolean) => void;
-  toggleVideo: (enabled?: boolean) => void;
+  toggleAudio: (enabled?: boolean) => Promise<void>
+  toggleVideo: (enabled?: boolean) => Promise<void>
 }
 
 interface ChatInterfaceProps {
@@ -104,7 +104,7 @@ export function ChatInterface({
       <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2">
         <div className="bg-white rounded-[48px] border border-[#EAEAEA] flex items-center gap-8 px-12 py-4" style={{boxShadow: '0 6px 12px 0 rgba(125, 125, 125, 0.15)'}}>
           <button 
-            onClick={() => {
+            onClick={async () => {
               if (!webrtc.isConnected && !webrtc.isConnecting && isMqttConnected) {
                 webrtc.connect();
                 return;
@@ -112,11 +112,11 @@ export function ChatInterface({
 
               if (isRecording) {
                 setIsRecording(false);
-                webrtc.toggleAudio(false);
+                await webrtc.toggleAudio(false);
                 console.log('Stop recording');
               } else {
                 setIsRecording(true);
-                webrtc.toggleAudio(true);
+                await webrtc.toggleAudio(true);
                 console.log('Start recording');
               }
             }}
@@ -135,9 +135,11 @@ export function ChatInterface({
           </button>
           
           <button 
-            onClick={() => {
+            onClick={async () => {
               if (webrtc.isConnected) {
-                webrtc.toggleVideo();
+                await webrtc.toggleVideo();
+              } else {
+                await webrtc.toggleVideo(true);
               }
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${

@@ -67,16 +67,16 @@ export function useWebRTC({
     setConnectionState('disconnected')
   }, [])
 
-  const toggleAudio = useCallback((enabled?: boolean) => {
+  const toggleAudio = useCallback(async (enabled?: boolean) => {
     if (signalingRef.current) {
-      signalingRef.current.toggleAudio(enabled)
+      await signalingRef.current.toggleAudio(enabled)
       setIsAudioEnabled(enabled !== undefined ? enabled : !isAudioEnabled)
     }
   }, [isAudioEnabled])
 
-  const toggleVideo = useCallback((enabled?: boolean) => {
+  const toggleVideo = useCallback(async (enabled?: boolean) => {
     if (signalingRef.current) {
-      signalingRef.current.toggleVideo(enabled)
+      await signalingRef.current.toggleVideo(enabled)
       setIsVideoEnabled(enabled !== undefined ? enabled : !isVideoEnabled)
     }
   }, [isVideoEnabled])
