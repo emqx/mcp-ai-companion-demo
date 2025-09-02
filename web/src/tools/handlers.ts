@@ -60,12 +60,50 @@ export const changeEmotionHandler: ToolHandler = (
 }
 
 /**
+ * Handler for capturing photos from video stream
+ * @param args - Tool arguments containing 'source' and 'quality' fields
+ * @param context - Execution context with callback functions
+ * @returns Promise with execution result
+ */
+export const takePhotoHandler: ToolHandler = async (
+  args: Record<string, any>,
+  context: ToolHandlerContext
+): Promise<ToolExecutionResult> => {
+  const { source = 'remote', quality = 0.9 } = args
+  
+  mcpLogger.info(`📸 Taking photo from ${source} stream (quality: ${quality})`)
+  
+  // Call the photo capture callback if available
+  if (context.onTakePhoto) {
+    try {
+      const result = await context.onTakePhoto(source, quality)
+      return {
+        success: true,
+        message: `Photo captured successfully: ${result.filename}`,
+        data: result
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: `Photo capture failed: ${error instanceof Error ? error.message : String(error)}`
+      }
+    }
+  }
+  
+  return {
+    success: false,
+    message: 'Photo capture callback not available'
+  }
+}
+
+/**
  * Registry of all available tool handlers
  * Maps tool names to their corresponding handler functions
  */
 export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   control_camera: controlCameraHandler,
-  change_emotion: changeEmotionHandler
+  change_emotion: changeEmotionHandler,
+  take_photo: takePhotoHandler
 }
 
 /**

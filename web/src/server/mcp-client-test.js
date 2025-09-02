@@ -162,6 +162,7 @@ class McpMqttClient {
         console.log(chalk.white('  📹 camera_on     - Enable camera'));
         console.log(chalk.white('  📹 camera_off    - Disable camera'));  
         console.log(chalk.white('  😊 emotion <name> - Change emotion (happy, sad, angry, etc.)'));
+        console.log(chalk.white('  📸 take_photo    - Take a photo from video stream'));
         console.log(chalk.white('  🚪 quit          - Exit test client\n'));
         
         // Extract server info for manual tool calls
@@ -247,8 +248,10 @@ class McpMqttClient {
         } else if (command.startsWith('emotion ')) {
           const emotion = command.split(' ')[1];
           await this.callTool('change_emotion', { emotion });
+        } else if (command === 'take_photo') {
+          await this.callTool('take_photo', { source: 'remote', quality: 0.9 });
         } else {
-          console.log(chalk.red('❓ Unknown command. Try: camera_on, camera_off, emotion <emotion>, quit'));
+          console.log(chalk.red('❓ Unknown command. Try: camera_on, camera_off, emotion <emotion>, take_photo, quit'));
         }
         
         promptUser();

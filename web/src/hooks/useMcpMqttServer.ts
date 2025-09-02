@@ -4,7 +4,8 @@ import { mcpServerConfig } from '@/config/mqtt'
 import type { 
   MqttConnectionOptions, 
   MqttMessage,
-  McpClientInfo
+  McpClientInfo,
+  McpServerCallbacks
 } from '@/types/mqtt'
 
 export interface UseMqttOptions extends MqttConnectionOptions {
@@ -13,10 +14,7 @@ export interface UseMqttOptions extends MqttConnectionOptions {
   serverName?: string
   autoInitializeMcp?: boolean
   clientInfo?: McpClientInfo
-  callbacks?: {
-    onCameraControl?: (enabled: boolean) => void
-    onEmotionChange?: (emotion: string) => void
-  }
+  callbacks?: McpServerCallbacks
 }
 
 export interface UseMqttServerReturn {

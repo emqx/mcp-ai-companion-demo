@@ -3,7 +3,7 @@ import { EmotionAnimation } from './EmotionAnimation';
 import { EmotionSelector } from './EmotionSelector';
 import { ChatMessages } from './ChatMessages';
 import { useAudioPlaying } from '@/hooks/useAudioPlaying';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 interface WebRTCState {
   remoteStream: MediaStream | null;
@@ -25,21 +25,28 @@ interface ChatInterfaceProps {
   webrtc: WebRTCState & WebRTCActions;
   isMqttConnected: boolean;
   aiReplyText?: string;
+  showVideo: boolean;
+  setShowVideo: (show: boolean) => void;
+  selectedEmotion: string;
+  setSelectedEmotion: (emotion: string) => void;
+  videoRef: RefObject<HTMLVideoElement | null>;
 }
 
 export function ChatInterface({ 
   webrtc,
   isMqttConnected,
-  aiReplyText
+  aiReplyText,
+  showVideo,
+  setShowVideo,
+  selectedEmotion,
+  setSelectedEmotion,
+  videoRef
 }: ChatInterfaceProps) {
   console.log('ChatInterface render - aiReplyText:', aiReplyText)
   
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [selectedEmotion, setSelectedEmotion] = useState('happy');
-  const [showVideo, setShowVideo] = useState(false);
+  const audioRef = useRef<HTMLVideoElement>(null)
   
-  const isSpeaking = useAudioPlaying(audioRef, 1000);
+  const isSpeaking = useAudioPlaying(audioRef, 1000)
 
   useEffect(() => {
     if (webrtc.remoteStream) {
@@ -47,7 +54,7 @@ export function ChatInterface({
         audioRef.current.srcObject = webrtc.remoteStream;
       }
       
-      if (showVideo && videoRef.current) {
+      if (showVideo && videoRef?.current) {
         videoRef.current.srcObject = webrtc.remoteStream;
       }
     }
@@ -98,10 +105,6 @@ export function ChatInterface({
               </div>
             )}
           </div>
-          {/* <div className="mt-2 text-center text-sm text-gray-500">
-            <div>连接状态: {connectionState}</div>
-            <div className="text-xs">ID: {signalingId}</div>
-          </div> */}
         </div>
       )}
 

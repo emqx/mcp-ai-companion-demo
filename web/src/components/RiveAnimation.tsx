@@ -1,7 +1,7 @@
 import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
 
 interface RiveAnimationProps {
-  emotion: string;
+  emotion: string
 }
 
 function RiveAnimationInner({ emotion }: { emotion: string }) {

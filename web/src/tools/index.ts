@@ -35,9 +35,6 @@ export const McpTools = {
  * @param callbacks - Object containing callback functions for tool operations
  * @returns Tool handler context
  */
-export function createToolContext(callbacks: {
-  onCameraControl?: (enabled: boolean) => void
-  onEmotionChange?: (emotion: string) => void
-}): ToolHandlerContext {
+export function createToolContext(callbacks: ToolHandlerContext): ToolHandlerContext {
   return callbacks
 }

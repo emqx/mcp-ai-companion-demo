@@ -123,3 +123,11 @@ export interface McpToolsCallResult {
   content: McpToolContent[]
   isError?: boolean
 }
+
+export type McpServerCallbacks = import('@/tools/types').ToolHandlerContext
+
+export interface McpServerOptions {
+  serverId?: string
+  serverName?: string
+  callbacks?: McpServerCallbacks
+}
