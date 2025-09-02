@@ -4,9 +4,8 @@ import json
 import threading
 import queue
 
-import asyncio
-from mcp_client_init import create_mcp_client
-from lamindex import ConversationalAgent
+import asyncio, anyio
+from lamindex import ConversationalAgent, init_mcp_and_agent
 from lamindex import FuncCallEvent, MessageEvent
 
 # 发送给 TTS 的消息队列
@@ -31,13 +30,13 @@ def read_message():
     # Strip whitespace and check if line is empty after stripping
     line = line.strip()
     if not line:
-        return None
+        return False
 
     try:
         return json.loads(line)
     except json.JSONDecodeError as e:
         print(f"JSON decode error: {e}, line: '{line}'", file=sys.stderr)
-        return None
+        return False
 
 
 def send_message(message):
@@ -121,22 +120,6 @@ def asr_worker():
         else:
             print("Warning: main_loop not running; dropping ASR task")
 
-
-async def init_mcp_and_agent():
-    # 使用 async with 风格的手工进入/退出，保证全局存活
-    mcp_client = await create_mcp_client(client_name="example_client", host="localhost")
-    await mcp_client.__aenter__()
-    try:
-        await mcp_client.start()
-        import anyio
-
-        await anyio.sleep(3.0)
-        return ConversationalAgent(mcp_client=mcp_client)
-    except Exception:
-        await mcp_client.__aexit__(None, None, None)
-        raise
-
-
 async def main():
     global main_loop
     main_loop = asyncio.get_event_loop()
@@ -147,8 +130,11 @@ async def main():
     asr_thread = threading.Thread(target=asr_worker, daemon=True)
     asr_thread.start()
 
+    tg = anyio.create_task_group()
+    await tg.__aenter__()
+
     global agent
-    agent = await init_mcp_and_agent()
+    (agent, mcp_client) = await init_mcp_and_agent(tg)
 
     send_message(
         {
@@ -164,7 +150,8 @@ async def main():
     result = await asyncio.to_thread(read_message)
     if not result:
         print("No more input, exiting.")
-        sys.exit(1)
+        await mcp_client.stop()
+        sys.exit(0)
 
     # Handle JSON decode errors gracefully
     if not isinstance(result, dict):
@@ -180,6 +167,10 @@ async def main():
         while True:
             msg = await asyncio.to_thread(read_message)
             if msg is None:
+                print("No more input, exiting...")
+                await mcp_client.stop()
+                break
+            if not msg:
                 # Skip None messages (empty lines, JSON decode errors, etc.)
                 # Add small delay to prevent busy waiting
                 await asyncio.sleep(0.01)
@@ -208,13 +199,10 @@ def handle_single(msg):
     global inflight_requests
     if "method" in msg:
         if msg["method"] == "asr_result":
-            if "id" in msg:
-                print("asr_result should not have id")
-                exit(1)
-        # Extract the recognized text from the asr_result message and put it into the asr_queue
-        params = msg.get("params", {})
-        recognized_text = params.get("text", "")
-        asr_queue.put(recognized_text)
+            # Extract the recognized text from the asr_result message and put it into the asr_queue
+            params = msg.get("params", {})
+            recognized_text = params.get("text", "")
+            asr_queue.put(recognized_text)
     if "result" in msg:
         if msg["id"] not in inflight_requests:
             print(f"Unknown id in response: {msg['id']}")

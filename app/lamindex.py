@@ -1,4 +1,3 @@
-import asyncio
 import anyio
 import logging
 import re
@@ -22,10 +21,10 @@ from llama_index.core.workflow import (
     step,
 )
 
-import mcp.client.mqtt as mcp_mqtt
+from mcp_client_init import McpMqttClient
+from mcp.shared.mqtt import MqttOptions
 from mcp.shared.mqtt import configure_logging
 import mcp.types as types
-
 
 from llama_index.llms.siliconflow import SiliconFlow
 from llama_index.core.llms import ChatMessage, MessageRole
@@ -39,34 +38,16 @@ from openai import OpenAI
 configure_logging(level="DEBUG")
 logger = logging.getLogger(__name__)
 
-
-async def on_mcp_server_discovered(client: mcp_mqtt.MqttTransportClient, server_name):
-    logger.info(f"Discovered {server_name}, connecting ...")
-    await client.initialize_mcp_server(server_name)
-
-
-async def on_mcp_connect(client, server_name, connect_result):
-    capabilities = client.get_session(server_name).server_info.capabilities
-    logger.info(f"Capabilities of {server_name}: {capabilities}")
-    if capabilities.prompts:
-        prompts = await client.list_prompts(server_name)
-        logger.info(f"Prompts of {server_name}: {prompts}")
-    if capabilities.resources:
-        resources = await client.list_resources(server_name)
-        logger.info(f"Resources of {server_name}: {resources}")
-        resource_templates = await client.list_resource_templates(server_name)
-        logger.info(f"Resources templates of {server_name}: {resource_templates}")
-    if capabilities.tools:
-        toolsResult = await client.list_tools(server_name)
-        tools = toolsResult.tools
-        logger.info(f"Tools of {server_name}: {tools}")
-
-
-async def on_mcp_disconnect(client, server_name):
-    logger.info(f"Disconnected from {server_name}")
-
-
 client = None
+
+mqtt_clientid=os.getenv("MQTT_CLIENT_ID") or f"mcp_ai_companion_demo_{os.getpid()}"
+mqtt_options = MqttOptions(
+    host=os.getenv("MQTT_BROKER_HOST") or "localhost",
+    port=int(os.getenv("MQTT_BROKER_PORT") or 1883),
+    username=None,
+    password=None,
+)
+
 import os
 
 api_key = os.environ.get("DASHSCOPE_API_KEY")
@@ -89,12 +70,16 @@ def build_fn_schema_from_input_schema(model_name: str, input_schema: dict):
     class_name = re.sub(r"\W+", "_", f"{model_name}Params")
     return create_model(class_name, **fields)
 
-
-async def get_mcp_tools(mcp_client: mcp_mqtt.MqttTransportClient) -> List[BaseTool]:
+async def get_mcp_tools(mcp_client: McpMqttClient) -> List[BaseTool]:
+    alive_mcp_servers = mcp_client.get_alive_mcp_servers()
+    if len(alive_mcp_servers) == 0:
+        return []
+    first_mcp_server_name = alive_mcp_servers[0].server_name
+    client_session = mcp_client.get_session(first_mcp_server_name)
     all_tools = []
     try:
         try:
-            tools_result = await mcp_client.list_tools("ESP32 Demo Server")
+            tools_result = await client_session.list_tools()
 
             if tools_result is False:
                 return all_tools
@@ -105,11 +90,11 @@ async def get_mcp_tools(mcp_client: mcp_mqtt.MqttTransportClient) -> List[BaseTo
             for tool in tools:
                 logger.info(f"tool: {tool.name} - {tool.description}")
 
-                def create_mcp_tool_wrapper(client_ref, server_name, tool_name):
+                def create_mcp_tool_wrapper(client_ref, tool_name):
                     async def mcp_tool_wrapper(**kwargs):
                         try:
                             result = await client_ref.call_tool(
-                                server_name, tool_name, kwargs
+                                tool_name, kwargs
                             )
                             if result is False:
                                 return f"call {tool_name} failed"
@@ -164,7 +149,7 @@ async def get_mcp_tools(mcp_client: mcp_mqtt.MqttTransportClient) -> List[BaseTo
                     return mcp_tool_wrapper
 
                 wrapper_func = create_mcp_tool_wrapper(
-                    mcp_client, "ESP32 Demo Server", tool.name
+                    client_session, tool.name
                 )
 
                 try:
@@ -260,17 +245,10 @@ class MessageEvent(Event):
 
 
 class ConversationalAgent(Workflow):
-    def __init__(self, mcp_client: Optional[mcp_mqtt.MqttTransportClient] = None):
-        # Initialize base Workflow to set up dispatcher and internal state
+    def __init__(self, mcp_client: McpMqttClient | None = None):
         super().__init__()
-        # self.llm = SiliconFlow(
-        #     api_key=api_key,
-        #     model="deepseek-ai/DeepSeek-V3",
-        #     temperature=0.6,
-        #     max_tokens=4000,
-        #     timeout=180,
-        # )
 
+        self.mcp_client = mcp_client
         self.llm = OpenAILike(
             model="deepseek-v3",
             api_key=api_key,
@@ -284,7 +262,6 @@ class ConversationalAgent(Workflow):
         )
         Settings.llm = self.llm
 
-        self.mcp_client = mcp_client
         self.tools = [
             FunctionTool.from_defaults(
                 fn=explain_photo,
@@ -298,8 +275,6 @@ class ConversationalAgent(Workflow):
         ]
 
         # self.agent = AgentRunner.from_llm(llm=self.llm, tools=self.tools, verbose=True)
-
-        self.mcp_tools_loaded = False
 
         self.conversation_history = []
 
@@ -373,16 +348,25 @@ class ConversationalAgent(Workflow):
         return final_messages
 
     async def load_mcp_tools(self):
-        if not self.mcp_tools_loaded and self.mcp_client:
+        print("Loading MCP tools...")
+        if self.mcp_client:
             try:
                 mcp_tools = await get_mcp_tools(self.mcp_client)
+                print(f"Found tools: {mcp_tools}")
                 if mcp_tools:
                     self.tools.extend(mcp_tools)
+                    ## remove duplicate tools by name, keep the last one
+                    unique_tools = {}
+                    for tool in self.tools:
+                        tool_name = getattr(tool.metadata, "name", str(tool))
+                        unique_tools[tool_name] = tool
+                    self.tools = list(unique_tools.values())
+                    print(f"Total tools names now: {[getattr(tool.metadata, 'name', str(tool)) for tool in self.tools]}")
+
                     # self.agent = AgentRunner.from_llm(
                     #     llm=self.llm, tools=self.tools, verbose=True
                     # )
                     logger.info(f"load {len(mcp_tools)} tools")
-                    self.mcp_tools_loaded = True
             except Exception as e:
                 logger.error(f"load tool error: {e}")
 
@@ -428,8 +412,7 @@ class ConversationalAgent(Workflow):
     @step
     async def chat(self, ctx: Context, ev: StartEvent) -> StopEvent:
         try:
-            if not self.mcp_tools_loaded:
-                await self.load_mcp_tools()
+            await self.load_mcp_tools()
 
             query_info = AgentWorkflow.from_tools_or_functions(
                 tools_or_functions=self.tools,
@@ -462,34 +445,45 @@ class ConversationalAgent(Workflow):
             logger.error(error_msg)
             return StopEvent
 
+async def init_mcp_and_agent(tg: anyio.abc.TaskGroup):
+    mcp_client = McpMqttClient(
+        mqtt_options=mqtt_options,
+        client_name=f"ai_companion_demo",
+        server_name_filter="#",
+        clientid=mqtt_clientid
+    )
+    tg.start_soon(mcp_client.start)
+    await mcp_client.connect()
+    agent = ConversationalAgent(mcp_client=mcp_client)
+    await agent.load_mcp_tools()
+    return (agent, mcp_client)
 
 async def main():
     try:
-        async with mcp_mqtt.MqttTransportClient(
-            "test_client",
-            auto_connect_to_mcp_server=True,
-            on_mcp_server_discovered=on_mcp_server_discovered,
-            on_mcp_connect=on_mcp_connect,
-            on_mcp_disconnect=on_mcp_disconnect,
-            mqtt_options=mcp_mqtt.MqttOptions(
-                host="localhost",
-            ),
-        ) as mcp_client:
-            await mcp_client.start()
-            await anyio.sleep(3)
+        tg = anyio.create_task_group()
+        await tg.__aenter__()
+        agent = await init_mcp_and_agent(tg)
+        await anyio.sleep(2.0)
+        ## aysnc load tools every 10 seconds
+        # def load_tools_periodically():
+        #     async def _load():
+        #         while True:
+        #             try:
+        #                 await agent.load_mcp_tools()
+        #             except Exception as e:
+        #                 logger.error(f"periodically load tool error: {e}")
+        #             await anyio.sleep(10.0)
+        #     tg.start_soon(_load)
+        #load_tools_periodically()
 
-            agent = ConversationalAgent(mcp_client)
-            if not agent.mcp_tools_loaded:
-                await agent.load_mcp_tools()
-
-            print("input 'exit' or 'quit' exit")
-            print("input 'tools' show available tools")
-            print("=" * 50)
-
+        print("input 'exit' or 'quit' exit")
+        print("input 'tools' show available tools")
+        print("=" * 50)
+        async def get_input(self):
             while True:
                 try:
-                    user_input = input("\nuser: ").strip()
-
+                    user_input = await ainput("\nuser: ")
+                    user_input = user_input.strip()
                     if user_input.lower() in ["exit", "quit"]:
                         break
 
@@ -516,6 +510,9 @@ async def main():
                     break
                 except Exception as e:
                     print(f"error: {e}")
+        tg.start_soon(get_input, None)
+        #wait for the input task to complete
+        await tg.__aexit__(None, None, None)
 
     except Exception as e:
         print(f"agent init error: {e}")
