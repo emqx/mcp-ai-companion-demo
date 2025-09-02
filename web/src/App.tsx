@@ -30,7 +30,7 @@ function App() {
     }
   })
   const videoRef = useRef<HTMLVideoElement>(null)
-  const audioRef = useRef<HTMLVideoElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
   const onCameraControl = useCallback((enabled: boolean) => {
     setShowVideo(enabled)

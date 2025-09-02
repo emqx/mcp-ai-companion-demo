@@ -33,7 +33,7 @@ interface ChatInterfaceProps {
   selectedEmotion: string;
   setSelectedEmotion: (emotion: string) => void;
   videoRef: RefObject<HTMLVideoElement | null>;
-  audioRef: RefObject<HTMLVideoElement | null>;
+  audioRef: RefObject<HTMLAudioElement | null>;
   volume: number;
   isMuted: boolean;
   mqttConfig: MqttConfig;
@@ -71,6 +71,9 @@ export function ChatInterface({
       
       if (showVideo && videoRef?.current) {
         videoRef.current.srcObject = webrtc.remoteStream
+        // Also apply volume and mute state to video element
+        videoRef.current.volume = volume
+        videoRef.current.muted = isMuted
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -82,7 +85,12 @@ export function ChatInterface({
       audioRef.current.volume = volume
       audioRef.current.muted = isMuted
     }
-  }, [volume, isMuted, audioRef])
+    // Also update video element if it exists
+    if (videoRef?.current) {
+      videoRef.current.volume = volume
+      videoRef.current.muted = isMuted
+    }
+  }, [volume, isMuted, audioRef, videoRef])
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">

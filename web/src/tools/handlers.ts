@@ -136,7 +136,7 @@ export const controlVolumeHandler: ToolHandler = (
   
   // Call the volume control callback if available
   if (context.onVolumeControl) {
-    context.onVolumeControl(volume !== undefined ? volume / 100 : 1, muted)
+    context.onVolumeControl(volume !== undefined ? volume / 100 : undefined, muted)
     
     const statusMsg = []
     if (volume !== undefined) statusMsg.push(`volume set to ${volume}%`)
