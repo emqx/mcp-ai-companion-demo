@@ -12,6 +12,7 @@ export interface McpMqttConfig extends MqttBrokerConfig {
   serverName: string
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface WebRTCMqttConfig extends MqttBrokerConfig {
   // WebRTC specific config can be added here
 }

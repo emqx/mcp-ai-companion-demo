@@ -38,11 +38,11 @@ export class McpMqttServer {
   } = {}) {
     const { serverId, serverName, callbacks, ...mqttOptions } = options
     
-    this.serverId = serverId || 'default-server'
+    const clientId = `mcp-ai-web-ui-${Math.random().toString(16).substring(2, 10)}`
+    
+    this.serverId = serverId || clientId // Use clientId as serverId if not provided
     this.serverName = serverName || 'mcp-ai-companion-demo-web-ui'
     this.callbacks = callbacks || {}
-    
-    const clientId = `mcp-ai-web-ui-${Math.random().toString(16).substring(2, 10)}`
     
     this.connectionOptions = {
       brokerUrl: 'ws://localhost:8083/mqtt',

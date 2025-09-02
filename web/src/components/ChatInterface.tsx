@@ -58,6 +58,7 @@ export function ChatInterface({
         videoRef.current.srcObject = webrtc.remoteStream
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [webrtc.remoteStream, showVideo])
 
   return (

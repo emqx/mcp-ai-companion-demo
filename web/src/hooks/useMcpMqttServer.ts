@@ -63,7 +63,7 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
     const config = {
       ...mcpServerConfig,
       ...mqttOptionsRef.current,
-      serverId: serverId || mcpServerConfig.serverId,
+      serverId, // Don't use config default, let McpMqttServer generate dynamic clientId
       serverName: serverName || mcpServerConfig.serverName,
       callbacks
     }
