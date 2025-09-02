@@ -89,7 +89,7 @@ export function MqttSettings({ config, onConfigChange }: MqttSettingsProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 rounded-full cursor-pointer"
+          className="h-10 w-10 rounded-full"
           title="MQTT 设置"
         >
           <Settings className="h-5 w-5" />
@@ -141,13 +141,13 @@ export function MqttSettings({ config, onConfigChange }: MqttSettingsProps) {
 
         <div className="p-4">
           <div className="flex gap-3">
-            <Button onClick={handleSave} className="flex-1 cursor-pointer text-white" style={{backgroundColor: '#5E4EFF'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4A3EE6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#5E4EFF'}>
+            <Button onClick={handleSave} className="flex-1 text-white" style={{backgroundColor: '#5E4EFF'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4A3EE6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#5E4EFF'}>
               保存配置
             </Button>
             <Button 
               variant="outline" 
               onClick={handleResetToDefault}
-              className="flex-1 cursor-pointer hover:bg-gray-50"
+              className="flex-1 hover:bg-gray-50"
               style={{borderColor: '#5E4EFF', color: '#5E4EFF'}}
             >
               恢复默认

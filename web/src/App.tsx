@@ -6,6 +6,7 @@ import { appLogger } from '@/utils/logger'
 import { capturePhotoFromVideo } from '@/utils/photo-capture'
 import type { PhotoCaptureResult } from '@/tools/types'
 import { Toaster } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { defaultMqttConfig } from '@/config/mqtt'
 import { loadMqttConfig, saveMqttConfig, type MqttConfig } from '@/utils/storage'
 
@@ -60,15 +61,23 @@ function App() {
     // Update volume if provided (0.0 to 1.0)
     if (newVolume !== undefined) {
       setVolume(newVolume)
-      appLogger.info(`🔊 Volume set to ${Math.round(newVolume * 100)}%`)
+      const volumePercent = Math.round(newVolume * 100)
+      appLogger.info(`🔊 Volume set to ${volumePercent}%`)
+      toast(`音量调至 ${volumePercent}%`, {
+        duration: 3000,
+      })
     }
     
     // Update muted state if provided
     if (muted !== undefined) {
       setIsMuted(muted)
+      const message = muted ? '音频已静音' : '音频已取消静音'
       appLogger.info(`🔊 Audio ${muted ? 'muted' : 'unmuted'}`)
+      toast(message, {
+        duration: 3000,
+      })
     }
-    
+
     // Apply changes to audio element if it exists
     if (audioRef.current) {
       if (newVolume !== undefined) {

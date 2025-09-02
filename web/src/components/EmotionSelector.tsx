@@ -34,7 +34,7 @@ const emotions: Emotion[] = [
 export function EmotionSelector({ onEmotionSelect, selectedEmotion }: EmotionSelectorProps) {
   return (
     <Select value={selectedEmotion} onValueChange={onEmotionSelect}>
-      <SelectTrigger className="w-48 cursor-pointer">
+      <SelectTrigger className="w-48">
         <SelectValue placeholder="选择表情" />
       </SelectTrigger>
       <SelectContent>

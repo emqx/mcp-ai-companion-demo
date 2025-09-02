@@ -4,8 +4,9 @@ import { EmotionSelector } from './EmotionSelector'
 import { ChatMessages } from './ChatMessages'
 import { MqttSettings } from './MqttSettings'
 import { useAudioPlaying } from '@/hooks/useAudioPlaying'
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import type { MqttConfig } from '@/utils/storage'
+import { appLogger } from '@/utils/logger'
 
 interface WebRTCState {
   remoteStream: MediaStream | null;
@@ -57,6 +58,7 @@ export function ChatInterface({
   console.log('ChatInterface render - aiReplyText:', aiReplyText)
   
   const isSpeaking = useAudioPlaying(audioRef, 1000)
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (webrtc.remoteStream) {
@@ -96,7 +98,23 @@ export function ChatInterface({
         />
       </div>
 
-      <div className="mb-2">
+      <div 
+        className="mb-2 select-none cursor-pointer"
+        onClick={() => {
+          if (clickTimeoutRef.current) {
+            clearTimeout(clickTimeoutRef.current)
+            clickTimeoutRef.current = null
+            appLogger.log('双击头像 - 鼓励')
+            // TODO: 发送鼓励事件到后端
+          } else {
+            clickTimeoutRef.current = setTimeout(() => {
+              appLogger.log('单击头像 - 敲打')
+              // TODO: 发送敲打事件到后端
+              clickTimeoutRef.current = null
+            }, 300)
+          }
+        }}
+      >
         <EmotionAnimation emotion={selectedEmotion} />
       </div>
 
@@ -212,13 +230,12 @@ export function ChatInterface({
             />
           </button>
         </div>
-        
-        {/* Status Text */}
-        {/* <div className="text-center mt-4">
-          <p className="text-gray-500 text-sm">
+
+        <div className="text-center mt-4">
+          <p className="text-sm" style={{ color: '#707070' }}>
             双击头像表示鼓励，单击头像表示敲打
           </p>
-        </div> */}
+        </div>
       </div>
     </div>
   )
