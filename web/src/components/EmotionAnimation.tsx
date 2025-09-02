@@ -1,5 +1,5 @@
-import { useRive, useStateMachineInput, Layout, Fit, Alignment } from '@rive-app/react-canvas';
-import { useEffect } from 'react';
+import { useRive, useStateMachineInput, Layout, Fit, Alignment } from '@rive-app/react-canvas'
+import { useEffect } from 'react'
 
 interface EmotionAnimationProps {
   emotion: string;
@@ -24,7 +24,7 @@ const emotionFileMap: { [key: string]: string } = {
 }
 
 function GifAnimation({ emotion }: { emotion: string }) {
-  const gifSrc = emotionFileMap[emotion] || emotionFileMap['happy'];
+  const gifSrc = emotionFileMap[emotion] || emotionFileMap['happy']
   
   return (
     <img 
@@ -46,37 +46,37 @@ function RiveAnimationInner({ emotion }: { emotion: string }) {
     }),
     onLoad: (instance: any) => {
       console.log(instance)
-      console.log(`[RiveAnimation] animation loaded successfully!`);
+      console.log(`[RiveAnimation] animation loaded successfully!`)
       setTimeout(() => {
         if (rive) {
-          console.log('[RiveAnimation] State machines:', rive.stateMachineNames);
+          console.log('[RiveAnimation] State machines:', rive.stateMachineNames)
           if (rive.stateMachineNames && rive.stateMachineNames.length > 0) {
-            const smName = rive.stateMachineNames[0];
-            const inputs = rive.stateMachineInputs(smName);
-            console.log(`[RiveAnimation] Inputs for "${smName}":`, inputs ? Object.keys(inputs) : 'none');
+            const smName = rive.stateMachineNames[0]
+            const inputs = rive.stateMachineInputs(smName)
+            console.log(`[RiveAnimation] Inputs for "${smName}":`, inputs ? Object.keys(inputs) : 'none')
           }
         }
-      }, 100);
+      }, 100)
     },
     onLoadError: (error) => {
-      console.error(`[RiveAnimation] Failed to load ${emotion} animation:`, error);
+      console.error(`[RiveAnimation] Failed to load ${emotion} animation:`, error)
     },
-  });
+  })
 
-  const emotionInput = useStateMachineInput(rive, 'State Machine 1', 'Number 1');
+  const emotionInput = useStateMachineInput(rive, 'State Machine 1', 'Number 1')
 
   useEffect(() => {
-    console.log(`[RiveAnimation] emotionInput:`, emotionInput, 'for emotion:', emotion);
+    console.log(`[RiveAnimation] emotionInput:`, emotionInput, 'for emotion:', emotion)
     console.log(emotionInput)
     
     if (rive && !emotionInput) {
-      console.log('[RiveAnimation] Available state machines:', rive.stateMachineNames);
+      console.log('[RiveAnimation] Available state machines:', rive.stateMachineNames)
       if (rive.stateMachineNames && rive.stateMachineNames.length > 0) {
-        const smName = rive.stateMachineNames[0];
-        const inputs = rive.stateMachineInputs(smName);
-        console.log(`[RiveAnimation] Available inputs for "${smName}":`, inputs ? Object.keys(inputs) : 'none');
+        const smName = rive.stateMachineNames[0]
+        const inputs = rive.stateMachineInputs(smName)
+        console.log(`[RiveAnimation] Available inputs for "${smName}":`, inputs ? Object.keys(inputs) : 'none')
         if (inputs) {
-          console.log(`[RiveAnimation] Input details:`, inputs);
+          console.log(`[RiveAnimation] Input details:`, inputs)
         }
       }
     }
@@ -96,16 +96,16 @@ function RiveAnimationInner({ emotion }: { emotion: string }) {
         'relaxed': 10,
         'serious': 11,
         'angry': 12
-      };
+      }
       
-      const emotionValue = emotionMap[emotion];
+      const emotionValue = emotionMap[emotion]
       console.log(`${emotion} ${emotionValue}`)
       if (emotionValue !== undefined) {
-        emotionInput.value = emotionValue;
-        console.log(`[RiveAnimation] Set emotion to ${emotionValue} (${emotion})`);
+        emotionInput.value = emotionValue
+        console.log(`[RiveAnimation] Set emotion to ${emotionValue} (${emotion})`)
       }
     }
-  }, [emotionInput, emotion, rive]);
+  }, [emotionInput, emotion, rive])
 
   return (
     <RiveComponent 
@@ -115,13 +115,13 @@ function RiveAnimationInner({ emotion }: { emotion: string }) {
         display: 'block'
       }} 
     />
-  );
+  )
 }
 
 export function EmotionAnimation({ emotion, type = 'gif' }: EmotionAnimationProps) {
   if (type === 'rive') {
-    return <RiveAnimationInner emotion={emotion} />;
+    return <RiveAnimationInner emotion={emotion} />
   }
   
-  return <GifAnimation emotion={emotion} />;
+  return <GifAnimation emotion={emotion} />
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react'
 
 interface ChatMessagesProps {
   isLoading?: boolean;
@@ -32,8 +32,8 @@ export function ChatMessages({ isLoading = false, isSpeaking = false, aiReplyTex
           />
         ))}
       </div>
-    );
-  };
+    )
+  }
 
   // If not connected/loading, show welcome message
   if (!isLoading && !isSpeaking && !aiReplyText) {
@@ -43,7 +43,7 @@ export function ChatMessages({ isLoading = false, isSpeaking = false, aiReplyTex
           <span className="text-gray-500 text-base">你好，我是 EMQ 机器人，打开麦克风开始对话！</span>
         </div>
       </div>
-    );
+    )
   }
 
   // Connected state: show animation + text
@@ -63,5 +63,5 @@ export function ChatMessages({ isLoading = false, isSpeaking = false, aiReplyTex
         </span>
       </div>
     </div>
-  );
+  )
 }

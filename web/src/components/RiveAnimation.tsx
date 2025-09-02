@@ -1,4 +1,4 @@
-import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
+import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas'
 
 interface RiveAnimationProps {
   emotion: string
@@ -13,12 +13,12 @@ function RiveAnimationInner({ emotion }: { emotion: string }) {
       alignment: Alignment.Center
     }),
     onLoad: () => {
-      console.log(`[RiveAnimation] ${emotion} animation loaded successfully!`);
+      console.log(`[RiveAnimation] ${emotion} animation loaded successfully!`)
     },
     onLoadError: (error) => {
-      console.error(`[RiveAnimation] Failed to load ${emotion} animation:`, error);
+      console.error(`[RiveAnimation] Failed to load ${emotion} animation:`, error)
     },
-  });
+  })
 
   return (
     <RiveComponent
@@ -28,11 +28,11 @@ function RiveAnimationInner({ emotion }: { emotion: string }) {
         display: 'block'
       }} 
     />
-  );
+  )
 }
 
 export function RiveAnimation({ emotion }: RiveAnimationProps) {
   return (
     <RiveAnimationInner key={emotion} emotion={emotion} />
-  );
+  )
 }

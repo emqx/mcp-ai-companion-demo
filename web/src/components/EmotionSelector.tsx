@@ -4,7 +4,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select"
 
 interface Emotion {
   name: string;
@@ -29,7 +29,7 @@ const emotions: Emotion[] = [
   { name: "serious", label: "严肃 Serious" },
   { name: "disappointed", label: "失望 Disappointed" },
   { name: "laug", label: "大笑 Laughing" }
-];
+]
 
 export function EmotionSelector({ onEmotionSelect, selectedEmotion }: EmotionSelectorProps) {
   return (
@@ -45,5 +45,5 @@ export function EmotionSelector({ onEmotionSelect, selectedEmotion }: EmotionSel
         ))}
       </SelectContent>
     </Select>
-  );
+  )
 }

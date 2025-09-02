@@ -1,9 +1,9 @@
-import { Mic, MicOff, Volume2, Camera } from 'lucide-react';
-import { EmotionAnimation } from './EmotionAnimation';
-import { EmotionSelector } from './EmotionSelector';
-import { ChatMessages } from './ChatMessages';
-import { useAudioPlaying } from '@/hooks/useAudioPlaying';
-import { useEffect, useRef, type RefObject } from 'react';
+import { Mic, MicOff, Volume2, Camera } from 'lucide-react'
+import { EmotionAnimation } from './EmotionAnimation'
+import { EmotionSelector } from './EmotionSelector'
+import { ChatMessages } from './ChatMessages'
+import { useAudioPlaying } from '@/hooks/useAudioPlaying'
+import { useEffect, useRef, type RefObject } from 'react'
 
 interface WebRTCState {
   remoteStream: MediaStream | null;
@@ -51,14 +51,14 @@ export function ChatInterface({
   useEffect(() => {
     if (webrtc.remoteStream) {
       if (audioRef.current) {
-        audioRef.current.srcObject = webrtc.remoteStream;
+        audioRef.current.srcObject = webrtc.remoteStream
       }
       
       if (showVideo && videoRef?.current) {
-        videoRef.current.srcObject = webrtc.remoteStream;
+        videoRef.current.srcObject = webrtc.remoteStream
       }
     }
-  }, [webrtc.remoteStream, showVideo]);
+  }, [webrtc.remoteStream, showVideo])
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">
@@ -113,12 +113,12 @@ export function ChatInterface({
           <button 
             onClick={async () => {
               if (!webrtc.isConnected && !webrtc.isConnecting && isMqttConnected) {
-                webrtc.connect();
-                return;
+                webrtc.connect()
+                return
               }
 
-              await webrtc.toggleAudio();
-              console.log(webrtc.isAudioEnabled ? 'Muting audio' : 'Enabling audio');
+              await webrtc.toggleAudio()
+              console.log(webrtc.isAudioEnabled ? 'Muting audio' : 'Enabling audio')
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
               webrtc.isConnecting
@@ -139,9 +139,9 @@ export function ChatInterface({
           <button 
             onClick={async () => {
               if (webrtc.isConnected) {
-                await webrtc.toggleVideo();
+                await webrtc.toggleVideo()
               } else {
-                await webrtc.toggleVideo(true);
+                await webrtc.toggleVideo(true)
               }
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
@@ -157,12 +157,12 @@ export function ChatInterface({
           <button 
             onClick={() => {
               if (!showVideo) {
-                setShowVideo(true);
+                setShowVideo(true)
                 if (isMqttConnected && !webrtc.isConnected && !webrtc.isConnecting) {
-                  webrtc.connect();
+                  webrtc.connect()
                 }
               } else {
-                setShowVideo(false);
+                setShowVideo(false)
               }
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
@@ -184,5 +184,5 @@ export function ChatInterface({
         </div> */}
       </div>
     </div>
-  );
+  )
 }

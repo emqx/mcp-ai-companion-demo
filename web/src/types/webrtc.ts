@@ -23,13 +23,13 @@ export interface ICECandidateData {
 
 export interface SignalingMessage {
   type: 'sdp_offer' | 'sdp_answer' | 'ice_candidate'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   data: SDPData | ICECandidateData | any // Phoenix signaling expects specific JSON format
 }
 
 export interface PhoenixChannelPayload {
   type: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   data: any
 }
 
