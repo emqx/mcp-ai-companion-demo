@@ -1,4 +1,4 @@
-import { Mic, Volume2, Camera } from 'lucide-react';
+import { Mic, MicOff, Volume2, Camera } from 'lucide-react';
 import { EmotionAnimation } from './EmotionAnimation';
 import { EmotionSelector } from './EmotionSelector';
 import { ChatMessages } from './ChatMessages';
@@ -38,7 +38,6 @@ export function ChatInterface({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [selectedEmotion, setSelectedEmotion] = useState('happy');
   const [showVideo, setShowVideo] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   
   const isSpeaking = useAudioPlaying(audioRef, 1000);
 
@@ -115,28 +114,23 @@ export function ChatInterface({
                 return;
               }
 
-              if (isRecording) {
-                setIsRecording(false);
-                await webrtc.toggleAudio(false);
-                console.log('Stop recording');
-              } else {
-                setIsRecording(true);
-                await webrtc.toggleAudio(true);
-                console.log('Start recording');
-              }
+              await webrtc.toggleAudio();
+              console.log(webrtc.isAudioEnabled ? 'Muting audio' : 'Enabling audio');
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
-              isRecording 
-                ? 'bg-red-500 hover:bg-red-600 shadow-lg scale-110' 
-                : webrtc.isConnecting
+              webrtc.isConnecting
                 ? 'bg-yellow-500 animate-pulse'
                 : webrtc.isConnected && webrtc.isAudioEnabled
                 ? 'bg-blue-500 hover:bg-blue-600 shadow-md' 
                 : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
-            title={isRecording ? "停止录音" : webrtc.isConnecting ? "连接中..." : !webrtc.isConnected ? "点击连接" : "开始录音"}
+            title={webrtc.isConnecting ? "连接中..." : !webrtc.isConnected ? "点击连接" : webrtc.isAudioEnabled ? "关闭麦克风" : "开启麦克风"}
           >
-            <Mic className={`w-6 h-6 ${isRecording || webrtc.isConnecting || (webrtc.isConnected && webrtc.isAudioEnabled) ? 'text-white' : 'text-[#343741]'}`} />
+            {webrtc.isConnected && webrtc.isAudioEnabled ? (
+              <Mic className="w-6 h-6 text-white" />
+            ) : (
+              <MicOff className={`w-6 h-6 ${webrtc.isConnecting ? 'text-white' : 'text-[#343741]'}`} />
+            )}
           </button>
           
           <button 

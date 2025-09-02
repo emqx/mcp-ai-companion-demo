@@ -192,16 +192,19 @@ export function useWebRTCMqtt({
         webrtcLogger.info('🎤 Reconnecting for audio...')
         await connect()
       } else if (signalingRef.current) {
+        webrtcLogger.info('🎤 Enabling audio...')
         signalingRef.current.toggleAudio(true)
       }
       setIsAudioEnabled(true)
     } else {
-      // If disabling, disconnect the connection
-      webrtcLogger.info('🎤 Disconnecting audio...')
-      disconnect()
+      // If disabling, just mute the audio tracks without disconnecting
+      if (signalingRef.current) {
+        webrtcLogger.info('🎤 Muting audio...')
+        signalingRef.current.toggleAudio(false)
+      }
       setIsAudioEnabled(false)
     }
-  }, [isAudioEnabled, connectionState, connect, disconnect])
+  }, [isAudioEnabled, connectionState, connect])
 
   const toggleVideo = useCallback(async (enabled?: boolean) => {
     const shouldEnable = enabled !== undefined ? enabled : !isVideoEnabled
