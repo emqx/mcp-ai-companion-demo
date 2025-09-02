@@ -18,7 +18,7 @@ export interface WebRTCMqttConfig extends MqttBrokerConfig {
 
 // Default MQTT broker configuration
 export const defaultMqttConfig: MqttBrokerConfig = {
-  brokerUrl: 'ws://localhost:8083/mqtt',
+  brokerUrl: 'ws://broker.emqx.io:8083/mqtt',
   username: 'emqx-mcp-webrtc-web-ui',
   password: 'public',
   connectTimeout: 4000,

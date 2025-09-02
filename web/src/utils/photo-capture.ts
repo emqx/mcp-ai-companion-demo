@@ -87,8 +87,7 @@ export async function capturePhotoFromVideo(
     source
   }
 
-  // Auto-download the image
-  downloadPhoto(result)
+  // Skip auto-download when uploading to server
 
   // Upload if configuration is provided
   if (upload?.url) {

@@ -28,7 +28,13 @@ function App() {
     if (!videoRef?.current?.videoWidth || !videoRef?.current?.videoHeight) {
       throw new Error('Video not ready for capture')
     }
-    return await capturePhotoFromVideo(videoRef.current, source, { quality })
+    return await capturePhotoFromVideo(videoRef.current, source, { 
+      quality,
+      upload: {
+        url: '/api/upload',
+        formFieldName: 'file'
+      }
+    })
   }, [])
 
   const callbacks = useMemo(() => ({

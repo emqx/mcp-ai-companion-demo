@@ -21,7 +21,7 @@ function RiveAnimationInner({ emotion }: { emotion: string }) {
   });
 
   return (
-    <RiveComponent 
+    <RiveComponent
       style={{ 
         width: '180px', 
         height: '180px', 

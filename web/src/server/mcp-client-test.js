@@ -299,7 +299,7 @@ async function runTest() {
   console.log(chalk.bold.blue('\n🚀 === MCP Client Test Started ===\n'));
   
   const client = new McpMqttClient({
-    brokerUrl: 'ws://localhost:8083/mqtt'
+    brokerUrl: 'ws://broker.emqx.io:8083/mqtt'
   });
 
   try {

@@ -8,25 +8,25 @@ interface EmotionAnimationProps {
 
 function GifAnimation({ emotion }: { emotion: string }) {
   const emotionFileMap: { [key: string]: string } = {
-    'happy': 'happy 1.gif',
-    'laug': 'laug 2.gif',
-    'surprised': 'surprised 3.gif',
-    'tired': 'tired 4.gif',
-    'disappointed': 'disappointed 5.gif',
-    'shy': 'shy6.gif',
-    'thinking': 'thinking 7.gif',
-    'playful': 'playful 8.gif',
-    'sad': 'sad 9.gif',
-    'relaxed': 'relaxed 10.gif',
-    'serious': 'serious 11.gif',
-    'angry': 'anggry 12.gif'
+    'happy': new URL('../assets/animations/happy 1.gif', import.meta.url).href,
+    'laug': new URL('../assets/animations/laug 2.gif', import.meta.url).href,
+    'surprised': new URL('../assets/animations/surprised 3.gif', import.meta.url).href,
+    'tired': new URL('../assets/animations/tired 4.gif', import.meta.url).href,
+    'disappointed': new URL('../assets/animations/disappointed 5.gif', import.meta.url).href,
+    'shy': new URL('../assets/animations/shy6.gif', import.meta.url).href,
+    'thinking': new URL('../assets/animations/thinking 7.gif', import.meta.url).href,
+    'playful': new URL('../assets/animations/playful 8.gif', import.meta.url).href,
+    'sad': new URL('../assets/animations/sad 9.gif', import.meta.url).href,
+    'relaxed': new URL('../assets/animations/relaxed 10.gif', import.meta.url).href,
+    'serious': new URL('../assets/animations/serious 11.gif', import.meta.url).href,
+    'angry': new URL('../assets/animations/anggry 12.gif', import.meta.url).href
   };
 
-  const gifFile = emotionFileMap[emotion] || 'happy 1.gif';
+  const gifSrc = emotionFileMap[emotion] || emotionFileMap['happy'];
   
   return (
     <img 
-      src={`/src/assets/animations/${gifFile}`}
+      src={gifSrc}
       alt={`${emotion} animation`}
       style={{ 
         width: '180px', 
@@ -40,7 +40,7 @@ function GifAnimation({ emotion }: { emotion: string }) {
 
 function RiveAnimationInner({ emotion }: { emotion: string }) {
   const { rive, RiveComponent } = useRive({
-    src: `/src/assets/animations/expression_04_状态机_2.riv`,
+    src: new URL('../assets/animations/expression_04_状态机_2.riv', import.meta.url).href,
     stateMachines: 'State Machine 1',
     autoplay: true,
     layout: new Layout({
