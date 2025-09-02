@@ -1,9 +1,11 @@
-import { Mic, MicOff, Volume2, Camera } from 'lucide-react'
+import { Mic, Volume2, Camera } from 'lucide-react'
 import { EmotionAnimation } from './EmotionAnimation'
 import { EmotionSelector } from './EmotionSelector'
 import { ChatMessages } from './ChatMessages'
+import { MqttSettings } from './MqttSettings'
 import { useAudioPlaying } from '@/hooks/useAudioPlaying'
 import { useEffect, useRef, type RefObject } from 'react'
+import type { MqttConfig } from '@/utils/storage'
 
 interface WebRTCState {
   remoteStream: MediaStream | null;
@@ -30,6 +32,8 @@ interface ChatInterfaceProps {
   selectedEmotion: string;
   setSelectedEmotion: (emotion: string) => void;
   videoRef: RefObject<HTMLVideoElement | null>;
+  mqttConfig: MqttConfig;
+  onMqttConfigChange: (config: MqttConfig) => void;
 }
 
 export function ChatInterface({ 
@@ -40,7 +44,9 @@ export function ChatInterface({
   setShowVideo,
   selectedEmotion,
   setSelectedEmotion,
-  videoRef
+  videoRef,
+  mqttConfig,
+  onMqttConfigChange
 }: ChatInterfaceProps) {
   console.log('ChatInterface render - aiReplyText:', aiReplyText)
   
@@ -63,7 +69,12 @@ export function ChatInterface({
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">
-      <div className="fixed top-4 right-4">
+      <div className="fixed top-4 right-4 flex items-center gap-2">
+        <MqttSettings 
+          config={mqttConfig}
+          onConfigChange={onMqttConfigChange}
+          isConnected={isMqttConnected}
+        />
         <EmotionSelector 
           selectedEmotion={selectedEmotion}
           onEmotionSelect={setSelectedEmotion}
@@ -123,18 +134,20 @@ export function ChatInterface({
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
               webrtc.isConnecting
-                ? 'bg-yellow-500 animate-pulse'
+                ? 'bg-button-connecting'
                 : webrtc.isConnected && webrtc.isAudioEnabled
-                ? 'bg-blue-500 hover:bg-blue-600 shadow-md' 
+                ? 'bg-button-active' 
                 : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
             title={webrtc.isConnecting ? "连接中..." : !webrtc.isConnected ? "点击连接" : webrtc.isAudioEnabled ? "关闭麦克风" : "开启麦克风"}
           >
-            {webrtc.isConnected && webrtc.isAudioEnabled ? (
-              <Mic className="w-6 h-6 text-white" />
-            ) : (
-              <MicOff className={`w-6 h-6 ${webrtc.isConnecting ? 'text-white' : 'text-[#343741]'}`} />
-            )}
+            <Mic className={`w-6 h-6 ${
+              webrtc.isConnecting 
+                ? 'text-button-connecting' 
+                : webrtc.isConnected && webrtc.isAudioEnabled
+                ? 'text-button-active'
+                : 'text-[#343741]'
+            }`} />
           </button>
           
           <button 
@@ -147,12 +160,16 @@ export function ChatInterface({
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
               webrtc.isConnected && webrtc.isVideoEnabled 
-                ? 'bg-orange-500 hover:bg-orange-600 shadow-md' 
+                ? 'bg-button-active' 
                 : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
             title="扬声器控制"
           >
-            <Volume2 className={`w-6 h-6 ${webrtc.isConnected && webrtc.isVideoEnabled ? 'text-white' : 'text-[#343741]'}`} />
+            <Volume2 
+              className={`w-6 h-6 ${
+                webrtc.isConnected && webrtc.isVideoEnabled ? 'text-button-active' : 'text-[#343741]'
+              }`} 
+            />
           </button>
           
           <button 
@@ -168,12 +185,16 @@ export function ChatInterface({
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
               showVideo 
-                ? 'bg-purple-500 hover:bg-purple-600 shadow-md' 
+                ? 'bg-button-active' 
                 : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
             title={showVideo ? "关闭视频聊天" : "开启视频聊天"}
           >
-            <Camera className={`w-6 h-6 ${showVideo ? 'text-white' : 'text-[#343741]'}`} />
+            <Camera 
+              className={`w-6 h-6 ${
+                showVideo ? 'text-button-active' : 'text-[#343741]'
+              }`} 
+            />
           </button>
         </div>
         

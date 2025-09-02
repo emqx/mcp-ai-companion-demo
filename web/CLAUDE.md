@@ -2,7 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Code Can Not Use Chinese Comment!!!!!!
+## Code Style Rules
+
+**CRITICAL RULES - MUST FOLLOW:**
+
+1. **Code Can Not Use Chinese Comment!!!!!!**
+2. **NEVER USE INLINE STYLES** - Always use Tailwind CSS classes instead of inline `style` attributes
+3. When creating custom colors or styles, add them to `src/index.css` using `@layer utilities` and use them as Tailwind classes
 
 ## Commands
 
@@ -25,11 +31,14 @@ pnpm lint
 ### shadcn/ui Components
 
 ```bash
-# Add new shadcn/ui components
-pnpm dlx shadcn@latest add <component-name>
+# Add new shadcn/ui components (需要使用 Node.js v22)
+cd /Users/ysfscream/Workspace/EMQ/mcp-ai-companion-demo/web && nvm use v22 && pnpm dlx shadcn@latest add <component-name>
 
 # Example: Add a card component
-pnpm dlx shadcn@latest add card
+cd /Users/ysfscream/Workspace/EMQ/mcp-ai-companion-demo/web && nvm use v22 && pnpm dlx shadcn@latest add card
+
+# Example: Add alert dialog component
+cd /Users/ysfscream/Workspace/EMQ/mcp-ai-companion-demo/web && nvm use v22 && pnpm dlx shadcn@latest add alert-dialog
 ```
 
 ## Related Projects

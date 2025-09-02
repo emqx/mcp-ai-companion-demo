@@ -122,3 +122,44 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .bg-button-active {
+    background-color: rgba(94, 78, 255, 0.30);
+    box-shadow: 0 0 0 2px rgba(94, 78, 255, 0.20), 0 2px 8px rgba(94, 78, 255, 0.25);
+  }
+  .text-button-active {
+    color: #5E4EFF;
+  }
+  .bg-button-connecting {
+    background: rgba(94, 78, 255, 0.20);
+    position: relative;
+    overflow: visible;
+  }
+  .bg-button-connecting::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 50px;
+    border: 2px solid transparent;
+    border-top: 2px solid #5E4EFF;
+    animation: spin-border 1s linear infinite;
+  }
+  .text-button-connecting {
+    color: #5E4EFF;
+    position: relative;
+    z-index: 1;
+  }
+}
+
+@keyframes spin-border {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

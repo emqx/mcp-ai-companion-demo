@@ -45,12 +45,14 @@ export class McpMqttServer {
     this.callbacks = callbacks || {}
     
     this.connectionOptions = {
-      brokerUrl: 'ws://localhost:8083/mqtt',
+      brokerUrl: mqttOptions.brokerUrl || 'ws://localhost:8083/mqtt',
       clientId,
       clean: true,
-      connectTimeout: 4000,
-      reconnectPeriod: 1000,
+      connectTimeout: mqttOptions.connectTimeout || 4000,
+      reconnectPeriod: mqttOptions.reconnectPeriod || 1000,
       protocolVersion: 5, // MQTT 5.0 required by MCP over MQTT spec
+      username: mqttOptions.username,
+      password: mqttOptions.password,
       will: {
         topic: `$mcp-client/presence/${clientId}`,
         payload: JSON.stringify({
@@ -84,11 +86,12 @@ export class McpMqttServer {
       this.connectionState = 'connecting'
       
       try {
+        mqttLogger.info(`🔌 MCP: Connecting to MQTT broker at ${this.connectionOptions.brokerUrl} (ClientID: ${this.connectionOptions.clientId})`)
         this.mqttClient = mqtt.connect(this.connectionOptions.brokerUrl!, this.connectionOptions)
         
         this.mqttClient.on('connect', () => {
           this.connectionState = 'connected'
-          mqttLogger.info(`✅ Step 1/3: Connected to broker (${this.connectionOptions.clientId})`)
+          mqttLogger.info(`✅ Step 1/3: Connected to broker ${this.connectionOptions.brokerUrl} (${this.connectionOptions.clientId})`)
           
           // Use setTimeout to avoid race condition with subscriptions
           setTimeout(() => {
@@ -132,7 +135,7 @@ export class McpMqttServer {
         })
 
         this.mqttClient.on('reconnect', () => {
-          mqttLogger.info('🔄 Reconnecting...')
+          mqttLogger.info(`🔄 MCP: Reconnecting to ${this.connectionOptions.brokerUrl}...`)
         })
 
       } catch (error) {
@@ -341,7 +344,7 @@ export class McpMqttServer {
       jsonrpc: '2.0',
       id: request.id,
       result: {
-        protocolVersion: '2025-06-18',
+        protocolVersion: '2024-11-05',
         capabilities: {
           tools: {
             listChanged: true

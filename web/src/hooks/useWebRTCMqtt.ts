@@ -10,6 +10,8 @@ export interface UseWebRTCMqttOptions extends Omit<UseWebRTCOptions, 'signalingI
   username?: string
   password?: string
   clientId?: string
+  connectTimeout?: number
+  reconnectPeriod?: number
   autoConnect?: boolean
 }
 
@@ -18,6 +20,8 @@ export function useWebRTCMqtt({
   username,
   password,
   clientId,
+  connectTimeout,
+  reconnectPeriod,
   config = {},
   mediaConstraints = {
     video: true,
@@ -54,6 +58,8 @@ export function useWebRTCMqtt({
       brokerUrl: brokerUrl || webrtcClientConfig.brokerUrl,
       username: username || webrtcClientConfig.username,
       password: password || webrtcClientConfig.password,
+      connectTimeout: connectTimeout || webrtcClientConfig.connectTimeout,
+      reconnectPeriod: reconnectPeriod || webrtcClientConfig.reconnectPeriod,
       clientId: actualClientId,
       clean: true
     }
@@ -93,7 +99,7 @@ export function useWebRTCMqtt({
         mqttLogger.info('🔄 WebRTC: MQTT reconnecting...')
       })
     })
-  }, [brokerUrl, actualClientId, username, password])
+  }, [brokerUrl, actualClientId, username, password, connectTimeout, reconnectPeriod])
 
   const connect = useCallback(async () => {
     try {

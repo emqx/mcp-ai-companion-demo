@@ -6,11 +6,26 @@ import { appLogger } from '@/utils/logger'
 import { capturePhotoFromVideo } from '@/utils/photo-capture'
 import type { PhotoCaptureResult } from '@/tools/types'
 import { Toaster } from '@/components/ui/sonner'
+import { defaultMqttConfig } from '@/config/mqtt'
+import { loadMqttConfig, saveMqttConfig, type MqttConfig } from '@/utils/storage'
 
 function App() {
   const [aiReplyText, setAiReplyText] = useState<string>('')
   const [showVideo, setShowVideo] = useState<boolean>(false)
   const [selectedEmotion, setSelectedEmotion] = useState<string>('happy')
+  const [mqttConfig, setMqttConfig] = useState<MqttConfig>(() => {
+    const savedConfig = loadMqttConfig()
+    if (savedConfig) {
+      return savedConfig
+    }
+    return {
+      brokerUrl: defaultMqttConfig.brokerUrl,
+      username: defaultMqttConfig.username,
+      password: defaultMqttConfig.password,
+      connectTimeout: defaultMqttConfig.connectTimeout,
+      reconnectPeriod: defaultMqttConfig.reconnectPeriod
+    }
+  })
   const videoRef = useRef<HTMLVideoElement>(null)
 
   const onCameraControl = useCallback((enabled: boolean) => {
@@ -38,6 +53,13 @@ function App() {
     })
   }, [])
 
+  const onMqttConfigChange = useCallback((newConfig: MqttConfig) => {
+    setMqttConfig(newConfig)
+    saveMqttConfig(newConfig)
+    appLogger.info('💾 MQTT config saved to localStorage')
+    // TODO: Reconnect MQTT with new config
+  }, [])
+
   const callbacks = useMemo(() => ({
     onCameraControl,
     onEmotionChange,
@@ -48,8 +70,13 @@ function App() {
     isConnected: isMqttConnected,
     isMcpInitialized
   } = useMcpMqttServer({
+    brokerUrl: mqttConfig.brokerUrl,
+    username: mqttConfig.username,
+    password: mqttConfig.password,
+    connectTimeout: mqttConfig.connectTimeout,
+    reconnectPeriod: mqttConfig.reconnectPeriod,
     autoConnect: true,
-    callbacks
+    callbacks,
   })
 
   const {
@@ -66,6 +93,11 @@ function App() {
     isVideoEnabled
   } = useWebRTCMqtt({
     autoConnect: false,
+    brokerUrl: mqttConfig.brokerUrl,
+    username: mqttConfig.username,
+    password: mqttConfig.password,
+    connectTimeout: mqttConfig.connectTimeout,
+    reconnectPeriod: mqttConfig.reconnectPeriod,
     onASRResponse: (results: string) => {
       console.log('🎤 ASR Response received:', results)
       // Clear AI reply text when user starts speaking
@@ -115,6 +147,8 @@ function App() {
         selectedEmotion={selectedEmotion}
         setSelectedEmotion={setSelectedEmotion}
         videoRef={videoRef}
+        mqttConfig={mqttConfig}
+        onMqttConfigChange={onMqttConfigChange}
       />
       <Toaster />
     </>

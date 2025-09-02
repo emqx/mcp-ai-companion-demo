@@ -194,7 +194,7 @@ class McpMqttClient {
       id: Math.random().toString(16).substring(2, 10),
       method: 'initialize',
       params: {
-        protocolVersion: '2025-06-18',
+        protocolVersion: '2024-11-05',
         capabilities: {
           tools: {}
         },

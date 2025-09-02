@@ -138,7 +138,7 @@ async initializeServer(serverId, serverName) {
     id: generateId(),
     method: 'initialize',
     params: {
-      protocolVersion: '2025-06-18',
+      protocolVersion: '2024-11-05',
       capabilities: { tools: {} },
       clientInfo: { name: 'client-name', version: '1.0.0' }
     }
