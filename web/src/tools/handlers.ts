@@ -97,13 +97,72 @@ export const takePhotoHandler: ToolHandler = async (
 }
 
 /**
+ * Handler for controlling audio volume and mute state
+ * @param args - Tool arguments containing 'volume' and/or 'muted' fields
+ * @param context - Execution context with callback functions
+ * @returns Execution result with success status and message
+ */
+export const controlVolumeHandler: ToolHandler = (
+  args: Record<string, any>,
+  context: ToolHandlerContext
+): ToolExecutionResult => {
+  const { volume, muted } = args
+  
+  // Validate volume parameter if provided
+  if (volume !== undefined && (typeof volume !== 'number' || volume < 0 || volume > 100)) {
+    return {
+      success: false,
+      message: 'Volume must be a number between 0 and 100'
+    }
+  }
+  
+  // Validate muted parameter if provided
+  if (muted !== undefined && typeof muted !== 'boolean') {
+    return {
+      success: false,
+      message: 'Muted must be a boolean value'
+    }
+  }
+  
+  // At least one parameter must be provided
+  if (volume === undefined && muted === undefined) {
+    return {
+      success: false,
+      message: 'Either volume or muted parameter must be provided'
+    }
+  }
+  
+  mcpLogger.info(`🔊 Volume control: ${volume !== undefined ? `volume=${volume}%` : ''} ${muted !== undefined ? `muted=${muted}` : ''}`.trim())
+  
+  // Call the volume control callback if available
+  if (context.onVolumeControl) {
+    context.onVolumeControl(volume !== undefined ? volume / 100 : 1, muted)
+    
+    const statusMsg = []
+    if (volume !== undefined) statusMsg.push(`volume set to ${volume}%`)
+    if (muted !== undefined) statusMsg.push(`audio ${muted ? 'muted' : 'unmuted'}`)
+    
+    return {
+      success: true,
+      message: `Volume control updated: ${statusMsg.join(', ')}`
+    }
+  }
+  
+  return {
+    success: false,
+    message: 'Volume control callback not available'
+  }
+}
+
+/**
  * Registry of all available tool handlers
  * Maps tool names to their corresponding handler functions
  */
 export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   control_camera: controlCameraHandler,
   change_emotion: changeEmotionHandler,
-  take_photo: takePhotoHandler
+  take_photo: takePhotoHandler,
+  control_volume: controlVolumeHandler
 }
 
 /**

@@ -59,6 +59,27 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       },
       required: []
     }
+  },
+
+  control_volume: {
+    name: 'control_volume',
+    description: 'Control the audio volume and mute state',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        volume: {
+          type: 'number',
+          description: 'Volume level as percentage (0-100)',
+          minimum: 0,
+          maximum: 100
+        },
+        muted: {
+          type: 'boolean',
+          description: 'Whether to mute or unmute the audio'
+        }
+      },
+      required: []
+    }
   }
 }
 

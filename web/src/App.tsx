@@ -13,6 +13,8 @@ function App() {
   const [aiReplyText, setAiReplyText] = useState<string>('')
   const [showVideo, setShowVideo] = useState<boolean>(false)
   const [selectedEmotion, setSelectedEmotion] = useState<string>('happy')
+  const [volume, setVolume] = useState<number>(1.0) // 0.0 to 1.0
+  const [isMuted, setIsMuted] = useState<boolean>(false)
   const [mqttConfig, setMqttConfig] = useState<MqttConfig>(() => {
     const savedConfig = loadMqttConfig()
     if (savedConfig) {
@@ -27,6 +29,7 @@ function App() {
     }
   })
   const videoRef = useRef<HTMLVideoElement>(null)
+  const audioRef = useRef<HTMLVideoElement>(null)
 
   const onCameraControl = useCallback((enabled: boolean) => {
     setShowVideo(enabled)
@@ -53,6 +56,30 @@ function App() {
     })
   }, [])
 
+  const onVolumeControl = useCallback((newVolume?: number, muted?: boolean) => {
+    // Update volume if provided (0.0 to 1.0)
+    if (newVolume !== undefined) {
+      setVolume(newVolume)
+      appLogger.info(`🔊 Volume set to ${Math.round(newVolume * 100)}%`)
+    }
+    
+    // Update muted state if provided
+    if (muted !== undefined) {
+      setIsMuted(muted)
+      appLogger.info(`🔊 Audio ${muted ? 'muted' : 'unmuted'}`)
+    }
+    
+    // Apply changes to audio element if it exists
+    if (audioRef.current) {
+      if (newVolume !== undefined) {
+        audioRef.current.volume = newVolume
+      }
+      if (muted !== undefined) {
+        audioRef.current.muted = muted
+      }
+    }
+  }, [])
+
   const onMqttConfigChange = useCallback((newConfig: MqttConfig) => {
     setMqttConfig(newConfig)
     saveMqttConfig(newConfig)
@@ -63,8 +90,9 @@ function App() {
   const callbacks = useMemo(() => ({
     onCameraControl,
     onEmotionChange,
-    onTakePhoto
-  }), [onCameraControl, onEmotionChange, onTakePhoto])
+    onTakePhoto,
+    onVolumeControl
+  }), [onCameraControl, onEmotionChange, onTakePhoto, onVolumeControl])
 
   const {
     isConnected: isMqttConnected,
@@ -147,6 +175,9 @@ function App() {
         selectedEmotion={selectedEmotion}
         setSelectedEmotion={setSelectedEmotion}
         videoRef={videoRef}
+        audioRef={audioRef}
+        volume={volume}
+        isMuted={isMuted}
         mqttConfig={mqttConfig}
         onMqttConfigChange={onMqttConfigChange}
       />

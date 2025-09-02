@@ -4,7 +4,7 @@ import { EmotionSelector } from './EmotionSelector'
 import { ChatMessages } from './ChatMessages'
 import { MqttSettings } from './MqttSettings'
 import { useAudioPlaying } from '@/hooks/useAudioPlaying'
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, type RefObject } from 'react'
 import type { MqttConfig } from '@/utils/storage'
 
 interface WebRTCState {
@@ -32,6 +32,9 @@ interface ChatInterfaceProps {
   selectedEmotion: string;
   setSelectedEmotion: (emotion: string) => void;
   videoRef: RefObject<HTMLVideoElement | null>;
+  audioRef: RefObject<HTMLVideoElement | null>;
+  volume: number;
+  isMuted: boolean;
   mqttConfig: MqttConfig;
   onMqttConfigChange: (config: MqttConfig) => void;
 }
@@ -45,12 +48,13 @@ export function ChatInterface({
   selectedEmotion,
   setSelectedEmotion,
   videoRef,
+  audioRef,
+  volume,
+  isMuted,
   mqttConfig,
   onMqttConfigChange
 }: ChatInterfaceProps) {
   console.log('ChatInterface render - aiReplyText:', aiReplyText)
-  
-  const audioRef = useRef<HTMLVideoElement>(null)
   
   const isSpeaking = useAudioPlaying(audioRef, 1000)
 
@@ -58,6 +62,9 @@ export function ChatInterface({
     if (webrtc.remoteStream) {
       if (audioRef.current) {
         audioRef.current.srcObject = webrtc.remoteStream
+        // Apply volume and mute state to audio element
+        audioRef.current.volume = volume
+        audioRef.current.muted = isMuted
       }
       
       if (showVideo && videoRef?.current) {
@@ -65,7 +72,15 @@ export function ChatInterface({
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webrtc.remoteStream, showVideo])
+  }, [webrtc.remoteStream, showVideo, volume, isMuted])
+
+  // Update volume and mute state when they change
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume
+      audioRef.current.muted = isMuted
+    }
+  }, [volume, isMuted, audioRef])
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">
@@ -201,7 +216,7 @@ export function ChatInterface({
         {/* Status Text */}
         {/* <div className="text-center mt-4">
           <p className="text-gray-500 text-sm">
-            双击XX头像可录制，单击XX头像可录音
+            双击头像表示鼓励，单击头像表示敲打
           </p>
         </div> */}
       </div>

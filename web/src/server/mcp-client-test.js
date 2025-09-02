@@ -102,11 +102,21 @@ class McpMqttClient {
     console.debug(chalk.gray(`📥 Received: ${topic}`));
     
     try {
-      const data = JSON.parse(payload);
-      
       if (topic.startsWith('$mcp-server/presence/')) {
+        if (payload.trim() === '') {
+          // Empty payload means server unregistration
+          const topicParts = topic.split('/');
+          const serverId = topicParts[2];
+          const serverName = topicParts[3];
+          console.log(chalk.red(`🔻 [MCP Client] Server offline: ${chalk.bold(serverName)} (${serverId})`));
+          this.servers.delete(`${serverId}/${serverName}`);
+          return;
+        }
+        
+        const data = JSON.parse(payload);
         this.handleServerPresence(topic, data);
       } else if (topic.startsWith(`$mcp-rpc/${this.clientId}/`)) {
+        const data = JSON.parse(payload);
         this.handleRpcResponse(topic, data);
       }
     } catch (error) {
@@ -159,11 +169,14 @@ class McpMqttClient {
         
         console.log(chalk.magenta('\n🎮 === Manual Tool Testing ==='));
         console.log(chalk.cyan('Available commands:'));
-        console.log(chalk.white('  📹 camera_on     - Enable camera'));
-        console.log(chalk.white('  📹 camera_off    - Disable camera'));  
-        console.log(chalk.white('  😊 emotion <name> - Change emotion (happy, sad, angry, etc.)'));
-        console.log(chalk.white('  📸 take_photo    - Take a photo from video stream'));
-        console.log(chalk.white('  🚪 quit          - Exit test client\n'));
+        console.log(chalk.white('  📹 camera_on       - Enable camera'));
+        console.log(chalk.white('  📹 camera_off      - Disable camera'));  
+        console.log(chalk.white('  😊 emotion <name>  - Change emotion (happy, sad, angry, etc.)'));
+        console.log(chalk.white('  📸 take_photo      - Take a photo from video stream'));
+        console.log(chalk.white('  🔊 volume <0-100>  - Set volume percentage (0-100)'));
+        console.log(chalk.white('  🔇 mute            - Mute audio'));
+        console.log(chalk.white('  🔊 unmute          - Unmute audio'));
+        console.log(chalk.white('  🚪 quit            - Exit test client\n'));
         
         // Extract server info for manual tool calls
         const topicParts = topic.split('/');
@@ -250,8 +263,19 @@ class McpMqttClient {
           await this.callTool('change_emotion', { emotion });
         } else if (command === 'take_photo') {
           await this.callTool('take_photo', { source: 'remote', quality: 0.9 });
+        } else if (command.startsWith('volume ')) {
+          const volume = parseInt(command.split(' ')[1]);
+          if (isNaN(volume) || volume < 0 || volume > 100) {
+            console.log(chalk.red('❓ Volume must be a number between 0 and 100'));
+          } else {
+            await this.callTool('control_volume', { volume });
+          }
+        } else if (command === 'mute') {
+          await this.callTool('control_volume', { muted: true });
+        } else if (command === 'unmute') {
+          await this.callTool('control_volume', { muted: false });
         } else {
-          console.log(chalk.red('❓ Unknown command. Try: camera_on, camera_off, emotion <emotion>, take_photo, quit'));
+          console.log(chalk.red('❓ Unknown command. Try: camera_on, camera_off, emotion <emotion>, take_photo, volume <0-100>, mute, unmute, volume_test, quit'));
         }
         
         promptUser();
@@ -299,7 +323,7 @@ async function runTest() {
   console.log(chalk.bold.blue('\n🚀 === MCP Client Test Started ===\n'));
   
   const client = new McpMqttClient({
-    brokerUrl: 'ws://broker.emqx.io:8083/mqtt'
+    brokerUrl: 'ws://localhost:8083/mqtt'
   });
 
   try {

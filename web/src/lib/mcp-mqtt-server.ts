@@ -54,13 +54,10 @@ export class McpMqttServer {
       username: mqttOptions.username,
       password: mqttOptions.password,
       will: {
-        topic: `$mcp-client/presence/${clientId}`,
-        payload: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'notifications/disconnected'
-        }),
+        topic: `$mcp-server/presence/${this.serverId}/${this.serverName}`,
+        payload: '',
         qos: 0,
-        retain: false
+        retain: true
       },
       properties: {
         userProperties: {
@@ -146,17 +143,24 @@ export class McpMqttServer {
   }
 
   async disconnect(): Promise<void> {
-    return new Promise((resolve) => {
-      if (this.mqttClient) {
-        this.mqttClient.end(false, {}, () => {
+    if (this.mqttClient) {
+      try {
+        // Clear presence retained message before disconnecting
+        const presenceTopic = `$mcp-server/presence/${this.serverId}/${this.serverName}`
+        mcpLogger.info(`🧹 Clearing presence retained message: ${presenceTopic}`)
+        await this.publish(presenceTopic, '', { retain: true })
+      } catch (error) {
+        mcpLogger.error('❌ Failed to clear presence message:', error instanceof Error ? error.message : String(error))
+      }
+      
+      return new Promise((resolve) => {
+        this.mqttClient!.end(false, {}, () => {
           this.connectionState = 'disconnected'
           mqttLogger.warn('🔌 Connection closed')
           resolve()
         })
-      } else {
-        resolve()
-      }
-    })
+      })
+    }
   }
 
   async publish(topic: string, message: string, options?: { qos?: 0 | 1 | 2, retain?: boolean }): Promise<void> {

@@ -31,6 +31,8 @@ export interface ToolHandlerContext {
   onEmotionChange?: (emotion: string) => void
   /** Callback for photo capture operations */
   onTakePhoto?: (source: 'local' | 'remote', quality: number) => Promise<PhotoCaptureResult>
+  /** Callback for volume control operations */
+  onVolumeControl?: (volume: number, muted?: boolean) => void
 }
 
 /**
