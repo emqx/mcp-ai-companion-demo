@@ -196,11 +196,11 @@ async def create_mcp_client(
     """
     # 使用默认回调函数如果没有提供
     if on_mcp_server_discovered is None:
-        on_mcp_server_discovered = on_mcp_server_discovered
+        on_mcp_server_discovered = globals()["on_mcp_server_discovered"]
     if on_mcp_connect is None:
-        on_mcp_connect = on_mcp_connect
+        on_mcp_connect = globals()["on_mcp_connect"]
     if on_mcp_disconnect is None:
-        on_mcp_disconnect = on_mcp_disconnect
+        on_mcp_disconnect = globals()["on_mcp_disconnect"]
 
     mcp_client = mcp_mqtt.MqttTransportClient(
         client_name,
@@ -221,6 +221,9 @@ async def initialize_mcp_client(
 ) -> mcp_mqtt.MqttTransportClient:
     """初始化 MCP 客户端并等待连接建立
 
+    注意：此函数已弃用，请使用 async with 上下文管理器模式
+    参考 example_usage() 函数的实现
+
     Args:
         client_name: 客户端名称
         host: MQTT 服务器主机地址
@@ -231,6 +234,9 @@ async def initialize_mcp_client(
     """
     mcp_client = await create_mcp_client(client_name, host)
 
+    # 手动进入上下文以初始化 _task_group
+    await mcp_client.__aenter__()
+
     try:
         await mcp_client.start()
         await anyio.sleep(wait_time)
@@ -238,6 +244,8 @@ async def initialize_mcp_client(
         return mcp_client
     except Exception as e:
         logger.error(f"Failed to initialize MCP client: {e}")
+        # 如果初始化失败，需要退出上下文
+        await mcp_client.__aexit__(None, None, None)
         raise
 
 
@@ -245,17 +253,19 @@ async def initialize_mcp_client(
 async def example_usage():
     """使用示例"""
     try:
-        # 创建并初始化 MCP 客户端
-        mcp_client = await initialize_mcp_client(
-            client_name="example_client", host="localhost", wait_time=3.0
-        )
+        # 使用异步上下文管理器创建并初始化 MCP 客户端
+        async with await create_mcp_client(
+            client_name="test_client", host="localhost"
+        ) as mcp_client:
+            await mcp_client.start()
+            await anyio.sleep(3.0)
+            logger.info(f"MCP client 'test_client' initialized successfully")
 
-        # 获取工具列表
-        tools = await get_mcp_tools(mcp_client)
-        logger.info(f"Found {len(tools)} MCP tools")
+            # 获取工具列表
+            tools = await get_mcp_tools(mcp_client)
+            logger.info(f"Found {len(tools)} MCP tools")
 
-        # 使用完毕后关闭客户端
-        await mcp_client.stop()
+            # 上下文管理器会自动处理清理工作
 
     except Exception as e:
         logger.error(f"Example usage error: {e}")

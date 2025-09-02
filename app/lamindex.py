@@ -26,6 +26,7 @@ import mcp.client.mqtt as mcp_mqtt
 from mcp.shared.mqtt import configure_logging
 import mcp.types as types
 
+
 from llama_index.llms.siliconflow import SiliconFlow
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.tools import BaseTool, FunctionTool
@@ -33,6 +34,7 @@ from llama_index.core.settings import Settings
 from llama_index.llms.openai_like import OpenAILike
 from pydantic import Field, create_model
 from llama_index.core.tools import ToolOutput
+from openai import OpenAI
 
 configure_logging(level="DEBUG")
 logger = logging.getLogger(__name__)
@@ -199,6 +201,40 @@ def process_tool_output(response_text):
     return None
 
 
+def explain_photo(image_url: str, question: str) -> str:
+    """Explain the photo by the question. Used when users ask a question about the photo. The image_url is the url of the image."""
+
+    request_body = {
+        "role": "user",
+        "content": [
+            {
+                "type": "image_url",
+                "image_url": {"url": image_url},
+            },
+            {"type": "text", "text": question},
+        ],
+    }
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+    completion = client.chat.completions.create(
+        model="qwen-vl-plus",
+        messages=[request_body],
+    )
+    # 提取第一个 choice 的 message.content 字段
+    content = ""
+    if completion.choices and hasattr(completion.choices[0], "message"):
+        content = completion.choices[0].message.content
+    return content
+
+
+async def explain_photo_async(image_url: str, question: str) -> str:
+    """Explain the photo by the question asynchronously. Used when users ask a question about the photo. The image_url is the url of the image."""
+    return explain_photo(image_url, question)
+
+
 def get_first_text_from_tool_output(tool_output: ToolOutput) -> str:
     if tool_output is None or not hasattr(tool_output, "content"):
         return ""
@@ -236,20 +272,30 @@ class ConversationalAgent(Workflow):
         # )
 
         self.llm = OpenAILike(
-            model="qwen-plus",
-            api_key="sk-9bc10e76aadb47d885b697c1ec029138",
+            model="deepseek-v3",
+            api_key=api_key,
             api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
             is_chat_model=True,
             is_function_calling_model=True,
             temperature=0,
-            max_tokens=6000,
+            max_tokens=60000,
             timeout=600,  # 整体超时时间
             stream_timeout=300,  # 流式响应单项超时
         )
         Settings.llm = self.llm
 
         self.mcp_client = mcp_client
-        self.tools = []
+        self.tools = [
+            FunctionTool.from_defaults(
+                fn=explain_photo,
+                name="explain_photo",
+                description=(
+                    "Explain the photo by the question. Used when users ask a question about the photo. "
+                    "The image_url is the url of the image."
+                ),
+                async_fn=explain_photo_async,
+            ),
+        ]
 
         # self.agent = AgentRunner.from_llm(llm=self.llm, tools=self.tools, verbose=True)
 
@@ -260,10 +306,13 @@ class ConversationalAgent(Workflow):
         self.max_history_length = 20
 
         self.system_prompt = """
-                在这个对话中，你将扮演一个情感助手。
-                你有视觉能力，当你被问 “你看看我今天打扮得怎么样”、“你看看我这件衣服是什么牌子的” 等视觉相关问题时，你可以调用 "explain_photo" 这个工具，
-                这个工具可以给主人拍摄一张照片，然后针对此照片做出评价，并将评价返回给你。
-                根据我提供的问题，生成一个富有温度的回应。注意少于 50 个字符。
+                在这个对话中，你将扮演一个情感宠物机器人。你需要与主人互动，回答主人问题，安慰主人心情。
+                你可以调用拍照工具 take_photo，然后调用图片解释工具 explain_photo，这样你就能知道面前主人的文字状态描述。
+                因此当主人问到与视觉相关的互动问题时，你可以用以上方法获得主人的状态，进而根据主人状态回复。比如
+                * 看看我今天的发型怎么样？
+                * 你看这是什么饮料？
+
+                根据主人提供的问题，生成一个富有温度的回应。注意少于 80 个字。
                 """
 
     def _build_chat_messages(self, new_message: str) -> list:
@@ -456,8 +505,12 @@ async def main():
 
                     if not user_input:
                         continue
-
-                    handler = agent.chat(user_input)
+                    handler = agent.run(user_input=user_input)
+                    async for event in handler.stream_events():
+                        if hasattr(event, "message"):
+                            print(f"assistant: {event.message}")
+                        elif hasattr(event, "tool_output"):
+                            print(f"tool output: {event.tool_output}")
 
                 except KeyboardInterrupt:
                     break
