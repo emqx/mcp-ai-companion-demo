@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Package files
+mcp-ai-companion-demo-web-*.tar.gz
+*.tar.gz
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
