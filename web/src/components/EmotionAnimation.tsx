@@ -3,39 +3,36 @@ import { useEffect } from 'react';
 
 interface EmotionAnimationProps {
   emotion: string;
-  type?: 'rive' | 'gif';
+  type?: 'rive' | 'gif'
+}
+
+const createAssetUrl = (filename: string) => new URL(`../assets/animations/${filename}`, import.meta.url).href
+
+const emotionFileMap: { [key: string]: string } = {
+  'happy': createAssetUrl('happy 1.gif'),
+  'laug': createAssetUrl('laug 2.gif'),
+  'surprised': createAssetUrl('surprised 3.gif'),
+  'tired': createAssetUrl('tired 4.gif'),
+  'disappointed': createAssetUrl('disappointed 5.gif'),
+  'shy': createAssetUrl('shy6.gif'),
+  'thinking': createAssetUrl('thinking 7.gif'),
+  'playful': createAssetUrl('playful 8.gif'),
+  'sad': createAssetUrl('sad 9.gif'),
+  'relaxed': createAssetUrl('relaxed 10.gif'),
+  'serious': createAssetUrl('serious 11.gif'),
+  'angry': createAssetUrl('anggry 12.gif')
 }
 
 function GifAnimation({ emotion }: { emotion: string }) {
-  const emotionFileMap: { [key: string]: string } = {
-    'happy': new URL('../assets/animations/happy 1.gif', import.meta.url).href,
-    'laug': new URL('../assets/animations/laug 2.gif', import.meta.url).href,
-    'surprised': new URL('../assets/animations/surprised 3.gif', import.meta.url).href,
-    'tired': new URL('../assets/animations/tired 4.gif', import.meta.url).href,
-    'disappointed': new URL('../assets/animations/disappointed 5.gif', import.meta.url).href,
-    'shy': new URL('../assets/animations/shy6.gif', import.meta.url).href,
-    'thinking': new URL('../assets/animations/thinking 7.gif', import.meta.url).href,
-    'playful': new URL('../assets/animations/playful 8.gif', import.meta.url).href,
-    'sad': new URL('../assets/animations/sad 9.gif', import.meta.url).href,
-    'relaxed': new URL('../assets/animations/relaxed 10.gif', import.meta.url).href,
-    'serious': new URL('../assets/animations/serious 11.gif', import.meta.url).href,
-    'angry': new URL('../assets/animations/anggry 12.gif', import.meta.url).href
-  };
-
   const gifSrc = emotionFileMap[emotion] || emotionFileMap['happy'];
   
   return (
     <img 
       src={gifSrc}
       alt={`${emotion} animation`}
-      style={{ 
-        width: '180px', 
-        height: '180px', 
-        display: 'block',
-        objectFit: 'contain'
-      }}
+      className="w-[180px] h-[180px] block object-contain"
     />
-  );
+  )
 }
 
 function RiveAnimationInner({ emotion }: { emotion: string }) {
