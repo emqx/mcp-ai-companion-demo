@@ -1,58 +1,222 @@
-import asyncio
-import anyio
+from contextlib import AsyncExitStack
+from datetime import timedelta
+
 import logging
 import re
-from typing import List, Optional, Union, cast, Any
-from dataclasses import dataclass
-
-import mcp.client.mqtt as mcp_mqtt
-from mcp.shared.mqtt import configure_logging
+from typing import List, cast, Any
+import anyio
+from llama_index.core.tools import BaseTool, FunctionTool
+from mcp.client.mqtt import InitializeResult, MqttTransportClient
+from mcp.shared.mqtt import MqttOptions
+from pydantic import BaseModel
+from pydantic import Field, create_model
 import mcp.types as types
 
-from llama_index.core.tools import BaseTool, FunctionTool
-from pydantic import Field, create_model
-
-# 配置日志
-configure_logging(level="DEBUG")
 logger = logging.getLogger(__name__)
 
+class McpServer(BaseModel):
+    server_name: str
+    success: bool
 
-async def on_mcp_server_discovered(client: mcp_mqtt.MqttTransportClient, server_name):
-    """MCP 服务器发现时的回调函数"""
-    logger.info(f"Discovered {server_name}, connecting ...")
-    await client.initialize_mcp_server(server_name)
+class McpMqttClient:
+    def __init__(self, mqtt_options: MqttOptions, client_name: str, server_name_filter: str, read_timeout: int = 10, clientid: str | None = None):
+        self._mqtt_client = None
+        self.clientid = clientid
+        self.mqtt_options = mqtt_options
+        self.read_timeout = read_timeout
+        self.client_name = client_name
+        self.server_name_filter = server_name_filter
+        self.mcp_servers: list[McpServer] = []
+        self.mcp_tools: list[BaseTool] = []
+        self._stop_event = anyio.Event()
+        self._connected_event = anyio.Event()
 
+    def is_connected(self) -> bool:
+        return self._mqtt_client.is_connected() if self._mqtt_client else False
 
-async def on_mcp_connect(client, server_name, connect_result):
-    """MCP 连接成功时的回调函数"""
-    capabilities = client.get_session(server_name).server_info.capabilities
-    logger.info(f"Capabilities of {server_name}: {capabilities}")
+    async def start(self):
+        logger.info("MCP MQTT Client running ...")
+        self._exit_stack = AsyncExitStack()
+        self._mqtt_client = await self._exit_stack.enter_async_context(
+            MqttTransportClient(
+                mcp_client_name=self.client_name,
+                client_id=self.clientid,
+                server_name_filter=self.server_name_filter,
+                auto_connect_to_mcp_server=True,
+                on_mcp_server_discovered=self.on_mcp_server_discovered,
+                on_mcp_connect=self.on_mcp_connect,
+                on_mcp_disconnect=self.on_mcp_disconnect,
+                mqtt_options=self.mqtt_options,
+            )
+        )
+        self._connected_event.set()
+        await self._stop_event.wait()
+        logger.info("MCP MQTT Client termniated.")
+        await self._exit_stack.aclose()
 
-    if capabilities.prompts:
-        prompts = await client.list_prompts(server_name)
-        logger.info(f"Prompts of {server_name}: {prompts}")
+    async def stop(self):
+        self._stop_event.set()
 
-    if capabilities.resources:
-        resources = await client.list_resources(server_name)
-        logger.info(f"Resources of {server_name}: {resources}")
-        resource_templates = await client.list_resource_templates(server_name)
-        logger.info(f"Resources templates of {server_name}: {resource_templates}")
+    async def connect(self) -> bool | str:
+        await self._connected_event.wait()
+        if self._mqtt_client:
+            return await self._mqtt_client.start(timeout=timedelta(seconds=3))
+        else:
+            return False
 
-    if capabilities.tools:
-        toolsResult = await client.list_tools(server_name)
-        tools = toolsResult.tools
-        logger.info(f"Tools of {server_name}: {tools}")
+    def get_mcp_servers(self):
+        return self.mcp_servers
 
+    def get_alive_mcp_servers(self):
+        return [server for server in self.mcp_servers if server.success]
 
-async def on_mcp_disconnect(client, server_name):
-    """MCP 断开连接时的回调函数"""
-    logger.info(f"Disconnected from {server_name}")
+    def get_session(self, server_name: str):
+        if self._mqtt_client:
+            return self._mqtt_client.get_session(server_name)
 
+    async def initialize_mcp_server(self, server_name) -> InitializeResult | None:
+        if self._mqtt_client:
+            return await self._mqtt_client.initialize_mcp_server(server_name, read_timeout_seconds=timedelta(seconds=self.read_timeout))
+        else:
+            return None
+
+    async def on_mcp_server_discovered(self, client, server_name):
+        logger.info(f"Discovered MCP server name: {server_name}")
+        self.mcp_servers.append(McpServer(server_name=server_name, success=False))
+
+    async def on_mcp_disconnect(self, client, server_name):
+        logger.info(f"Disconnected from MCP server name: {server_name}")
+        self.mcp_servers = [server for server in self.mcp_servers if server.server_name != server_name]
+
+    async def on_mcp_connect(self, client, server_name, connect_result):
+        success, _init_result = connect_result
+        logger.info(f"Connect to MCP server name: {server_name}, result: {success}")
+        if success == "ok":
+            await self.load_mcp_tools(server_name)
+        for server in self.mcp_servers:
+            if server.server_name == server_name:
+                server.success = success == "ok"
+                break
+        else:
+            self.mcp_servers.append(McpServer(server_name=server_name, success=success))
+
+    async def load_mcp_tools(self, server_name: str):
+        logger.info(f"Loading MCP tools from server: {server_name}")
+        try:
+            ## note that we only support 1 MCP server now
+            self.mcp_tools = await self.get_mcp_tools(server_name)
+            logger.info(f"loaded tools: {[tool.metadata.name for tool in self.mcp_tools]}")
+        except Exception as e:
+            logger.error(f"load tool error: {e}")
+
+    async def get_mcp_tools(self, server_name) -> List[FunctionTool]:
+        client_session = self.get_session(server_name)
+        all_tools = []
+        try:
+            try:
+                tools_result = await client_session.list_tools()
+
+                if tools_result is False:
+                    return all_tools
+
+                list_tools_result = cast(types.ListToolsResult, tools_result)
+                tools = list_tools_result.tools
+
+                for tool in tools:
+                    logger.info(f"tool: {tool.name} - {tool.description}")
+
+                    def create_mcp_tool_wrapper(client_ref, tool_name):
+                        async def mcp_tool_wrapper(**kwargs):
+                            try:
+                                result = await client_ref.call_tool(
+                                    tool_name, kwargs
+                                )
+                                if result is False:
+                                    return f"call {tool_name} failed"
+
+                                call_result = cast(types.CallToolResult, result)
+
+                                if hasattr(call_result, "content") and call_result.content:
+                                    content_parts = []
+                                    for content_item in call_result.content:
+                                        if hasattr(content_item, "type"):
+                                            if content_item.type == "text":
+                                                text_content = cast(
+                                                    types.TextContent, content_item
+                                                )
+                                                content_parts.append(text_content.text)
+                                            elif content_item.type == "image":
+                                                image_content = cast(
+                                                    types.ImageContent, content_item
+                                                )
+                                                content_parts.append(
+                                                    f"[image: {image_content.mimeType}]"
+                                                )
+                                            elif content_item.type == "resource":
+                                                resource_content = cast(
+                                                    types.EmbeddedResource, content_item
+                                                )
+                                                content_parts.append(
+                                                    f"[resource: {resource_content.resource}]"
+                                                )
+                                            else:
+                                                content_parts.append(str(content_item))
+                                        else:
+                                            content_parts.append(str(content_item))
+
+                                    result_text = "\n".join(content_parts)
+
+                                    if (
+                                        hasattr(call_result, "isError")
+                                        and call_result.isError
+                                    ):
+                                        return f"tool return error: {result_text}"
+                                    else:
+                                        return result_text
+                                else:
+                                    return str(call_result)
+
+                            except Exception as e:
+                                error_msg = f"call {tool_name} error: {e}"
+                                logger.error(error_msg)
+                                return error_msg
+
+                        return mcp_tool_wrapper
+
+                    wrapper_func = create_mcp_tool_wrapper(
+                        client_session, tool.name
+                    )
+
+                    try:
+                        input_schema = getattr(tool, "inputSchema", {}) or {}
+                        fn_schema = build_fn_schema_from_input_schema(
+                            tool.name, input_schema
+                        )
+                        llamaindex_tool = FunctionTool.from_defaults(
+                            fn=wrapper_func,
+                            name=f"{tool.name}",
+                            description=tool.description or f"MCP tool: {tool.name}",
+                            async_fn=wrapper_func,
+                            fn_schema=fn_schema,
+                        )
+                        all_tools.append(llamaindex_tool)
+                        # logger.info(f"call tool success: mcp_{tool.name}")
+
+                    except Exception as e:
+                        logger.error(f"create tool {tool.name} error: {e}")
+
+            except Exception as e:
+                logger.error(f"Get tool list error: {e}")
+
+        except Exception as e:
+            logger.error(f"Get tool list error: {e}")
+
+        return all_tools
 
 def build_fn_schema_from_input_schema(model_name: str, input_schema: dict):
-    """从 JSON Schema 构建 Pydantic 模型
+    """Build a Pydantic model from JSON Schema's properties/required so params are top-level.
 
-    将嵌套类型放宽为 Any。required 控制字段是否必需。
+    We relax nested types to Any. Required controls whether a field is required.
     """
     props = (input_schema or {}).get("properties", {}) or {}
     required = set((input_schema or {}).get("required", []) or [])
@@ -65,212 +229,3 @@ def build_fn_schema_from_input_schema(model_name: str, input_schema: dict):
 
     class_name = re.sub(r"\W+", "_", f"{model_name}Params")
     return create_model(class_name, **fields)
-
-
-async def get_mcp_tools(
-    mcp_client: mcp_mqtt.MqttTransportClient, server_name: str = "ESP32 Demo Server"
-) -> List[BaseTool]:
-    """获取 MCP 工具列表并转换为 LlamaIndex 工具格式"""
-    all_tools = []
-    try:
-        try:
-            tools_result = await mcp_client.list_tools(server_name)
-
-            if tools_result is False:
-                return all_tools
-
-            list_tools_result = cast(types.ListToolsResult, tools_result)
-            tools = list_tools_result.tools
-
-            for tool in tools:
-                logger.info(f"tool: {tool.name} - {tool.description}")
-
-                def create_mcp_tool_wrapper(client_ref, server_name, tool_name):
-                    async def mcp_tool_wrapper(**kwargs):
-                        try:
-                            result = await client_ref.call_tool(
-                                server_name, tool_name, kwargs
-                            )
-                            if result is False:
-                                return f"call {tool_name} failed"
-
-                            call_result = cast(types.CallToolResult, result)
-
-                            if hasattr(call_result, "content") and call_result.content:
-                                content_parts = []
-                                for content_item in call_result.content:
-                                    if hasattr(content_item, "type"):
-                                        if content_item.type == "text":
-                                            text_content = cast(
-                                                types.TextContent, content_item
-                                            )
-                                            content_parts.append(text_content.text)
-                                        elif content_item.type == "image":
-                                            image_content = cast(
-                                                types.ImageContent, content_item
-                                            )
-                                            content_parts.append(
-                                                f"[image: {image_content.mimeType}]"
-                                            )
-                                        elif content_item.type == "resource":
-                                            resource_content = cast(
-                                                types.EmbeddedResource, content_item
-                                            )
-                                            content_parts.append(
-                                                f"[resource: {resource_content.resource}]"
-                                            )
-                                        else:
-                                            content_parts.append(str(content_item))
-                                    else:
-                                        content_parts.append(str(content_item))
-
-                                result_text = "\n".join(content_parts)
-
-                                if (
-                                    hasattr(call_result, "isError")
-                                    and call_result.isError
-                                ):
-                                    return f"tool return error: {result_text}"
-                                else:
-                                    return result_text
-                            else:
-                                return str(call_result)
-
-                        except Exception as e:
-                            error_msg = f"call {tool_name} error: {e}"
-                            logger.error(error_msg)
-                            return error_msg
-
-                    return mcp_tool_wrapper
-
-                wrapper_func = create_mcp_tool_wrapper(
-                    mcp_client, server_name, tool.name
-                )
-
-                try:
-                    input_schema = getattr(tool, "inputSchema", {}) or {}
-                    fn_schema = build_fn_schema_from_input_schema(
-                        tool.name, input_schema
-                    )
-                    llamaindex_tool = FunctionTool.from_defaults(
-                        fn=wrapper_func,
-                        name=f"{tool.name}",
-                        description=tool.description or f"MCP tool: {tool.name}",
-                        async_fn=wrapper_func,
-                        fn_schema=fn_schema,
-                    )
-                    all_tools.append(llamaindex_tool)
-
-                except Exception as e:
-                    logger.error(f"create tool {tool.name} error: {e}")
-
-        except Exception as e:
-            logger.error(f"Get tool list error: {e}")
-
-    except Exception as e:
-        logger.error(f"Get tool list error: {e}")
-
-    return all_tools
-
-
-async def create_mcp_client(
-    client_name: str = "test_client",
-    host: str = "localhost",
-    auto_connect_to_mcp_server: bool = True,
-    on_mcp_server_discovered=None,
-    on_mcp_connect=None,
-    on_mcp_disconnect=None,
-) -> mcp_mqtt.MqttTransportClient:
-    """创建并配置 MCP 客户端
-
-    Args:
-        client_name: 客户端名称
-        host: MQTT 服务器主机地址
-        auto_connect_to_mcp_server: 是否自动连接到 MCP 服务器
-        on_mcp_server_discovered: 服务器发现回调函数
-        on_mcp_connect: 连接成功回调函数
-        on_mcp_disconnect: 断开连接回调函数
-
-    Returns:
-        配置好的 MCP 客户端实例
-    """
-    # 使用默认回调函数如果没有提供
-    if on_mcp_server_discovered is None:
-        on_mcp_server_discovered = globals()["on_mcp_server_discovered"]
-    if on_mcp_connect is None:
-        on_mcp_connect = globals()["on_mcp_connect"]
-    if on_mcp_disconnect is None:
-        on_mcp_disconnect = globals()["on_mcp_disconnect"]
-
-    mcp_client = mcp_mqtt.MqttTransportClient(
-        client_name,
-        auto_connect_to_mcp_server=auto_connect_to_mcp_server,
-        on_mcp_server_discovered=on_mcp_server_discovered,
-        on_mcp_connect=on_mcp_connect,
-        on_mcp_disconnect=on_mcp_disconnect,
-        mqtt_options=mcp_mqtt.MqttOptions(
-            host=host,
-        ),
-    )
-
-    return mcp_client
-
-
-async def initialize_mcp_client(
-    client_name: str = "test_client", host: str = "localhost", wait_time: float = 3.0
-) -> mcp_mqtt.MqttTransportClient:
-    """初始化 MCP 客户端并等待连接建立
-
-    注意：此函数已弃用，请使用 async with 上下文管理器模式
-    参考 example_usage() 函数的实现
-
-    Args:
-        client_name: 客户端名称
-        host: MQTT 服务器主机地址
-        wait_time: 等待连接建立的时间（秒）
-
-    Returns:
-        已启动的 MCP 客户端实例
-    """
-    mcp_client = await create_mcp_client(client_name, host)
-
-    # 手动进入上下文以初始化 _task_group
-    await mcp_client.__aenter__()
-
-    try:
-        await mcp_client.start()
-        await anyio.sleep(wait_time)
-        logger.info(f"MCP client '{client_name}' initialized successfully")
-        return mcp_client
-    except Exception as e:
-        logger.error(f"Failed to initialize MCP client: {e}")
-        # 如果初始化失败，需要退出上下文
-        await mcp_client.__aexit__(None, None, None)
-        raise
-
-
-# 使用示例
-async def example_usage():
-    """使用示例"""
-    try:
-        # 使用异步上下文管理器创建并初始化 MCP 客户端
-        async with await create_mcp_client(
-            client_name="test_client", host="localhost"
-        ) as mcp_client:
-            await mcp_client.start()
-            await anyio.sleep(3.0)
-            logger.info(f"MCP client 'test_client' initialized successfully")
-
-            # 获取工具列表
-            tools = await get_mcp_tools(mcp_client)
-            logger.info(f"Found {len(tools)} MCP tools")
-
-            # 上下文管理器会自动处理清理工作
-
-    except Exception as e:
-        logger.error(f"Example usage error: {e}")
-
-
-if __name__ == "__main__":
-    # 运行示例
-    anyio.run(example_usage)
