@@ -5,6 +5,7 @@ import { ChatInterface } from '@/components/ChatInterface'
 import { appLogger } from '@/utils/logger'
 import { capturePhotoFromVideo } from '@/utils/photo-capture'
 import type { PhotoCaptureResult } from '@/tools/types'
+import { Toaster } from '@/components/ui/sonner'
 
 function App() {
   const [aiReplyText, setAiReplyText] = useState<string>('')
@@ -92,29 +93,31 @@ function App() {
     }
   }, [isWebRTCMqttConnected, isWebRTCConnected])
 
-
   return (
-    <ChatInterface 
-      webrtc={{
-        remoteStream,
-        isConnecting: isWebRTCConnecting,
-        isConnected: isWebRTCConnected,
-        error: webRTCError,
-        isAudioEnabled,
-        isVideoEnabled,
-        connect: connectWebRTC,
-        disconnect: disconnectWebRTC,
-        toggleAudio,
-        toggleVideo
-      }}
-      isMqttConnected={isMqttConnected}
-      aiReplyText={aiReplyText}
-      showVideo={showVideo}
-      setShowVideo={setShowVideo}
-      selectedEmotion={selectedEmotion}
-      setSelectedEmotion={setSelectedEmotion}
-      videoRef={videoRef}
-    />
+    <>
+      <ChatInterface 
+        webrtc={{
+          remoteStream,
+          isConnecting: isWebRTCConnecting,
+          isConnected: isWebRTCConnected,
+          error: webRTCError,
+          isAudioEnabled,
+          isVideoEnabled,
+          connect: connectWebRTC,
+          disconnect: disconnectWebRTC,
+          toggleAudio,
+          toggleVideo
+        }}
+        isMqttConnected={isMqttConnected}
+        aiReplyText={aiReplyText}
+        showVideo={showVideo}
+        setShowVideo={setShowVideo}
+        selectedEmotion={selectedEmotion}
+        setSelectedEmotion={setSelectedEmotion}
+        videoRef={videoRef}
+      />
+      <Toaster />
+    </>
   )
 }
 

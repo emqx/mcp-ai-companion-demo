@@ -1,4 +1,5 @@
 import type { PhotoCaptureResult } from '@/tools/types'
+import { toast } from 'sonner'
 
 /**
  * Configuration for photo upload
@@ -94,9 +95,12 @@ export async function capturePhotoFromVideo(
     try {
       await uploadPhoto(result, upload)
       console.log('Photo uploaded successfully:', filename)
+      // Show success notification
+      toast.success('📸 Photo captured and uploaded successfully!')
     } catch (error) {
       console.warn('Photo upload failed:', error)
-      // Don't throw error, downloading locally is still successful
+      // Show error notification  
+      toast.error(`❌ Upload failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
