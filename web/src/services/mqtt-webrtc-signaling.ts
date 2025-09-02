@@ -109,7 +109,7 @@ export class MqttWebRTCSignaling {
           const payload = JSON.parse(message.toString()) as SignalingMessage
           this.handleSignalingMessage(topic, payload)
         } catch (error) {
-          webrtcLogger.error('❌ Failed to parse message')
+          webrtcLogger.error(`❌ ${error} Failed to parse message`)
         }
       }
     }
@@ -164,6 +164,7 @@ export class MqttWebRTCSignaling {
           break
 
         case 'tts_text':
+          // eslint-disable-next-line no-case-declarations
           const newText = message.text || ''
           this.ttsText += newText
           webrtcLogger.info('🔊 TTS text received:', newText)

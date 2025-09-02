@@ -190,7 +190,7 @@ export class McpMqttServer {
         return
       }
 
-      this.mqttClient.subscribe(topic, { qos }, (error, _granted) => {
+      this.mqttClient.subscribe(topic, { qos }, (error) => {
         if (error) {
           mqttLogger.error(`❌ Subscribe failed to "${topic}" (ClientID: ${this.connectionOptions.clientId}):`, error.message)
           reject(error)

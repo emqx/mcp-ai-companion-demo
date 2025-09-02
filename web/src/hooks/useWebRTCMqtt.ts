@@ -134,6 +134,7 @@ export function useWebRTCMqtt({
       setError(err as Error)
       setConnectionState('failed')
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actualClientId, config, mediaConstraints, onASRResponse, mqttConnected, connectMqtt])
 
   const disconnect = useCallback(() => {
@@ -256,6 +257,7 @@ export function useWebRTCMqtt({
       
       webrtcLogger.info('✅ WebRTC cleanup completed')
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoConnect])
 
   return {
