@@ -6,6 +6,7 @@ import type {
   McpToolsCallResult,
 } from '@/types/mqtt'
 import { mcpLogger, mqttLogger } from '@/utils/logger'
+import { McpTools, createToolContext } from '@/tools'
 
 export class McpMqttServer {
   private mqttClient: BaseMqttClient | null = null
@@ -363,41 +364,13 @@ export class McpMqttServer {
   private async handleToolsListRequest(request: JsonRpcRequest, clientId: string): Promise<void> {
     mcpLogger.info(`🔧 Tools/list request from ClientID: ${clientId} (ServerID: ${this.serverId})`)
     
+    const tools = McpTools.list()
+    
     const response = {
       jsonrpc: '2.0',
       id: request.id,
       result: {
-        tools: [
-          {
-            name: 'control_camera',
-            description: 'Control the camera (enable/disable video feed)',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                enabled: {
-                  type: 'boolean',
-                  description: 'Whether to enable or disable the camera'
-                }
-              },
-              required: ['enabled']
-            }
-          },
-          {
-            name: 'change_emotion',
-            description: 'Change the avatar emotion/animation',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                emotion: {
-                  type: 'string',
-                  description: 'The emotion to display',
-                  enum: ['happy', 'sad', 'angry', 'surprised', 'thinking', 'playful', 'relaxed', 'serious', 'shy', 'tired', 'disappointed', 'laug']
-                }
-              },
-              required: ['emotion']
-            }
-          }
-        ]
+        tools,
       }
     }
     
@@ -410,38 +383,27 @@ export class McpMqttServer {
   private async handleToolsCallRequest(request: JsonRpcRequest, clientId: string): Promise<void> {
     const { name, arguments: args } = request.params || {}
     mcpLogger.info(`🛠️ Tools/call request: "${name}" from ClientID: ${clientId} (ServerID: ${this.serverId})`)
-    let result: McpToolsCallResult
     
     try {
-      switch (name) {
-        case 'control_camera':
-          mcpLogger.info(`📷 Camera ${args?.enabled ? 'ON' : 'OFF'}`)
-          if (this.callbacks.onCameraControl) {
-            this.callbacks.onCameraControl(args?.enabled)
-          }
-          result = {
-            content: [{
-              type: 'text',
-              text: `Camera ${args?.enabled ? 'enabled' : 'disabled'} successfully`
-            }]
-          }
-          break
-          
-        case 'change_emotion':
-          mcpLogger.info(`😊 Emotion: ${args?.emotion}`)
-          if (this.callbacks.onEmotionChange) {
-            this.callbacks.onEmotionChange(args?.emotion)
-          }
-          result = {
-            content: [{
-              type: 'text',
-              text: `Emotion changed to ${args?.emotion} successfully`
-            }]
-          }
-          break
-          
-        default:
-          throw new Error(`Unknown tool: ${name}`)
+      // Validate tool arguments
+      const validation = McpTools.validate(name, args || {})
+      if (!validation.valid) {
+        throw new Error(`Invalid arguments: ${validation.errors?.join(', ')}`)
+      }
+      
+      // Execute tool with context
+      const toolContext = createToolContext(this.callbacks)
+      const executionResult = await McpTools.execute(name, args || {}, toolContext)
+      
+      if (!executionResult.success) {
+        throw new Error(executionResult.message)
+      }
+      
+      const result: McpToolsCallResult = {
+        content: [{
+          type: 'text',
+          text: executionResult.message
+        }]
       }
       
       const response = {
