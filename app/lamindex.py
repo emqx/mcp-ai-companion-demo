@@ -1,9 +1,9 @@
 import anyio
 import logging
-import re
 import os
-from typing import List, Optional, Union, cast, Any
+from typing import Any
 from dataclasses import dataclass
+import traceback
 
 from llama_index.core.agent.workflow import (
     AgentOutput,
@@ -24,18 +24,16 @@ from llama_index.core.workflow import (
 from mcp_client_init import McpMqttClient
 from mcp.shared.mqtt import MqttOptions
 from mcp.shared.mqtt import configure_logging
-import mcp.types as types
 
 from llama_index.llms.siliconflow import SiliconFlow
 from llama_index.core.llms import ChatMessage, MessageRole
-from llama_index.core.tools import BaseTool, FunctionTool
+from llama_index.core.tools import FunctionTool
 from llama_index.core.settings import Settings
 from llama_index.llms.openai_like import OpenAILike
-from pydantic import Field, create_model
 from llama_index.core.tools import ToolOutput
 from openai import OpenAI
 
-configure_logging(level="DEBUG")
+configure_logging(level="INFO")
 logger = logging.getLogger(__name__)
 
 client = None
@@ -51,133 +49,6 @@ mqtt_options = MqttOptions(
 import os
 
 api_key = os.environ.get("DASHSCOPE_API_KEY")
-
-
-def build_fn_schema_from_input_schema(model_name: str, input_schema: dict):
-    """Build a Pydantic model from JSON Schema's properties/required so params are top-level.
-
-    We relax nested types to Any. Required controls whether a field is required.
-    """
-    props = (input_schema or {}).get("properties", {}) or {}
-    required = set((input_schema or {}).get("required", []) or [])
-
-    fields = {}
-    for key, prop in props.items():
-        desc = prop.get("description") if isinstance(prop, dict) else None
-        default = ... if key in required else None
-        fields[key] = (Any, Field(default=default, description=desc))
-
-    class_name = re.sub(r"\W+", "_", f"{model_name}Params")
-    return create_model(class_name, **fields)
-
-async def get_mcp_tools(mcp_client: McpMqttClient) -> List[BaseTool]:
-    alive_mcp_servers = mcp_client.get_alive_mcp_servers()
-    if len(alive_mcp_servers) == 0:
-        return []
-    first_mcp_server_name = alive_mcp_servers[0].server_name
-    client_session = mcp_client.get_session(first_mcp_server_name)
-    all_tools = []
-    try:
-        try:
-            tools_result = await client_session.list_tools()
-
-            if tools_result is False:
-                return all_tools
-
-            list_tools_result = cast(types.ListToolsResult, tools_result)
-            tools = list_tools_result.tools
-
-            for tool in tools:
-                logger.info(f"tool: {tool.name} - {tool.description}")
-
-                def create_mcp_tool_wrapper(client_ref, tool_name):
-                    async def mcp_tool_wrapper(**kwargs):
-                        try:
-                            result = await client_ref.call_tool(
-                                tool_name, kwargs
-                            )
-                            if result is False:
-                                return f"call {tool_name} failed"
-
-                            call_result = cast(types.CallToolResult, result)
-
-                            if hasattr(call_result, "content") and call_result.content:
-                                content_parts = []
-                                for content_item in call_result.content:
-                                    if hasattr(content_item, "type"):
-                                        if content_item.type == "text":
-                                            text_content = cast(
-                                                types.TextContent, content_item
-                                            )
-                                            content_parts.append(text_content.text)
-                                        elif content_item.type == "image":
-                                            image_content = cast(
-                                                types.ImageContent, content_item
-                                            )
-                                            content_parts.append(
-                                                f"[image: {image_content.mimeType}]"
-                                            )
-                                        elif content_item.type == "resource":
-                                            resource_content = cast(
-                                                types.EmbeddedResource, content_item
-                                            )
-                                            content_parts.append(
-                                                f"[resource: {resource_content.resource}]"
-                                            )
-                                        else:
-                                            content_parts.append(str(content_item))
-                                    else:
-                                        content_parts.append(str(content_item))
-
-                                result_text = "\n".join(content_parts)
-
-                                if (
-                                    hasattr(call_result, "isError")
-                                    and call_result.isError
-                                ):
-                                    return f"tool return error: {result_text}"
-                                else:
-                                    return result_text
-                            else:
-                                return str(call_result)
-
-                        except Exception as e:
-                            error_msg = f"call {tool_name} error: {e}"
-                            logger.error(error_msg)
-                            return error_msg
-
-                    return mcp_tool_wrapper
-
-                wrapper_func = create_mcp_tool_wrapper(
-                    client_session, tool.name
-                )
-
-                try:
-                    input_schema = getattr(tool, "inputSchema", {}) or {}
-                    fn_schema = build_fn_schema_from_input_schema(
-                        tool.name, input_schema
-                    )
-                    llamaindex_tool = FunctionTool.from_defaults(
-                        fn=wrapper_func,
-                        name=f"{tool.name}",
-                        description=tool.description or f"MCP tool: {tool.name}",
-                        async_fn=wrapper_func,
-                        fn_schema=fn_schema,
-                    )
-                    all_tools.append(llamaindex_tool)
-                    # logger.info(f"call tool success: mcp_{tool.name}")
-
-                except Exception as e:
-                    logger.error(f"create tool {tool.name} error: {e}")
-
-        except Exception as e:
-            logger.error(f"Get tool list error: {e}")
-
-    except Exception as e:
-        logger.error(f"Get tool list error: {e}")
-
-    return all_tools
-
 
 def process_tool_output(response_text):
     if hasattr(response_text, "content"):
@@ -274,8 +145,6 @@ class ConversationalAgent(Workflow):
             ),
         ]
 
-        # self.agent = AgentRunner.from_llm(llm=self.llm, tools=self.tools, verbose=True)
-
         self.conversation_history = []
 
         self.max_history_length = 20
@@ -347,59 +216,6 @@ class ConversationalAgent(Workflow):
 
         return final_messages
 
-    async def load_mcp_tools(self):
-        print("Loading MCP tools...")
-        if self.mcp_client:
-            try:
-                mcp_tools = await get_mcp_tools(self.mcp_client)
-                print(f"Found tools: {mcp_tools}")
-                if mcp_tools:
-                    self.tools.extend(mcp_tools)
-                    ## remove duplicate tools by name, keep the last one
-                    unique_tools = {}
-                    for tool in self.tools:
-                        tool_name = getattr(tool.metadata, "name", str(tool))
-                        unique_tools[tool_name] = tool
-                    self.tools = list(unique_tools.values())
-                    print(f"Total tools names now: {[getattr(tool.metadata, 'name', str(tool)) for tool in self.tools]}")
-
-                    # self.agent = AgentRunner.from_llm(
-                    #     llm=self.llm, tools=self.tools, verbose=True
-                    # )
-                    logger.info(f"load {len(mcp_tools)} tools")
-            except Exception as e:
-                logger.error(f"load tool error: {e}")
-
-    # async def chat(self, message: str) -> str:
-    #     try:
-    #         if not self.mcp_tools_loaded:
-    #             await self.load_mcp_tools()
-
-    #         query_info = AgentWorkflow.from_tools_or_functions(
-    #             tools_or_functions=self.tools,
-    #             llm=self.llm,
-    #             system_prompt=self.system_prompt,
-    #             verbose=False,
-    #             timeout=180,
-    #         )
-
-    #         message = self._build_chat_messages(message)
-    #         handler = query_info.run(chat_history=message)
-
-    #         output = None
-    #         async for event in handler.stream_events():
-    #             if isinstance(event, AgentOutput):
-    #                 output = event.response
-    #         response = process_tool_output(output)
-
-    #         logger.info(f"Agent response: {response}")
-    #         return str(response)
-
-    #     except Exception as e:
-    #         error_msg = f"error: {e}"
-    #         logger.error(error_msg)
-    #         return error_msg
-
     def _emit_func_call_event(
         self, ctx: Context, name: str, args: dict[str, Any], result: str | None = None
     ) -> None:
@@ -412,10 +228,10 @@ class ConversationalAgent(Workflow):
     @step
     async def chat(self, ctx: Context, ev: StartEvent) -> StopEvent:
         try:
-            await self.load_mcp_tools()
-
+            tools = self.tools + self.mcp_client.mcp_tools
+            logger.info(f"Calling AgentWorkflow with tools: {[tool.metadata.name for tool in tools]}")
             query_info = AgentWorkflow.from_tools_or_functions(
-                tools_or_functions=self.tools,
+                tools_or_functions=tools,
                 llm=self.llm,
                 system_prompt=self.system_prompt,
                 verbose=False,
@@ -455,41 +271,28 @@ async def init_mcp_and_agent(tg: anyio.abc.TaskGroup):
     tg.start_soon(mcp_client.start)
     await mcp_client.connect()
     agent = ConversationalAgent(mcp_client=mcp_client)
-    await agent.load_mcp_tools()
     return (agent, mcp_client)
 
 async def main():
     try:
         tg = anyio.create_task_group()
         await tg.__aenter__()
-        agent = await init_mcp_and_agent(tg)
-        await anyio.sleep(2.0)
-        ## aysnc load tools every 10 seconds
-        # def load_tools_periodically():
-        #     async def _load():
-        #         while True:
-        #             try:
-        #                 await agent.load_mcp_tools()
-        #             except Exception as e:
-        #                 logger.error(f"periodically load tool error: {e}")
-        #             await anyio.sleep(10.0)
-        #     tg.start_soon(_load)
-        #load_tools_periodically()
-
+        agent, _ = await init_mcp_and_agent(tg)
         print("input 'exit' or 'quit' exit")
         print("input 'tools' show available tools")
         print("=" * 50)
         async def get_input(self):
             while True:
                 try:
-                    user_input = await ainput("\nuser: ")
+                    user_input = input("\nuser: ")
                     user_input = user_input.strip()
                     if user_input.lower() in ["exit", "quit"]:
                         break
 
                     if user_input.lower() == "tools":
-                        print(f"available tools: {len(agent.tools)}")
-                        for tool in agent.tools:
+                        tools = agent.tools + agent.mcp_client.mcp_tools
+                        print(f"available tools: {len(tools)}")
+                        for tool in tools:
                             tool_name = getattr(tool.metadata, "name", str(tool))
                             tool_desc = getattr(
                                 tool.metadata, "description", "No description"
@@ -509,7 +312,8 @@ async def main():
                 except KeyboardInterrupt:
                     break
                 except Exception as e:
-                    print(f"error: {e}")
+                    error_msg = traceback.format_exc()
+                    print(f"error: {e}, traceback: {error_msg}")
         tg.start_soon(get_input, None)
         #wait for the input task to complete
         await tg.__aexit__(None, None, None)

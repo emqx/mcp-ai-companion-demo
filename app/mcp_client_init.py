@@ -1,10 +1,18 @@
 from contextlib import AsyncExitStack
 from datetime import timedelta
 
+import logging
+import re
+from typing import List, cast, Any
 import anyio
+from llama_index.core.tools import BaseTool, FunctionTool
 from mcp.client.mqtt import InitializeResult, MqttTransportClient
 from mcp.shared.mqtt import MqttOptions
 from pydantic import BaseModel
+from pydantic import Field, create_model
+import mcp.types as types
+
+logger = logging.getLogger(__name__)
 
 class McpServer(BaseModel):
     server_name: str
@@ -19,6 +27,7 @@ class McpMqttClient:
         self.client_name = client_name
         self.server_name_filter = server_name_filter
         self.mcp_servers: list[McpServer] = []
+        self.mcp_tools: list[BaseTool] = []
         self._stop_event = anyio.Event()
         self._connected_event = anyio.Event()
 
@@ -26,7 +35,7 @@ class McpMqttClient:
         return self._mqtt_client.is_connected() if self._mqtt_client else False
 
     async def start(self):
-        print("MCP MQTT Client running ...")
+        logger.info("MCP MQTT Client running ...")
         self._exit_stack = AsyncExitStack()
         self._mqtt_client = await self._exit_stack.enter_async_context(
             MqttTransportClient(
@@ -42,7 +51,7 @@ class McpMqttClient:
         )
         self._connected_event.set()
         await self._stop_event.wait()
-        print("MCP MQTT Client termniated.")
+        logger.info("MCP MQTT Client termniated.")
         await self._exit_stack.aclose()
 
     async def stop(self):
@@ -72,19 +81,151 @@ class McpMqttClient:
             return None
 
     async def on_mcp_server_discovered(self, client, server_name):
-        print(f"Discovered MCP server name: {server_name}")
+        logger.info(f"Discovered MCP server name: {server_name}")
         self.mcp_servers.append(McpServer(server_name=server_name, success=False))
 
     async def on_mcp_disconnect(self, client, server_name):
-        print(f"Disconnected from MCP server name: {server_name}")
+        logger.info(f"Disconnected from MCP server name: {server_name}")
         self.mcp_servers = [server for server in self.mcp_servers if server.server_name != server_name]
 
     async def on_mcp_connect(self, client, server_name, connect_result):
         success, _init_result = connect_result
-        print(f"Connect to MCP server name: {server_name}, result: {success}")
+        logger.info(f"Connect to MCP server name: {server_name}, result: {success}")
+        if success == "ok":
+            await self.load_mcp_tools(server_name)
         for server in self.mcp_servers:
             if server.server_name == server_name:
                 server.success = success == "ok"
                 break
         else:
             self.mcp_servers.append(McpServer(server_name=server_name, success=success))
+
+    async def load_mcp_tools(self, server_name: str):
+        logger.info(f"Loading MCP tools from server: {server_name}")
+        try:
+            ## note that we only support 1 MCP server now
+            self.mcp_tools = await self.get_mcp_tools(server_name)
+            logger.info(f"loaded tools: {[tool.metadata.name for tool in self.mcp_tools]}")
+        except Exception as e:
+            logger.error(f"load tool error: {e}")
+
+    async def get_mcp_tools(self, server_name) -> List[FunctionTool]:
+        client_session = self.get_session(server_name)
+        all_tools = []
+        try:
+            try:
+                tools_result = await client_session.list_tools()
+
+                if tools_result is False:
+                    return all_tools
+
+                list_tools_result = cast(types.ListToolsResult, tools_result)
+                tools = list_tools_result.tools
+
+                for tool in tools:
+                    logger.info(f"tool: {tool.name} - {tool.description}")
+
+                    def create_mcp_tool_wrapper(client_ref, tool_name):
+                        async def mcp_tool_wrapper(**kwargs):
+                            try:
+                                result = await client_ref.call_tool(
+                                    tool_name, kwargs
+                                )
+                                if result is False:
+                                    return f"call {tool_name} failed"
+
+                                call_result = cast(types.CallToolResult, result)
+
+                                if hasattr(call_result, "content") and call_result.content:
+                                    content_parts = []
+                                    for content_item in call_result.content:
+                                        if hasattr(content_item, "type"):
+                                            if content_item.type == "text":
+                                                text_content = cast(
+                                                    types.TextContent, content_item
+                                                )
+                                                content_parts.append(text_content.text)
+                                            elif content_item.type == "image":
+                                                image_content = cast(
+                                                    types.ImageContent, content_item
+                                                )
+                                                content_parts.append(
+                                                    f"[image: {image_content.mimeType}]"
+                                                )
+                                            elif content_item.type == "resource":
+                                                resource_content = cast(
+                                                    types.EmbeddedResource, content_item
+                                                )
+                                                content_parts.append(
+                                                    f"[resource: {resource_content.resource}]"
+                                                )
+                                            else:
+                                                content_parts.append(str(content_item))
+                                        else:
+                                            content_parts.append(str(content_item))
+
+                                    result_text = "\n".join(content_parts)
+
+                                    if (
+                                        hasattr(call_result, "isError")
+                                        and call_result.isError
+                                    ):
+                                        return f"tool return error: {result_text}"
+                                    else:
+                                        return result_text
+                                else:
+                                    return str(call_result)
+
+                            except Exception as e:
+                                error_msg = f"call {tool_name} error: {e}"
+                                logger.error(error_msg)
+                                return error_msg
+
+                        return mcp_tool_wrapper
+
+                    wrapper_func = create_mcp_tool_wrapper(
+                        client_session, tool.name
+                    )
+
+                    try:
+                        input_schema = getattr(tool, "inputSchema", {}) or {}
+                        fn_schema = build_fn_schema_from_input_schema(
+                            tool.name, input_schema
+                        )
+                        llamaindex_tool = FunctionTool.from_defaults(
+                            fn=wrapper_func,
+                            name=f"{tool.name}",
+                            description=tool.description or f"MCP tool: {tool.name}",
+                            async_fn=wrapper_func,
+                            fn_schema=fn_schema,
+                        )
+                        all_tools.append(llamaindex_tool)
+                        # logger.info(f"call tool success: mcp_{tool.name}")
+
+                    except Exception as e:
+                        logger.error(f"create tool {tool.name} error: {e}")
+
+            except Exception as e:
+                logger.error(f"Get tool list error: {e}")
+
+        except Exception as e:
+            logger.error(f"Get tool list error: {e}")
+
+        return all_tools
+
+def build_fn_schema_from_input_schema(model_name: str, input_schema: dict):
+    """Build a Pydantic model from JSON Schema's properties/required so params are top-level.
+
+    We relax nested types to Any. Required controls whether a field is required.
+    """
+    props = (input_schema or {}).get("properties", {}) or {}
+    required = set((input_schema or {}).get("required", []) or [])
+
+    fields = {}
+    for key, prop in props.items():
+        desc = prop.get("description") if isinstance(prop, dict) else None
+        default = ... if key in required else None
+        fields[key] = (Any, Field(default=default, description=desc))
+
+    class_name = re.sub(r"\W+", "_", f"{model_name}Params")
+    return create_model(class_name, **fields)
