@@ -5,7 +5,7 @@ import threading
 import queue
 
 import asyncio, anyio
-from lamindex import ConversationalAgent, init_mcp_and_agent
+from lamindex import ConversationalAgent
 from lamindex import FuncCallEvent, MessageEvent
 
 # 发送给 TTS 的消息队列
@@ -134,7 +134,7 @@ async def main():
     await tg.__aenter__()
 
     global agent
-    (agent, mcp_client) = await init_mcp_and_agent(tg)
+    agent = ConversationalAgent()
 
     send_message(
         {
@@ -150,7 +150,7 @@ async def main():
     result = await asyncio.to_thread(read_message)
     if not result:
         print("No more input, exiting.")
-        await mcp_client.stop()
+        await agent.mcp_client.stop()
         sys.exit(0)
 
     # Handle JSON decode errors gracefully
@@ -168,7 +168,7 @@ async def main():
             msg = await asyncio.to_thread(read_message)
             if msg is None:
                 print("No more input, exiting...")
-                await mcp_client.stop()
+                await agent.mcp_client.stop()
                 break
             if not msg:
                 # Skip None messages (empty lines, JSON decode errors, etc.)
@@ -176,9 +176,9 @@ async def main():
                 await asyncio.sleep(0.01)
                 continue
             if isinstance(msg, list):
-                handle_batch(msg)
+                await handle_batch(tg, msg)
             if isinstance(msg, dict):
-                handle_single(msg)
+                await handle_single(tg, msg)
 
     # 创建后台任务，不阻塞主协程
     main_task = asyncio.create_task(main_loop_task())
@@ -195,14 +195,24 @@ async def main():
         main_task.cancel()
 
 
-def handle_single(msg):
+async def handle_single(tg, msg):
     global inflight_requests
+    global agent
     if "method" in msg:
-        if msg["method"] == "asr_result":
+        params = msg.get("params", {})
+        method = msg["method"]
+        if method == "asr_result":
             # Extract the recognized text from the asr_result message and put it into the asr_queue
-            params = msg.get("params", {})
             recognized_text = params.get("text", "")
             asr_queue.put(recognized_text)
+        elif method == "set_device_id":
+            device_id = params.get("device_id", "")
+            suffix = device_id.split("-")[-1] if "-" in device_id else device_id
+            server_name_filter = "web-ui-hardware-controller/" + suffix
+            await agent.init_mcp(tg, server_name_filter=server_name_filter)
+            print(f"MCP initialized with server name filter: {server_name_filter}")
+        else:
+            print(f"Unknown method: {method}")
     if "result" in msg:
         if msg["id"] not in inflight_requests:
             print(f"Unknown id in response: {msg['id']}")
@@ -216,9 +226,9 @@ def handle_single(msg):
             print(f"Received result: {msg['result']} for request: {current_request}")
 
 
-def handle_batch(msgs):
+async def handle_batch(tg, msgs):
     for msg in msgs:
-        handle_single(msg)
+       await handle_single(tg, msg)
 
 
 if __name__ == "__main__":

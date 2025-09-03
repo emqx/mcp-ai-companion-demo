@@ -228,7 +228,7 @@ class ConversationalAgent(Workflow):
     @step
     async def chat(self, ctx: Context, ev: StartEvent) -> StopEvent:
         try:
-            tools = self.tools + self.mcp_client.mcp_tools
+            tools = self.tools + self.mcp_client.mcp_tools if self.mcp_client else self.tools
             logger.info(f"Calling AgentWorkflow with tools: {[tool.metadata.name for tool in tools]}")
             query_info = AgentWorkflow.from_tools_or_functions(
                 tools_or_functions=tools,
@@ -261,23 +261,22 @@ class ConversationalAgent(Workflow):
             logger.error(error_msg)
             return StopEvent
 
-async def init_mcp_and_agent(tg: anyio.abc.TaskGroup):
-    mcp_client = McpMqttClient(
-        mqtt_options=mqtt_options,
-        client_name=f"ai_companion_demo",
-        server_name_filter="#",
-        clientid=mqtt_clientid
-    )
-    tg.start_soon(mcp_client.start)
-    await mcp_client.connect()
-    agent = ConversationalAgent(mcp_client=mcp_client)
-    return (agent, mcp_client)
+    async def init_mcp(self, tg: anyio.abc.TaskGroup, server_name_filter: str = "#") -> None:
+        mcp_client = McpMqttClient(
+            mqtt_options=mqtt_options,
+            client_name=f"ai_companion_demo",
+            server_name_filter=server_name_filter,
+            clientid=mqtt_clientid
+        )
+        tg.start_soon(mcp_client.start)
+        await mcp_client.connect()
+        self.mcp_client = mcp_client
 
 async def main():
     try:
         tg = anyio.create_task_group()
         await tg.__aenter__()
-        agent, _ = await init_mcp_and_agent(tg)
+        agent = ConversationalAgent()
         print("input 'exit' or 'quit' exit")
         print("input 'tools' show available tools")
         print("=" * 50)

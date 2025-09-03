@@ -106,12 +106,12 @@ class McpMqttClient:
         logger.info(f"Loading MCP tools from server: {server_name}")
         try:
             ## note that we only support 1 MCP server now
-            self.mcp_tools = await self.get_mcp_tools(server_name)
+            self.mcp_tools = await self._get_mcp_tools(server_name)
             logger.info(f"loaded tools: {[tool.metadata.name for tool in self.mcp_tools]}")
         except Exception:
             logger.error(f"load tool error: {traceback.format_exc()}")
 
-    async def get_mcp_tools(self, server_name) -> List[FunctionTool]:
+    async def _get_mcp_tools(self, server_name) -> List[FunctionTool]:
         client_session = self.get_session(server_name)
         all_tools = []
         try:
