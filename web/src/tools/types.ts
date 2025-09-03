@@ -19,6 +19,8 @@ export interface PhotoCaptureResult {
   filename: string
   /** Source of the capture (local or remote) */
   source: 'local' | 'remote'
+  /** Download URL for the uploaded photo (optional) */
+  downloadUrl?: string
 }
 
 /**

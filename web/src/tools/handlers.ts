@@ -77,9 +77,15 @@ export const takePhotoHandler: ToolHandler = async (
   if (context.onTakePhoto) {
     try {
       const result = await context.onTakePhoto(source, quality)
+      
+      // Include download URL in the message if available
+      const message = result.downloadUrl 
+        ? `Photo captured successfully. Download URL: ${result.downloadUrl}`
+        : `Photo captured successfully: ${result.filename}`
+      
       return {
         success: true,
-        message: `Photo captured successfully: ${result.filename}`,
+        message,
         data: result
       }
     } catch (error) {

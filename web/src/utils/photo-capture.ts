@@ -93,8 +93,13 @@ export async function capturePhotoFromVideo(
   // Upload if configuration is provided
   if (upload?.url) {
     try {
-      await uploadPhoto(result, upload)
-      console.log('Photo uploaded successfully:', filename)
+      const uploadResult = await uploadPhoto(result, upload)
+      console.log('Photo uploaded successfully:', filename, 'file_id:', uploadResult.file_id)
+      
+      // Construct download URL with the file_id
+      const downloadUrl = `http://localhost:4000/api/download/${uploadResult.file_id}`
+      result.downloadUrl = downloadUrl
+      
       // Show success notification
       toast.success('📸 Photo captured and uploaded successfully!')
     } catch (error) {
@@ -126,12 +131,12 @@ export function downloadPhoto(photo: PhotoCaptureResult): void {
  * Upload a photo to a server endpoint
  * @param photo - Photo capture result
  * @param config - Upload configuration
- * @returns Promise that resolves when upload completes
+ * @returns Promise that resolves with the file_id from the server
  */
 export async function uploadPhoto(
   photo: PhotoCaptureResult,
   config: UploadConfig
-): Promise<void> {
+): Promise<{ file_id: string }> {
   if (!config.url) {
     throw new Error('Upload URL is required')
   }
@@ -154,6 +159,13 @@ export async function uploadPhoto(
   if (!response.ok) {
     throw new Error(`Upload failed: ${response.status} ${response.statusText}`)
   }
+
+  const data = await response.json()
+  if (!data.file_id) {
+    throw new Error('Server response missing file_id')
+  }
+
+  return { file_id: data.file_id }
 }
 
 /**
