@@ -7,6 +7,7 @@ import type {
 } from '@/types/mqtt'
 import { mcpLogger, mqttLogger } from '@/utils/logger'
 import { McpTools, createToolContext } from '@/tools'
+import { defaultMqttConfig } from '@/config/mqtt'
 
 export class McpMqttServer {
   private mqttClient: BaseMqttClient | null = null
@@ -45,7 +46,7 @@ export class McpMqttServer {
     this.callbacks = callbacks || {}
     
     this.connectionOptions = {
-      brokerUrl: mqttOptions.brokerUrl || 'ws://localhost:8083/mqtt',
+      brokerUrl: mqttOptions.brokerUrl || defaultMqttConfig.brokerUrl,
       clientId,
       clean: true,
       connectTimeout: mqttOptions.connectTimeout || 4000,

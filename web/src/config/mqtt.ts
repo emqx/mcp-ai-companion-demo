@@ -17,9 +17,20 @@ export interface WebRTCMqttConfig extends MqttBrokerConfig {
   // WebRTC specific config can be added here
 }
 
+// Helper function to get broker URL with current host
+const getBrokerUrl = (url: string): string => {
+  // If URL contains localhost, replace with current window host
+  if (typeof window !== 'undefined' && url.includes('localhost')) {
+    const urlObj = new URL(url)
+    urlObj.hostname = window.location.hostname
+    return urlObj.toString()
+  }
+  return url
+}
+
 // Default MQTT broker configuration
 export const defaultMqttConfig: MqttBrokerConfig = {
-  brokerUrl: 'ws://broker.emqx.io:8083/mqtt',
+  brokerUrl: getBrokerUrl('ws://localhost:8083/mqtt'),
   username: 'emqx-mcp-webrtc-web-ui',
   password: 'public',
   connectTimeout: 4000,
