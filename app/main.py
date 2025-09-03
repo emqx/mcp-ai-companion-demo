@@ -48,52 +48,104 @@ def send_message(message):
 def tts_worker():
     global next_request_id
     global inflight_requests
+    current_task_id = None
     while True:
         tts_msg = tts_queue.get()
-        next_request_id = next_request_id + 1
         if tts_msg is None:
             break
-        task_id = random.randint(1, 999999)
+        
+        # Check if this is a streaming chunk
+        is_chunk = isinstance(tts_msg, dict) and tts_msg.get('is_chunk', False)
+        text = tts_msg.get('text', '') if isinstance(tts_msg, dict) else tts_msg
+        
+        if is_chunk:
+            # For streaming chunks, reuse the same task_id
+            if current_task_id is None:
+                current_task_id = random.randint(1, 999999)
+                # Send start message for the stream
+                next_request_id = next_request_id + 1
+                start_request = {
+                    "jsonrpc": "2.0",
+                    "id": next_request_id,
+                    "method": "tts_and_send_start",
+                    "params": {
+                        "task_id": current_task_id,
+                    },
+                }
+                inflight_requests[next_request_id] = start_request
+                send_message([start_request])
+            
+            # Send the chunk
+            next_request_id = next_request_id + 1
+            chunk_request = {
+                "jsonrpc": "2.0",
+                "id": next_request_id,
+                "method": "tts_and_send",
+                "params": {
+                    "task_id": current_task_id,
+                    "text": text,
+                },
+            }
+            inflight_requests[next_request_id] = chunk_request
+            send_message([chunk_request])
+            
+            # Check if this is the last chunk
+            if isinstance(tts_msg, dict) and tts_msg.get('is_final', False):
+                next_request_id = next_request_id + 1
+                finish_request = {
+                    "jsonrpc": "2.0",
+                    "id": next_request_id,
+                    "method": "tts_and_send_finish",
+                    "params": {
+                        "task_id": current_task_id,
+                    },
+                }
+                inflight_requests[next_request_id] = finish_request
+                send_message([finish_request])
+                current_task_id = None
+        else:
+            # Non-streaming message (complete message)
+            task_id = random.randint(1, 999999)
+            
+            current_request_0 = {
+                "jsonrpc": "2.0",
+                "id": next_request_id,
+                "method": "tts_and_send_start",
+                "params": {
+                    "task_id": task_id,
+                },
+            }
+            inflight_requests[next_request_id] = current_request_0
 
-        current_request_0 = {
-            "jsonrpc": "2.0",
-            "id": next_request_id,
-            "method": "tts_and_send_start",
-            "params": {
-                "task_id": task_id,
-            },
-        }
-        inflight_requests[next_request_id] = current_request_0
+            next_request_id = next_request_id + 1
+            current_request_1 = {
+                "jsonrpc": "2.0",
+                "id": next_request_id,
+                "method": "tts_and_send",
+                "params": {
+                    "task_id": task_id,
+                    "text": text,
+                },
+            }
+            inflight_requests[next_request_id] = current_request_1
 
-        next_request_id = next_request_id + 1
-        current_request_1 = {
-            "jsonrpc": "2.0",
-            "id": next_request_id,
-            "method": "tts_and_send",
-            "params": {
-                "task_id": task_id,
-                "text": tts_msg,
-            },
-        }
-        inflight_requests[next_request_id] = current_request_1
+            next_request_id = next_request_id + 1
+            current_request_2 = {
+                "jsonrpc": "2.0",
+                "id": next_request_id,
+                "method": "tts_and_send_finish",
+                "params": {
+                    "task_id": task_id,
+                },
+            }
+            inflight_requests[next_request_id] = current_request_2
 
-        next_request_id = next_request_id + 1
-        current_request_2 = {
-            "jsonrpc": "2.0",
-            "id": next_request_id,
-            "method": "tts_and_send_finish",
-            "params": {
-                "task_id": task_id,
-            },
-        }
-        inflight_requests[next_request_id] = current_request_2
-
-        batch_request = [
-            current_request_0,
-            current_request_1,
-            current_request_2,
-        ]
-        send_message(batch_request)
+            batch_request = [
+                current_request_0,
+                current_request_1,
+                current_request_2,
+            ]
+            send_message(batch_request)
 
 
 def asr_worker():
@@ -106,12 +158,27 @@ def asr_worker():
 
         async def _run_and_consume():
             handler = agent.run(user_input=tts_msg)
+            has_streamed = False
             async for ev in handler.stream_events():
                 if isinstance(ev, FuncCallEvent):
                     # INSERT_YOUR_CODE
                     pass
                 elif isinstance(ev, MessageEvent):
-                    if ev.message:
+                    if ev.is_chunk:
+                        has_streamed = True
+                        if ev.message:  # Non-empty chunk
+                            tts_queue.put({
+                                'text': ev.message,
+                                'is_chunk': True,
+                                'is_final': False
+                            })
+                        else:  # Empty chunk signals end of stream
+                            tts_queue.put({
+                                'text': '',
+                                'is_chunk': True,
+                                'is_final': True
+                            })
+                    elif ev.message:  # Non-streaming complete message
                         tts_queue.put(ev.message)
 
         # 将异步任务提交到主线程事件循环执行

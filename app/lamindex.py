@@ -4,6 +4,7 @@ import os
 from typing import Any
 from dataclasses import dataclass
 import traceback
+from pathlib import Path
 
 from llama_index.core.agent.workflow import (
     AgentOutput,
@@ -113,6 +114,7 @@ class FuncCallEvent(Event):
 
 class MessageEvent(Event):
     message: str
+    is_chunk: bool = False  # 标记是否为流式片段
 
 
 class ConversationalAgent(Workflow):
@@ -125,11 +127,12 @@ class ConversationalAgent(Workflow):
             api_key=api_key,
             api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
             is_chat_model=True,
-            is_function_calling_model=True,
-            temperature=0,
+            is_function_calling_model=True,  # 强制使用 Function Calling 模式，避免 ReAct
+            temperature=0.6,  # DeepSeek v3 推荐参数
+            top_p=0.95,       # DeepSeek v3 推荐参数
             max_tokens=60000,
-            timeout=600,  # 整体超时时间
-            stream_timeout=300,  # 流式响应单项超时
+            timeout=600,
+            stream_timeout=300,
         )
         Settings.llm = self.llm
 
@@ -149,15 +152,10 @@ class ConversationalAgent(Workflow):
 
         self.max_history_length = 20
 
-        self.system_prompt = """
-                在这个对话中，你将扮演一个情感宠物机器人。你需要与主人互动，回答主人问题，安慰主人心情。
-                你可以调用拍照工具 take_photo，然后调用图片解释工具 explain_photo，这样你就能知道面前主人的文字状态描述。
-                因此当主人问到与视觉相关的互动问题时，你可以用以上方法获得主人的状态，进而根据主人状态回复。比如
-                * 看看我今天的发型怎么样？
-                * 你看这是什么饮料？
-
-                根据主人提供的问题，生成一个富有温度的回应。注意少于 80 个字。
-                """
+        # Load system prompt from txt file
+        prompt_file = Path(__file__).parent / "prompts" / "conversational_system_prompt.txt"
+        with open(prompt_file, "r", encoding="utf-8") as f:
+            self.system_prompt = f.read().strip()
 
     def _build_chat_messages(self, new_message: str) -> list:
         """Build structured chat message array"""
@@ -239,20 +237,33 @@ class ConversationalAgent(Workflow):
             )
 
             message = self._build_chat_messages(ev.user_input)
-            handler = query_info.run(chat_history=message)
+            handler = query_info.run(chat_history=message, stream=True)
 
-            output = None
+            accumulated_response = ""
             async for event in handler.stream_events():
-                if isinstance(event, AgentOutput):
-                    output = event.response
-                    response = process_tool_output(output)
-                    logger.info(f"Agent response: {response}")
-                    ctx.write_event_to_stream(MessageEvent(message=response))
+                if isinstance(event, AgentStream):
+                    # Handle streaming chunks
+                    if hasattr(event, 'delta') and event.delta:
+                        chunk = event.delta
+                        accumulated_response += chunk
+                        ctx.write_event_to_stream(MessageEvent(message=chunk, is_chunk=True))
+                        logger.debug(f"Stream chunk: {chunk}")
+                elif isinstance(event, AgentOutput):
+                    # Final complete response (fallback for non-streaming)
+                    if not accumulated_response:
+                        output = event.response
+                        response = process_tool_output(output)
+                        logger.info(f"Agent response: {response}")
+                        ctx.write_event_to_stream(MessageEvent(message=response, is_chunk=False))
                 elif isinstance(event, ToolCallResult):
                     text = get_first_text_from_tool_output(event.tool_output)
                     self._emit_func_call_event(
                         ctx, event.tool_name, event.tool_kwargs, text
                     )
+            
+            # Send stream end signal if we were streaming
+            if accumulated_response:
+                ctx.write_event_to_stream(MessageEvent(message="", is_chunk=True))  # End signal
 
             return StopEvent
 

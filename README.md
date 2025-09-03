@@ -51,6 +51,14 @@ pnpm dev
 
 This directory contains the Agent code, including interaction with multimedia services and the implementation for calling and interacting with LLM and VLM.
 
+**Requirements**: Python >= 3.11, uv
+
+```bash
+cd app
+uv sync
+uv run main.py
+```
+
 ## Contact Us
 
 If you are interested in this demo project or solution and want to learn more about commercial products and services, please [contact us](https://www.emqx.com/zh/contact).

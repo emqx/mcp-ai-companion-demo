@@ -49,6 +49,14 @@ pnpm dev
 
 该目录下为 Agent 的代码，包含了跟多媒体服务交互，与 LLM、VLM 调用和交互的实现
 
+**要求**: Python >= 3.11, uv
+
+```bash
+cd app
+uv sync
+uv run main.py
+```
+
 ## 联系我们
 
 如果您对该演示项目或解决方案感兴趣，想了解商业化的产品和服务，请[联系我们](https://www.emqx.com/zh/contact)。
