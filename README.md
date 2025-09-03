@@ -1,29 +1,31 @@
-# 硬件智能体演示项目
+# Hardware Intelligence Agent Demo Project
 
-基于 EMQX MCP、Agent、LLM、VLM、ASR 和 TTS 技术的硬件智能体演示项目。适用于情感陪伴玩具、智能家电、智能家居和具身智能等应用场景。
+[中文版](./README-zh.md)
 
-## 项目简介
+A hardware intelligence agent demo project based on EMQX MCP, Agent, LLM, VLM, ASR, and TTS technologies. Suitable for applications such as emotional companion toys, smart appliances, smart homes, and embodied intelligence.
 
-该项目实现了一个功能完整的智能体，用户能够通过语音和视觉与用户进行自然交互，并控制各种智能设备。该智能体具备以下核心能力：
+## Project Overview
 
-- **语音识别与合成**：接入语音流，实现实时语音识别和自然语音合成
-- **视觉理解**：基于图片识别的多模态大模型 (VLM) 进行视觉内容理解
-- **智能推理**：结合 LLM 和 Agent 技术，生成符合人物设定的智能回复
-- **设备控制**：通过 MCP over MQTT 协议控制摄像头、扬声器等外设
+This project implements a fully functional intelligent agent that enables users to interact naturally via voice and vision, and control various smart devices. The agent has the following core capabilities:
 
-## 系统架构
+- **Speech Recognition & Synthesis**: Integrates speech streams for real-time speech recognition and natural speech synthesis
+- **Visual Understanding**: Utilizes multimodal large models (VLM) for image-based visual content understanding
+- **Intelligent Reasoning**: Combines LLM and Agent technologies to generate intelligent responses aligned with character settings
+- **Device Control**: Controls peripherals such as cameras and speakers via MCP over MQTT protocol
 
-![系统架构图](docs/sys_arch.png)
+## System Architecture
 
-## 技术特点
+![System Architecture Diagram](docs/sys_arch.png)
 
-- **MQTT 通信**：基于 MQTT 协议实现数据上报和设备控制，具备低延时、轻量、节能等优势
-- **智能控制**：根据 LLM 推理结果，通过 MCP over MQTT 控制硬件设备，提升智能化程度
-- **多媒体流**：基于 WebRTC 的稳定多媒体流服务，支持语音活动检测 (VAD) 和语音打断
-- **灵活扩展**：高度灵活的 Agent 实现，可接入各种第三方模型，支持自定义业务逻辑
-- **私有部署**：支持全球多地就近接入，提升安全性，有效控制成本
+## Technical Features
 
-## 快速开始
+- **MQTT Communication**: Implements data reporting and device control based on the MQTT protocol, offering low latency, lightweight, and energy-efficient advantages
+- **Intelligent Control**: Enhances intelligence by controlling hardware devices via MCP over MQTT based on LLM reasoning results
+- **Multimedia Streaming**: Provides stable multimedia streaming services based on WebRTC, supporting Voice Activity Detection (VAD) and speech interruption
+- **Flexible Expansion**: Highly flexible Agent implementation, supports integration with various third-party models and custom business logic
+- **Private Deployment**: Supports global access with local proximity, enhancing security and effectively controlling costs
+
+## Quick Start
 
 ```shell
 git clone git@github.com:mqtt-ai/mcp-ai-companion-demo.git
@@ -31,13 +33,13 @@ cd mcp-ai-companion-demo
 # todo ...
 ```
 
-## 项目结构
+## Project Structure
 
 ### web
 
-智能体前端界面，提供用户交互界面和设备控制功能。基于 React + TypeScript + Vite + Tailwind CSS + shadcn/ui + MQTT.js，实现 MCP over MQTT 协议通信。
+The frontend interface for the agent, providing user interaction and device control features. Built with React, TypeScript, Vite, Tailwind CSS, shadcn/ui, and MQTT.js, implementing MCP over MQTT protocol communication.
 
-**要求**: Node.js >= 22.0.0
+**Requirements**: Node.js >= 22.0.0
 
 ```bash
 cd web
@@ -47,8 +49,8 @@ pnpm dev
 
 ### app
 
-该目录下为 Agent 的代码，包含了跟多媒体服务交互，与 LLM、VLM 调用和交互的实现
+This directory contains the Agent code, including interaction with multimedia services and the implementation for calling and interacting with LLM and VLM.
 
-## 联系我们
+## Contact Us
 
-如果您对该演示项目或解决方案感兴趣，想了解商业化的产品和服务，请[联系我们](https://www.emqx.com/zh/contact)。
+If you are interested in this demo project or solution and want to learn more about commercial products and services, please [contact us](https://www.emqx.com/zh/contact).
