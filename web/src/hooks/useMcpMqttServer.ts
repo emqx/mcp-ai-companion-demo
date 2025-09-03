@@ -10,7 +10,6 @@ import type {
 
 export interface UseMqttOptions extends MqttConnectionOptions {
   autoConnect?: boolean
-  serverId?: string
   serverName?: string
   autoInitializeMcp?: boolean
   clientInfo?: McpClientInfo
@@ -37,7 +36,6 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
   const { 
     autoConnect = true, 
     autoInitializeMcp = false,
-    serverId,
     serverName,
     clientInfo,
     callbacks,
@@ -63,7 +61,6 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
     const config = {
       ...mcpServerConfig,
       ...mqttOptionsRef.current,
-      serverId,
       serverName: serverName || mcpServerConfig.serverName,
       callbacks
     }
@@ -111,7 +108,7 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
         clientRef.current.disconnect()
       }
     }
-  }, [autoConnect, autoInitializeMcp, serverId, serverName, clientInfo, callbacks])
+  }, [autoConnect, autoInitializeMcp, serverName, clientInfo, callbacks])
 
   const connect = async () => {
     if (!client) return

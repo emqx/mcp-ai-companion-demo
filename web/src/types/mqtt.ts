@@ -127,7 +127,6 @@ export interface McpToolsCallResult {
 export type McpServerCallbacks = import('@/tools/types').ToolHandlerContext
 
 export interface McpServerOptions {
-  serverId?: string
   serverName?: string
   callbacks?: McpServerCallbacks
 }

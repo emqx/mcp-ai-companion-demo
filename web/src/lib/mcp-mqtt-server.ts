@@ -8,6 +8,7 @@ import type {
 import { mcpLogger, mqttLogger } from '@/utils/logger'
 import { McpTools, createToolContext } from '@/tools'
 import { defaultMqttConfig } from '@/config/mqtt'
+import { generateRandomId } from '@/utils/id-generator'
 
 export class McpMqttServer {
   private mqttClient: BaseMqttClient | null = null
@@ -30,19 +31,20 @@ export class McpMqttServer {
   private isInitialized = false
 
   constructor(options: MqttConnectionOptions & { 
-    serverId?: string, 
     serverName?: string,
     callbacks?: {
       onCameraControl?: (enabled: boolean) => void
       onEmotionChange?: (emotion: string) => void
     }
   } = {}) {
-    const { serverId, serverName, callbacks, ...mqttOptions } = options
+    const { serverName, callbacks, ...mqttOptions } = options
     
-    const clientId = `mcp-ai-web-ui-${Math.random().toString(16).substring(2, 10)}`
+    // Generate consistent random ID for client and server naming
+    const randomId = generateRandomId(8)
+    const clientId = `mcp-ai-web-ui-${randomId}`
     
-    this.serverId = serverId || clientId // Use clientId as serverId if not provided
-    this.serverName = serverName || 'mcp-ai-companion-demo-web-ui'
+    this.serverId = clientId
+    this.serverName = `${serverName || 'web-ui-hardware-controller'}/${randomId}`
     this.callbacks = callbacks || {}
     
     this.connectionOptions = {

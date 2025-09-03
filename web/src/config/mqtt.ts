@@ -10,7 +10,6 @@ export interface MqttBrokerConfig {
 }
 
 export interface McpMqttConfig extends MqttBrokerConfig {
-  serverId: string
   serverName: string
 }
 
@@ -32,7 +31,6 @@ export const defaultMqttConfig: MqttBrokerConfig = {
 // MCP Server configuration
 export const mcpServerConfig: McpMqttConfig = {
   ...defaultMqttConfig,
-  serverId: 'web-ui-hardware-server',
   serverName: 'web-ui-hardware-controller'
 }
 
