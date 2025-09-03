@@ -18,4 +18,4 @@ name = "aliyun"
 url = "https://mirrors.aliyun.com/pypi/simple/"
 
 [tool.uv.sources]
-mcp = { git = "https://github.com/emqx/mcp-python-sdk.git" }
+mcp = { git = "https://github.com/emqx/mcp-python-sdk.git", branch = "main" }

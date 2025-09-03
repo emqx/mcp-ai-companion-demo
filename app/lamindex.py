@@ -33,7 +33,7 @@ from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.tools import ToolOutput
 from openai import OpenAI
 
-configure_logging(level="INFO")
+configure_logging(level="DEBUG")
 logger = logging.getLogger(__name__)
 
 client = None

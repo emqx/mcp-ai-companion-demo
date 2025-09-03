@@ -1,6 +1,7 @@
 from contextlib import AsyncExitStack
 from datetime import timedelta
 
+import traceback
 import logging
 import re
 from typing import List, cast, Any
@@ -86,6 +87,7 @@ class McpMqttClient:
 
     async def on_mcp_disconnect(self, client, server_name):
         logger.info(f"Disconnected from MCP server name: {server_name}")
+        self.mcp_tools = []
         self.mcp_servers = [server for server in self.mcp_servers if server.server_name != server_name]
 
     async def on_mcp_connect(self, client, server_name, connect_result):
@@ -106,8 +108,8 @@ class McpMqttClient:
             ## note that we only support 1 MCP server now
             self.mcp_tools = await self.get_mcp_tools(server_name)
             logger.info(f"loaded tools: {[tool.metadata.name for tool in self.mcp_tools]}")
-        except Exception as e:
-            logger.error(f"load tool error: {e}")
+        except Exception:
+            logger.error(f"load tool error: {traceback.format_exc()}")
 
     async def get_mcp_tools(self, server_name) -> List[FunctionTool]:
         client_session = self.get_session(server_name)
@@ -177,9 +179,8 @@ class McpMqttClient:
                                     return str(call_result)
 
                             except Exception as e:
-                                error_msg = f"call {tool_name} error: {e}"
-                                logger.error(error_msg)
-                                return error_msg
+                                logger.error(f"call tool error, tool_name: {tool_name}, stack: {traceback.format_exc()}")
+                                return f"call tool {tool_name} error: {str(e)}"
 
                         return mcp_tool_wrapper
 
