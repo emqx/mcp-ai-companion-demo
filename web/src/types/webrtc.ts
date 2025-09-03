@@ -85,4 +85,5 @@ export interface UseWebRTCReturn {
   toggleVideo: (enabled?: boolean) => Promise<void>
   isAudioEnabled: boolean
   isVideoEnabled: boolean
+  cleanup?: () => void  // Optional cleanup function
 }

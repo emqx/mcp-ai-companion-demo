@@ -34,9 +34,11 @@ export class MqttWebRTCSignaling {
   private messageTopic: string
   private messageHandler: ((topic: string, message: Buffer) => void) | null = null
   private ttsText: string = ''
+  private isExternalClient: boolean = false
 
   constructor(options: MqttWebRTCSignalingOptions) {
     this.mqttClient = options.mqttClient
+    this.isExternalClient = !!options.mqttClient // Mark if client was provided externally
     this.clientId = options.clientId || `webrtc_client_${Math.random().toString(36).substring(7)}`
     this.config = { ...defaultWebRTCConfig, ...options.config }
     this.mediaConstraints = { ...defaultMediaConstraints, ...options.mediaConstraints }
@@ -60,6 +62,7 @@ export class MqttWebRTCSignaling {
     }
 
     try {
+      webrtcLogger.info(`🟢 WebRTC using Client ID: ${this.clientId}`)
       webrtcLogger.info('Step 1: Starting WebRTC signaling...')
       this.updateConnectionState('connecting')
       
@@ -337,6 +340,11 @@ export class MqttWebRTCSignaling {
         })
         
         this.messageHandler = null
+      }
+
+      // Don't disconnect the MQTT client if it was provided externally
+      if (!this.isExternalClient) {
+        this.mqttClient = null
       }
 
       // Reset state

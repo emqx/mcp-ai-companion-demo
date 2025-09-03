@@ -104,6 +104,7 @@ function App() {
   }), [onCameraControl, onEmotionChange, onTakePhoto, onVolumeControl])
 
   const {
+    client: mcpMqttClient,
     isConnected: isMqttConnected,
     isMcpInitialized
   } = useMcpMqttServer({
@@ -118,7 +119,6 @@ function App() {
 
   const {
     remoteStream,
-    mqttConnected: isWebRTCMqttConnected,
     isConnecting: isWebRTCConnecting,
     isConnected: isWebRTCConnected,
     error: webRTCError,
@@ -127,14 +127,10 @@ function App() {
     toggleAudio,
     toggleVideo,
     isAudioEnabled,
-    isVideoEnabled
+    isVideoEnabled,
+    cleanup: cleanupWebRTC
   } = useWebRTCMqtt({
-    autoConnect: false,
-    brokerUrl: mqttConfig.brokerUrl,
-    username: mqttConfig.username,
-    password: mqttConfig.password,
-    connectTimeout: mqttConfig.connectTimeout,
-    reconnectPeriod: mqttConfig.reconnectPeriod,
+    mqttClient: mcpMqttClient?.getMqttClient(), // Share the MCP MQTT client
     onASRResponse: (results: string) => {
       console.log('🎤 ASR Response received:', results)
       // Clear AI reply text when user starts speaking
@@ -154,13 +150,19 @@ function App() {
   }, [isMqttConnected, isMcpInitialized])
 
   useEffect(() => {
-    if (isWebRTCMqttConnected) {
-      appLogger.info('📡 WebRTC MQTT connected')
-    }
     if (isWebRTCConnected) {
       appLogger.info('🎥 WebRTC connected successfully')
     }
-  }, [isWebRTCMqttConnected, isWebRTCConnected])
+  }, [isWebRTCConnected])
+
+  // Cleanup WebRTC when component unmounts
+  useEffect(() => {
+    return () => {
+      if (cleanupWebRTC) {
+        cleanupWebRTC()
+      }
+    }
+  }, [cleanupWebRTC])
 
   return (
     <>

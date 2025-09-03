@@ -92,6 +92,7 @@ export class McpMqttServer {
         this.mqttClient.on('connect', () => {
           this.connectionState = 'connected'
           mqttLogger.info(`✅ Step 1/3: Connected to broker ${this.connectionOptions.brokerUrl} (${this.connectionOptions.clientId})`)
+          mqttLogger.info(`🔵 MCP Server Client ID: ${this.connectionOptions.clientId}`)
           
           // Use setTimeout to avoid race condition with subscriptions
           setTimeout(() => {

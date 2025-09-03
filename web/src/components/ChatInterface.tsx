@@ -1,6 +1,6 @@
 import { Mic, Volume2, Camera } from 'lucide-react'
 import { EmotionAnimation } from './EmotionAnimation'
-import { EmotionSelector } from './EmotionSelector'
+// import { EmotionSelector } from './EmotionSelector'
 import { ChatMessages } from './ChatMessages'
 import { MqttSettings } from './MqttSettings'
 import { useAudioPlaying } from '@/hooks/useAudioPlaying'
@@ -47,7 +47,7 @@ export function ChatInterface({
   showVideo,
   setShowVideo,
   selectedEmotion,
-  setSelectedEmotion,
+  // setSelectedEmotion,
   videoRef,
   audioRef,
   volume,
@@ -100,10 +100,10 @@ export function ChatInterface({
           onConfigChange={onMqttConfigChange}
           isConnected={isMqttConnected}
         />
-        <EmotionSelector 
+        {/*<EmotionSelector 
           selectedEmotion={selectedEmotion}
           onEmotionSelect={setSelectedEmotion}
-        />
+        />*/}
       </div>
 
       <div 
