@@ -1,3 +1,5 @@
+import { buildMqttWebSocketUrl } from '@/utils/host'
+
 export interface MqttBrokerConfig {
   brokerUrl: string
   username: string
@@ -17,20 +19,9 @@ export interface WebRTCMqttConfig extends MqttBrokerConfig {
   // WebRTC specific config can be added here
 }
 
-// Helper function to get broker URL with current host
-const getBrokerUrl = (url: string): string => {
-  // If URL contains localhost, replace with current window host
-  if (typeof window !== 'undefined' && url.includes('localhost')) {
-    const urlObj = new URL(url)
-    urlObj.hostname = window.location.hostname
-    return urlObj.toString()
-  }
-  return url
-}
-
 // Default MQTT broker configuration
 export const defaultMqttConfig: MqttBrokerConfig = {
-  brokerUrl: getBrokerUrl('ws://localhost:8083/mqtt'),
+  brokerUrl: buildMqttWebSocketUrl('/mqtt', 8083),
   username: 'emqx-mcp-webrtc-web-ui',
   password: 'public',
   connectTimeout: 4000,
