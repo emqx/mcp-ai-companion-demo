@@ -14,13 +14,13 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       properties: {
         enabled: {
           type: 'boolean',
-          description: 'Whether to enable or disable the camera'
-        }
+          description: 'Whether to enable or disable the camera',
+        },
       },
-      required: ['enabled']
-    }
+      required: ['enabled'],
+    },
   },
-  
+
   change_emotion: {
     name: 'change_emotion',
     description: 'Change the avatar emotion/animation',
@@ -30,13 +30,13 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         emotion: {
           type: 'string',
           description: 'The emotion to display',
-          enum: SUPPORTED_EMOTIONS as unknown as string[]
-        }
+          enum: SUPPORTED_EMOTIONS as unknown as string[],
+        },
       },
-      required: ['emotion']
-    }
+      required: ['emotion'],
+    },
   },
-  
+
   take_photo: {
     name: 'take_photo',
     description: 'Capture a photo from the video stream',
@@ -47,18 +47,18 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
           type: 'string',
           description: 'Which video stream to capture from',
           enum: ['local', 'remote'],
-          default: 'remote'
+          default: 'remote',
         },
         quality: {
           type: 'number',
           description: 'Image quality (0-1, where 1 is highest quality)',
           minimum: 0,
           maximum: 1,
-          default: 0.9
-        }
+          default: 0.9,
+        },
       },
-      required: []
-    }
+      required: [],
+    },
   },
 
   control_volume: {
@@ -71,16 +71,16 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
           type: 'number',
           description: 'Volume level as percentage (0-100)',
           minimum: 0,
-          maximum: 100
+          maximum: 100,
         },
         muted: {
           type: 'boolean',
-          description: 'Whether to mute or unmute the audio'
-        }
+          description: 'Whether to mute or unmute the audio',
+        },
       },
-      required: []
-    }
-  }
+      required: [],
+    },
+  },
 }
 
 /**
@@ -117,7 +117,7 @@ export function isValidToolName(name: string): boolean {
  */
 export function validateToolArguments(
   toolName: string,
-  args: Record<string, any>
+  args: Record<string, any>,
 ): { valid: boolean; errors?: string[] } {
   const tool = TOOL_DEFINITIONS[toolName]
   if (!tool) {

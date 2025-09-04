@@ -13,11 +13,11 @@ export function useWebRTC({
       autoGainControl: true,
       sampleRate: 48000,
       sampleSize: 16,
-      channelCount: 2
-    }
+      channelCount: 2,
+    },
   },
   autoConnect = false,
-  onASRResponse
+  onASRResponse,
 }: UseWebRTCOptions): UseWebRTCReturn {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
@@ -25,30 +25,25 @@ export function useWebRTC({
   const [error, setError] = useState<Error | null>(null)
   const [isAudioEnabled, setIsAudioEnabled] = useState(true)
   const [isVideoEnabled, setIsVideoEnabled] = useState(true)
-  
+
   const signalingRef = useRef<WebRTCSignaling | null>(null)
 
   const connect = useCallback(async () => {
     try {
       setError(null)
       setConnectionState('connecting')
-      
+
       if (signalingRef.current) {
         signalingRef.current.disconnect()
       }
- 
-      signalingRef.current = new WebRTCSignaling(
-        signalingId,
-        config,
-        mediaConstraints,
-        {
-          onConnectionStateChange: setConnectionState,
-          onLocalStream: setLocalStream,
-          onRemoteStream: setRemoteStream,
-          onError: setError,
-          onASRResponse: onASRResponse
-        }
-      )
+
+      signalingRef.current = new WebRTCSignaling(signalingId, config, mediaConstraints, {
+        onConnectionStateChange: setConnectionState,
+        onLocalStream: setLocalStream,
+        onRemoteStream: setRemoteStream,
+        onError: setError,
+        onASRResponse: onASRResponse,
+      })
 
       await signalingRef.current.connect()
     } catch (err) {
@@ -67,19 +62,25 @@ export function useWebRTC({
     setConnectionState('disconnected')
   }, [])
 
-  const toggleAudio = useCallback(async (enabled?: boolean) => {
-    if (signalingRef.current) {
-      await signalingRef.current.toggleAudio(enabled)
-      setIsAudioEnabled(enabled !== undefined ? enabled : !isAudioEnabled)
-    }
-  }, [isAudioEnabled])
+  const toggleAudio = useCallback(
+    async (enabled?: boolean) => {
+      if (signalingRef.current) {
+        await signalingRef.current.toggleAudio(enabled)
+        setIsAudioEnabled(enabled !== undefined ? enabled : !isAudioEnabled)
+      }
+    },
+    [isAudioEnabled],
+  )
 
-  const toggleVideo = useCallback(async (enabled?: boolean) => {
-    if (signalingRef.current) {
-      await signalingRef.current.toggleVideo(enabled)
-      setIsVideoEnabled(enabled !== undefined ? enabled : !isVideoEnabled)
-    }
-  }, [isVideoEnabled])
+  const toggleVideo = useCallback(
+    async (enabled?: boolean) => {
+      if (signalingRef.current) {
+        await signalingRef.current.toggleVideo(enabled)
+        setIsVideoEnabled(enabled !== undefined ? enabled : !isVideoEnabled)
+      }
+    },
+    [isVideoEnabled],
+  )
 
   useEffect(() => {
     if (autoConnect) {
@@ -91,7 +92,7 @@ export function useWebRTC({
         signalingRef.current.disconnect()
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoConnect])
 
   return {
@@ -106,6 +107,6 @@ export function useWebRTC({
     toggleAudio,
     toggleVideo,
     isAudioEnabled,
-    isVideoEnabled
+    isVideoEnabled,
   }
 }

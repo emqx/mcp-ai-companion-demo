@@ -12,7 +12,17 @@ interface MqttWebRTCSignalingOptions {
 }
 
 interface SignalingMessage {
-  type: 'sdp_offer' | 'sdp_answer' | 'ice_candidate' | 'webrtc_terminated' | 'asr_response' | 'tts_begin' | 'tts_text' | 'tts_complete' | 'tts_terminate' | 'chat'
+  type:
+    | 'sdp_offer'
+    | 'sdp_answer'
+    | 'ice_candidate'
+    | 'webrtc_terminated'
+    | 'asr_response'
+    | 'tts_begin'
+    | 'tts_text'
+    | 'tts_complete'
+    | 'tts_terminate'
+    | 'chat'
   data?: any
   reason?: string
   results?: string
@@ -43,13 +53,13 @@ export class MqttWebRTCSignaling {
     this.config = { ...defaultWebRTCConfig, ...options.config }
     this.mediaConstraints = { ...defaultMediaConstraints, ...options.mediaConstraints }
     this.callbacks = options.callbacks || {}
-    
+
     // Topics according to backend documentation:
     // Subscribe to: $webrtc/{device_id} (receive answer and candidates from proxy)
     // Publish to: $webrtc/{device_id}/multimedia_proxy (send offer and candidates to proxy)
-    this.webrtcTopic = `$webrtc/${this.clientId}`  // Subscribe to receive from proxy
-    this.multimediaTopic = `$webrtc/${this.clientId}/multimedia_proxy`  // Publish to send to proxy
-    this.messageTopic = `$message/${this.clientId}`  // For other messages (ASR, TTS)
+    this.webrtcTopic = `$webrtc/${this.clientId}` // Subscribe to receive from proxy
+    this.multimediaTopic = `$webrtc/${this.clientId}/multimedia_proxy` // Publish to send to proxy
+    this.messageTopic = `$message/${this.clientId}` // For other messages (ASR, TTS)
   }
 
   async connect(): Promise<void> {
@@ -65,13 +75,13 @@ export class MqttWebRTCSignaling {
       webrtcLogger.info(`🟢 WebRTC using Client ID: ${this.clientId}`)
       webrtcLogger.info('Step 1: Starting WebRTC signaling...')
       this.updateConnectionState('connecting')
-      
+
       webrtcLogger.info('Step 2: Subscribing to WebRTC topics')
       await this.subscribeToTopics()
-      
+
       webrtcLogger.info('Step 3: Setting up message handler')
       this.setupMessageHandler()
-      
+
       webrtcLogger.info('Step 4: Initializing WebRTC peer connection')
       await this.setupWebRTC()
     } catch (error) {
@@ -129,7 +139,7 @@ export class MqttWebRTCSignaling {
           if (this.pc && message.data) {
             const answer = new RTCSessionDescription({
               type: 'answer',
-              sdp: message.data.sdp || message.data
+              sdp: message.data.sdp || message.data,
             })
             await this.pc.setRemoteDescription(answer)
             webrtcLogger.info('✅ Set remote SDP answer')
@@ -141,7 +151,7 @@ export class MqttWebRTCSignaling {
             const candidate = new RTCIceCandidate({
               candidate: message.data.candidate,
               sdpMLineIndex: message.data.sdpMLineIndex,
-              sdpMid: message.data.sdpMid
+              sdpMid: message.data.sdpMid,
             })
             await this.pc.addIceCandidate(candidate)
             webrtcLogger.info('✅ Added ICE candidate')
@@ -203,10 +213,10 @@ export class MqttWebRTCSignaling {
     webrtcLogger.info('📤 Creating and sending offer to backend')
     const offer = await this.pc.createOffer()
     webrtcLogger.info('✅ Offer created, setting as local description')
-    
+
     await this.pc.setLocalDescription(offer)
     webrtcLogger.info('✅ Local description set, sending to backend via MQTT')
-    
+
     this.sendSignal('sdp_offer', offer)
     webrtcLogger.info('📡 Offer sent to backend, waiting for answer...')
   }
@@ -230,10 +240,10 @@ export class MqttWebRTCSignaling {
 
     this.pc.onconnectionstatechange = () => {
       if (!this.pc) return
-      
+
       const state = this.pc.connectionState
       webrtcLogger.info(`🔄 Connection state: ${state}`)
-      
+
       switch (state) {
         case 'connected':
           webrtcLogger.info('🎉 WebRTC connection established!')
@@ -273,7 +283,7 @@ export class MqttWebRTCSignaling {
 
     const message = JSON.stringify({ type, data })
     webrtcLogger.info(`📤 Publishing ${type} to topic: ${this.multimediaTopic}`)
-    
+
     this.mqttClient.publish(this.multimediaTopic, message, { qos: 0 }, (err) => {
       if (err) {
         webrtcLogger.error(`❌ Failed to send ${type}:`, err.message)
@@ -295,22 +305,22 @@ export class MqttWebRTCSignaling {
 
   disconnect(): void {
     webrtcLogger.info('🔌 WebRTC Signaling: Starting disconnect...')
-    
+
     try {
       // Stop local media streams
       if (this.localStream) {
         webrtcLogger.info('🎥 Stopping local stream tracks')
-        this.localStream.getTracks().forEach(track => {
+        this.localStream.getTracks().forEach((track) => {
           track.stop()
           webrtcLogger.info(`🔇 Stopped local ${track.kind} track`)
         })
         this.localStream = null
       }
 
-      // Stop remote media streams  
+      // Stop remote media streams
       if (this.remoteStream) {
         webrtcLogger.info('📺 Stopping remote stream tracks')
-        this.remoteStream.getTracks().forEach(track => {
+        this.remoteStream.getTracks().forEach((track) => {
           track.stop()
           webrtcLogger.info(`🔇 Stopped remote ${track.kind} track`)
         })
@@ -328,7 +338,7 @@ export class MqttWebRTCSignaling {
       if (this.mqttClient && this.messageHandler) {
         webrtcLogger.info('📡 Removing MQTT message handler and unsubscribing')
         this.mqttClient.removeListener('message', this.messageHandler)
-        
+
         // Unsubscribe from topics
         const topics = [this.webrtcTopic, this.messageTopic]
         this.mqttClient.unsubscribe(topics, {}, (err) => {
@@ -338,7 +348,7 @@ export class MqttWebRTCSignaling {
             webrtcLogger.info(`✅ Unsubscribed from topics: ${topics.join(', ')}`)
           }
         })
-        
+
         this.messageHandler = null
       }
 
@@ -350,7 +360,7 @@ export class MqttWebRTCSignaling {
       // Reset state
       this.ttsText = ''
       this.updateConnectionState('disconnected')
-      
+
       webrtcLogger.info('✅ WebRTC Signaling: Disconnect completed')
     } catch (error) {
       webrtcLogger.error('❌ Error during WebRTC signaling disconnect:', error)
@@ -360,18 +370,18 @@ export class MqttWebRTCSignaling {
 
   async toggleAudio(enabled?: boolean): Promise<void> {
     if (!this.localStream) return
-    
+
     const audioTracks = this.localStream.getAudioTracks()
-    audioTracks.forEach(track => {
+    audioTracks.forEach((track) => {
       track.enabled = enabled !== undefined ? enabled : !track.enabled
     })
   }
 
   toggleVideo(enabled?: boolean): void {
     if (!this.localStream) return
-    
+
     const videoTracks = this.localStream.getVideoTracks()
-    videoTracks.forEach(track => {
+    videoTracks.forEach((track) => {
       track.enabled = enabled !== undefined ? enabled : !track.enabled
     })
   }

@@ -54,7 +54,7 @@ DEBUG=true npm test
 After connection, use these interactive commands:
 
 - `camera_on` - Enable camera
-- `camera_off` - Disable camera  
+- `camera_off` - Disable camera
 - `emotion <name>` - Change emotion (happy, sad, angry, etc.)
 - `quit` - Exit
 
@@ -132,7 +132,7 @@ class McpMqttClient {
 async initializeServer(serverId, serverName) {
   // Subscribe to response topic first
   await this.subscribe(`$mcp-rpc/${this.clientId}/${serverId}/${serverName}`);
-  
+
   const request = {
     jsonrpc: '2.0',
     id: generateId(),
@@ -294,7 +294,7 @@ interface McpServerInfo {
 ## Testing Flow
 
 1. **Server Discovery** - Client discovers Web UI MCP Server
-2. **Handshake** - Initialize connection and exchange capabilities  
+2. **Handshake** - Initialize connection and exchange capabilities
 3. **Tool Listing** - Retrieve available hardware control tools
 4. **Interactive Testing** - Manual tool execution with real-time feedback
 

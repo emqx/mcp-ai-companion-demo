@@ -23,13 +23,13 @@ export interface ICECandidateData {
 
 export interface SignalingMessage {
   type: 'sdp_offer' | 'sdp_answer' | 'ice_candidate'
-   
+
   data: SDPData | ICECandidateData | any // Phoenix signaling expects specific JSON format
 }
 
 export interface PhoenixChannelPayload {
   type: string
-   
+
   data: any
 }
 
@@ -39,12 +39,7 @@ export interface VoiceType {
   icon: string
 }
 
-export type ConnectionState = 
-  | 'disconnected'
-  | 'connecting'
-  | 'connected'
-  | 'failed'
-  | 'closed'
+export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'failed' | 'closed'
 
 // Message types from backend
 export interface ASRResponse {
@@ -85,5 +80,5 @@ export interface UseWebRTCReturn {
   toggleVideo: (enabled?: boolean) => Promise<void>
   isAudioEnabled: boolean
   isVideoEnabled: boolean
-  cleanup?: () => void  // Optional cleanup function
+  cleanup?: () => void // Optional cleanup function
 }

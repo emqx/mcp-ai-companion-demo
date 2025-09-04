@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import "tw-animate-css";
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -125,14 +125,16 @@
 
 @layer utilities {
   .bg-button-active {
-    background-color: rgba(94, 78, 255, 0.30);
-    box-shadow: 0 0 0 2px rgba(94, 78, 255, 0.20), 0 2px 8px rgba(94, 78, 255, 0.25);
+    background-color: rgba(94, 78, 255, 0.3);
+    box-shadow:
+      0 0 0 2px rgba(94, 78, 255, 0.2),
+      0 2px 8px rgba(94, 78, 255, 0.25);
   }
   .text-button-active {
-    color: #5E4EFF;
+    color: #5e4eff;
   }
   .bg-button-connecting {
-    background: rgba(94, 78, 255, 0.20);
+    background: rgba(94, 78, 255, 0.2);
     position: relative;
     overflow: visible;
   }
@@ -145,11 +147,11 @@
     bottom: -2px;
     border-radius: 50px;
     border: 2px solid transparent;
-    border-top: 2px solid #5E4EFF;
+    border-top: 2px solid #5e4eff;
     animation: spin-border 1s linear infinite;
   }
   .text-button-connecting {
-    color: #5E4EFF;
+    color: #5e4eff;
     position: relative;
     z-index: 1;
   }

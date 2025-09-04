@@ -4,5 +4,7 @@
  * @returns A random hex string
  */
 export function generateRandomId(length: number = 8): string {
-  return Math.random().toString(16).substring(2, 2 + length)
+  return Math.random()
+    .toString(16)
+    .substring(2, 2 + length)
 }

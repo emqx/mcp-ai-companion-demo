@@ -10,7 +10,7 @@ function RiveAnimationInner({ emotion }: { emotion: string }) {
     autoplay: true,
     layout: new Layout({
       fit: Fit.Contain,
-      alignment: Alignment.Center
+      alignment: Alignment.Center,
     }),
     onLoad: () => {
       console.log(`[RiveAnimation] ${emotion} animation loaded successfully!`)
@@ -22,17 +22,15 @@ function RiveAnimationInner({ emotion }: { emotion: string }) {
 
   return (
     <RiveComponent
-      style={{ 
-        width: '180px', 
-        height: '180px', 
-        display: 'block'
-      }} 
+      style={{
+        width: '180px',
+        height: '180px',
+        display: 'block',
+      }}
     />
   )
 }
 
 export function RiveAnimation({ emotion }: RiveAnimationProps) {
-  return (
-    <RiveAnimationInner key={emotion} emotion={emotion} />
-  )
+  return <RiveAnimationInner key={emotion} emotion={emotion} />
 }

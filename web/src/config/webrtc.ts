@@ -1,11 +1,9 @@
 import type { WebRTCConfig, MediaConstraints } from '@/types/webrtc'
 
 export const defaultWebRTCConfig: WebRTCConfig = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' }
-  ],
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
   signalingUrl: 'ws://localhost:4000/signaling',
-  signalingId: undefined
+  signalingId: undefined,
 }
 
 export const defaultMediaConstraints: MediaConstraints = {
@@ -16,8 +14,8 @@ export const defaultMediaConstraints: MediaConstraints = {
     autoGainControl: true,
     sampleRate: 48000,
     sampleSize: 16,
-    channelCount: 2
-  }
+    channelCount: 2,
+  },
 }
 
 export const voiceTypes = [
@@ -25,5 +23,5 @@ export const voiceTypes = [
   { id: 'male', name: '男声', icon: '👨' },
   { id: 'female', name: '女声', icon: '👩' },
   { id: 'child', name: '童声', icon: '👶' },
-  { id: 'elder', name: '长者', icon: '👴' }
+  { id: 'elder', name: '长者', icon: '👴' },
 ]

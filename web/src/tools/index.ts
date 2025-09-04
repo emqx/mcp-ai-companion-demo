@@ -1,6 +1,6 @@
 /**
  * MCP Tools Module
- * 
+ *
  * This module provides a centralized interface for managing MCP (Model Context Protocol) tools.
  * It includes tool definitions, handlers, and execution utilities.
  */
@@ -27,7 +27,7 @@ export const McpTools = {
   /** Validate tool arguments against schema */
   validate: validateToolArguments,
   /** Execute a tool with given arguments and context */
-  execute: executeToolCall
+  execute: executeToolCall,
 }
 
 /**

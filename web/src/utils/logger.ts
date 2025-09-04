@@ -10,23 +10,23 @@ const loggerConfigs: Record<string, LoggerConfig> = {
   mcp: {
     prefix: '[MCP/MQTT]',
     color: '#00B4D8',
-    backgroundColor: 'transparent'
+    backgroundColor: 'transparent',
   },
   webrtc: {
     prefix: '[WebRTC/MQTT]',
     color: '#28A745',
-    backgroundColor: 'transparent'
+    backgroundColor: 'transparent',
   },
   mqtt: {
     prefix: '[MQTT]',
     color: '#8E44AD',
-    backgroundColor: 'transparent'
+    backgroundColor: 'transparent',
   },
   app: {
     prefix: '[App]',
     color: '#F77F00',
-    backgroundColor: 'transparent'
-  }
+    backgroundColor: 'transparent',
+  },
 }
 
 export class Logger {
@@ -45,11 +45,11 @@ export class Logger {
       `background: ${this.config.backgroundColor || 'transparent'}`,
       'padding: 2px 6px',
       'border-radius: 3px',
-      'font-weight: bold'
+      'font-weight: bold',
     ].join(';')
 
     const prefix = `%c${this.config.prefix}`
-    
+
     switch (level) {
       case 'debug':
         console.debug(prefix, styles, ...args)

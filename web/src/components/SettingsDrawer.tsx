@@ -3,14 +3,7 @@ import { Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { defaultMqttConfig } from '@/config/mqtt'
 import { toast } from 'sonner'
 
@@ -53,13 +46,14 @@ export function SettingsDrawer({ onSettingsUpdate }: SettingsDrawerProps) {
         throw new Error('URL must use ws://, wss://, mqtt://, or mqtts:// protocol')
       }
     } catch (error) {
-      toast.error('Invalid broker URL format')
+      const err = error as unknown as Error
+      toast.error(`Invalid broker URL format: ${err.message}`)
       return
     }
 
     // Save to localStorage
     localStorage.setItem('mqttSettings', JSON.stringify(settings))
-    
+
     // Update the default config (this will be used by new connections)
     Object.assign(defaultMqttConfig, {
       brokerUrl: settings.brokerUrl,
@@ -69,7 +63,7 @@ export function SettingsDrawer({ onSettingsUpdate }: SettingsDrawerProps) {
 
     // Notify parent component
     onSettingsUpdate?.(settings)
-    
+
     toast.success('MQTT settings updated successfully')
     setOpen(false)
   }
@@ -87,11 +81,7 @@ export function SettingsDrawer({ onSettingsUpdate }: SettingsDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-12 w-12 rounded-full hover:bg-gray-100 cursor-pointer"
-        >
+        <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full hover:bg-gray-100 cursor-pointer">
           <Settings className="h-6 w-6" />
         </Button>
       </SheetTrigger>
@@ -102,7 +92,7 @@ export function SettingsDrawer({ onSettingsUpdate }: SettingsDrawerProps) {
             Configure your MQTT broker connection settings
           </SheetDescription>
         </SheetHeader>
-        
+
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="space-y-6">
             <div className="space-y-3">
@@ -116,11 +106,9 @@ export function SettingsDrawer({ onSettingsUpdate }: SettingsDrawerProps) {
                 onChange={(e) => setSettings({ ...settings, brokerUrl: e.target.value })}
                 className="h-11 text-sm"
               />
-              <p className="text-xs text-gray-500">
-                WebSocket URL for MQTT broker (ws:// or wss://)
-              </p>
+              <p className="text-xs text-gray-500">WebSocket URL for MQTT broker (ws:// or wss://)</p>
             </div>
-            
+
             <div className="space-y-3">
               <Label htmlFor="username" className="text-sm font-medium text-gray-700">
                 Username
@@ -133,7 +121,7 @@ export function SettingsDrawer({ onSettingsUpdate }: SettingsDrawerProps) {
                 className="h-11 text-sm"
               />
             </div>
-            
+
             <div className="space-y-3">
               <Label htmlFor="password" className="text-sm font-medium text-gray-700">
                 Password
@@ -149,28 +137,17 @@ export function SettingsDrawer({ onSettingsUpdate }: SettingsDrawerProps) {
             </div>
           </div>
         </div>
-        
+
         <div className="px-6 py-4 bg-gray-50 border-t">
           <div className="space-y-3">
-            <Button 
-              variant="outline" 
-              onClick={handleReset}
-              className="w-full h-11 text-sm"
-            >
+            <Button variant="outline" onClick={handleReset} className="w-full h-11 text-sm">
               Reset to Default
             </Button>
             <div className="flex gap-3">
-              <Button 
-                variant="outline" 
-                onClick={() => setOpen(false)}
-                className="flex-1 h-11 text-sm"
-              >
+              <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 h-11 text-sm">
                 Cancel
               </Button>
-              <Button 
-                onClick={handleSave}
-                className="flex-1 h-11 text-sm bg-blue-600 hover:bg-blue-700 text-white"
-              >
+              <Button onClick={handleSave} className="flex-1 h-11 text-sm bg-blue-600 hover:bg-blue-700 text-white">
                 Save Changes
               </Button>
             </div>

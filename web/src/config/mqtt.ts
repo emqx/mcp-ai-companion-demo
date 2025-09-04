@@ -25,16 +25,16 @@ export const defaultMqttConfig: MqttBrokerConfig = {
   password: 'public',
   connectTimeout: 4000,
   reconnectPeriod: 1000,
-  protocolVersion: 5
+  protocolVersion: 5,
 }
 
 // MCP Server configuration
 export const mcpServerConfig: McpMqttConfig = {
   ...defaultMqttConfig,
-  serverName: 'web-ui-hardware-controller'
+  serverName: 'web-ui-hardware-controller',
 }
 
-// WebRTC client configuration  
+// WebRTC client configuration
 export const webrtcClientConfig: WebRTCMqttConfig = {
   ...defaultMqttConfig,
   // WebRTC uses same broker but independent connection

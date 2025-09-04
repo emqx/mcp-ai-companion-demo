@@ -26,7 +26,7 @@ function App() {
       username: defaultMqttConfig.username,
       password: defaultMqttConfig.password,
       connectTimeout: defaultMqttConfig.connectTimeout,
-      reconnectPeriod: defaultMqttConfig.reconnectPeriod
+      reconnectPeriod: defaultMqttConfig.reconnectPeriod,
     }
   })
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -51,14 +51,14 @@ function App() {
     if (!videoRef?.current?.videoWidth || !videoRef?.current?.videoHeight) {
       throw new Error('Video not ready for capture')
     }
-    const result = await capturePhotoFromVideo(videoRef.current, source, { 
+    const result = await capturePhotoFromVideo(videoRef.current, source, {
       quality,
       upload: {
         url: '/api/upload',
-        formFieldName: 'file'
-      }
+        formFieldName: 'file',
+      },
     })
-    
+
     appLogger.info(`📸 Photo captured successfully: ${result.filename}`)
 
     // Auto close camera after successful capture with delay
@@ -82,7 +82,7 @@ function App() {
         duration: 3000,
       })
     }
-    
+
     // Update muted state if provided
     if (muted !== undefined) {
       setIsMuted(muted)
@@ -111,17 +111,20 @@ function App() {
     // TODO: Reconnect MQTT with new config
   }, [])
 
-  const callbacks = useMemo(() => ({
-    onCameraControl,
-    onEmotionChange,
-    onTakePhoto,
-    onVolumeControl
-  }), [onCameraControl, onEmotionChange, onTakePhoto, onVolumeControl])
+  const callbacks = useMemo(
+    () => ({
+      onCameraControl,
+      onEmotionChange,
+      onTakePhoto,
+      onVolumeControl,
+    }),
+    [onCameraControl, onEmotionChange, onTakePhoto, onVolumeControl],
+  )
 
   const {
     client: mcpMqttClient,
     isConnected: isMqttConnected,
-    isMcpInitialized
+    isMcpInitialized,
   } = useMcpMqttServer({
     brokerUrl: mqttConfig.brokerUrl,
     username: mqttConfig.username,
@@ -132,19 +135,22 @@ function App() {
     callbacks,
   })
 
-  const onSendMessage = useCallback(async (message: string) => {
-    if (!mcpMqttClient) {
-      throw new Error('MQTT client is not available')
-    }
-    try {
-      const topic = `$message/${mcpMqttClient.getClientId()}/multimedia_proxy`
-      await mcpMqttClient.publish(topic, message)
-      mqttLogger.info(`Message sent to ${topic}: ${message}`)
-    } catch (error) {
-      mqttLogger.error('Failed to send MQTT message:', error)
-      throw error
-    }
-  }, [mcpMqttClient])
+  const onSendMessage = useCallback(
+    async (message: string) => {
+      if (!mcpMqttClient) {
+        throw new Error('MQTT client is not available')
+      }
+      try {
+        const topic = `$message/${mcpMqttClient.getClientId()}/multimedia_proxy`
+        await mcpMqttClient.publish(topic, message)
+        mqttLogger.info(`Message sent to ${topic}: ${message}`)
+      } catch (error) {
+        mqttLogger.error('Failed to send MQTT message:', error)
+        throw error
+      }
+    },
+    [mcpMqttClient],
+  )
 
   const {
     remoteStream,
@@ -157,7 +163,7 @@ function App() {
     toggleVideo,
     isAudioEnabled,
     isVideoEnabled,
-    cleanup: cleanupWebRTC
+    cleanup: cleanupWebRTC,
   } = useWebRTCMqtt({
     mqttClient: mcpMqttClient?.getMqttClient(), // Share the MCP MQTT client
     onASRResponse: (results: string) => {
@@ -169,7 +175,7 @@ function App() {
       console.log('🔊 TTS Text received:', text)
       console.log('Setting aiReplyText to:', text)
       setAiReplyText(text)
-    }
+    },
   })
 
   useEffect(() => {
@@ -195,7 +201,7 @@ function App() {
 
   return (
     <>
-      <ChatInterface 
+      <ChatInterface
         webrtc={{
           remoteStream,
           isConnecting: isWebRTCConnecting,
@@ -206,7 +212,7 @@ function App() {
           connect: connectWebRTC,
           disconnect: disconnectWebRTC,
           toggleAudio,
-          toggleVideo
+          toggleVideo,
         }}
         isMqttConnected={isMqttConnected}
         aiReplyText={aiReplyText}

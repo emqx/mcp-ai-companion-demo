@@ -36,18 +36,14 @@ export interface PhotoCaptureConfig {
 export async function capturePhotoFromVideo(
   videoElement: HTMLVideoElement,
   source: 'local' | 'remote',
-  config: PhotoCaptureConfig = {}
+  config: PhotoCaptureConfig = {},
 ): Promise<PhotoCaptureResult> {
-  const {
-    quality = 0.9,
-    format = 'image/jpeg',
-    upload
-  } = config
+  const { quality = 0.9, format = 'image/jpeg', upload } = config
 
   // Create canvas element
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
-  
+
   if (!ctx) {
     throw new Error('Failed to get canvas 2D context')
   }
@@ -70,13 +66,13 @@ export async function capturePhotoFromVideo(
         }
       },
       format,
-      quality
+      quality,
     )
   })
 
   // Generate data URL
   const dataUrl = canvas.toDataURL(format, quality)
-  
+
   // Generate filename with timestamp
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const extension = format.split('/')[1] || 'jpg'
@@ -86,7 +82,7 @@ export async function capturePhotoFromVideo(
     dataUrl,
     blob,
     filename,
-    source
+    source,
   }
 
   // Skip auto-download when uploading to server
@@ -96,16 +92,16 @@ export async function capturePhotoFromVideo(
     try {
       const uploadResult = await uploadPhoto(result, upload)
       console.log('Photo uploaded successfully:', filename, 'file_id:', uploadResult.file_id)
-      
+
       // Construct download URL with the file_id using dynamic host
       const downloadUrl = buildApiUrl(`/api/download/${uploadResult.file_id}`)
       result.downloadUrl = downloadUrl
-      
+
       // Show success notification
       toast.success('📸 Photo captured and uploaded successfully! Camera will close in 3 seconds...')
     } catch (error) {
       console.warn('Photo upload failed:', error)
-      // Show error notification  
+      // Show error notification
       toast.error(`❌ Upload failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
@@ -121,7 +117,7 @@ export function downloadPhoto(photo: PhotoCaptureResult): void {
   const link = document.createElement('a')
   link.href = photo.dataUrl
   link.download = photo.filename
-  
+
   // Temporarily add to DOM and trigger download
   document.body.appendChild(link)
   link.click()
@@ -134,10 +130,7 @@ export function downloadPhoto(photo: PhotoCaptureResult): void {
  * @param config - Upload configuration
  * @returns Promise that resolves with the file_id from the server
  */
-export async function uploadPhoto(
-  photo: PhotoCaptureResult,
-  config: UploadConfig
-): Promise<{ file_id: string }> {
+export async function uploadPhoto(photo: PhotoCaptureResult, config: UploadConfig): Promise<{ file_id: string }> {
   if (!config.url) {
     throw new Error('Upload URL is required')
   }
@@ -154,7 +147,7 @@ export async function uploadPhoto(
   const response = await fetch(config.url, {
     method: 'POST',
     headers,
-    body: formData
+    body: formData,
   })
 
   if (!response.ok) {
@@ -181,10 +174,10 @@ export function getVideoCaptureDimensions(videoElement: HTMLVideoElement): {
   if (!videoElement.videoWidth || !videoElement.videoHeight) {
     return null
   }
-  
+
   return {
     width: videoElement.videoWidth,
-    height: videoElement.videoHeight
+    height: videoElement.videoHeight,
   }
 }
 

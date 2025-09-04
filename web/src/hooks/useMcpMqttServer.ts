@@ -1,12 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { McpMqttServer } from '@/lib/mcp-mqtt-server'
 import { mcpServerConfig } from '@/config/mqtt'
-import type { 
-  MqttConnectionOptions, 
-  MqttMessage,
-  McpClientInfo,
-  McpServerCallbacks
-} from '@/types/mqtt'
+import type { MqttConnectionOptions, MqttMessage, McpClientInfo, McpServerCallbacks } from '@/types/mqtt'
 
 export interface UseMqttOptions extends MqttConnectionOptions {
   autoConnect?: boolean
@@ -24,7 +19,7 @@ export interface UseMqttServerReturn {
   connectionState: string
   connect: () => Promise<void>
   disconnect: () => Promise<void>
-  publish: (topic: string, message: string, options?: { qos?: 0 | 1 | 2, retain?: boolean }) => Promise<void>
+  publish: (topic: string, message: string, options?: { qos?: 0 | 1 | 2; retain?: boolean }) => Promise<void>
   subscribe: (topic: string | string[], qos?: 0 | 1 | 2) => Promise<void>
   unsubscribe: (topic: string | string[]) => Promise<void>
   messages: MqttMessage[]
@@ -33,15 +28,8 @@ export interface UseMqttServerReturn {
 }
 
 export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerReturn {
-  const { 
-    autoConnect = true, 
-    autoInitializeMcp = false,
-    serverName,
-    clientInfo,
-    callbacks,
-    ...mqttOptions 
-  } = options
-  
+  const { autoConnect = true, autoInitializeMcp = false, serverName, clientInfo, callbacks, ...mqttOptions } = options
+
   const [client, setClient] = useState<McpMqttServer | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
@@ -62,9 +50,9 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
       ...mcpServerConfig,
       ...mqttOptionsRef.current,
       serverName: serverName || mcpServerConfig.serverName,
-      callbacks
+      callbacks,
     }
-    
+
     const mqttClient = new McpMqttServer(config)
     clientRef.current = mqttClient
     setClient(mqttClient)
@@ -74,7 +62,7 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
       setIsConnecting(false)
       setError(null)
       setConnectionState('connected')
-      
+
       // Server is initialized when connected
       setIsMcpInitialized(true)
     })
@@ -92,7 +80,7 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
     })
 
     mqttClient.onMessage((message) => {
-      setMessages(prev => [...prev, message])
+      setMessages((prev) => [...prev, message])
     })
 
     if (autoConnect) {
@@ -112,10 +100,10 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
 
   const connect = async () => {
     if (!client) return
-    
+
     setIsConnecting(true)
     setError(null)
-    
+
     try {
       await client.connect()
     } catch (err) {
@@ -126,7 +114,7 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
 
   const disconnect = async () => {
     if (!client) return
-    
+
     try {
       await client.disconnect()
     } catch (err) {
@@ -134,7 +122,7 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
     }
   }
 
-  const publish = async (topic: string, message: string, options?: { qos?: 0 | 1 | 2, retain?: boolean }) => {
+  const publish = async (topic: string, message: string, options?: { qos?: 0 | 1 | 2; retain?: boolean }) => {
     if (!client) {
       throw new Error('MQTT client is not initialized')
     }
@@ -154,7 +142,6 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
     }
     return client.unsubscribe(topic)
   }
-
 
   return {
     client,

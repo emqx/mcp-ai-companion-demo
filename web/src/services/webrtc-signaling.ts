@@ -17,7 +17,7 @@ export class WebRTCSignaling {
     signalingId: string,
     config: Partial<WebRTCConfig> = {},
     mediaConstraints: Partial<MediaConstraints> = {},
-    callbacks: WebRTCCallbacks = {}
+    callbacks: WebRTCCallbacks = {},
   ) {
     this.signalingId = signalingId
     this.config = { ...defaultWebRTCConfig, ...config }
@@ -28,33 +28,33 @@ export class WebRTCSignaling {
   async connect(): Promise<void> {
     try {
       this.updateConnectionState('connecting')
-      
+
       // Create Phoenix socket
       this.socket = new Socket(this.config.signalingUrl, {
         params: { token: (window as any).userToken },
         logger: (kind, msg, data) => {
           console.log(`Phoenix Socket [${kind}]:`, msg, data)
-        }
+        },
       })
-      
+
       this.socket.onOpen(() => {
         console.log('Phoenix socket connected successfully')
       })
-      
+
       this.socket.onError((error) => {
         console.error('Phoenix socket error:', error)
         this.handleError(new Error('Socket connection failed'))
       })
-      
+
       this.socket.onClose(() => {
         console.log('Phoenix socket disconnected')
       })
-      
+
       this.socket.connect()
 
       // Join signaling channel
       this.channel = this.socket.channel(this.signalingId)
-      
+
       await this.joinChannel()
       await this.setupWebRTC()
     } catch (error) {
@@ -108,12 +108,12 @@ export class WebRTCSignaling {
     await this.pc.setLocalDescription(offer)
     console.log('Sent SDP offer:', offer)
     // Convert to the format expected by Phoenix signaling
-    this.sendMessage({ 
-      type: 'sdp_offer', 
+    this.sendMessage({
+      type: 'sdp_offer',
       data: {
         type: offer.type,
-        sdp: offer.sdp
-      }
+        sdp: offer.sdp,
+      },
     })
   }
 
@@ -124,23 +124,23 @@ export class WebRTCSignaling {
       if (event.candidate) {
         console.log('Sent ICE candidate:', event.candidate)
         // Convert to the format expected by Phoenix signaling
-        this.sendMessage({ 
-          type: 'ice_candidate', 
+        this.sendMessage({
+          type: 'ice_candidate',
           data: {
             candidate: event.candidate.candidate,
             sdpMLineIndex: event.candidate.sdpMLineIndex,
-            sdpMid: event.candidate.sdpMid
-          }
+            sdpMid: event.candidate.sdpMid,
+          },
         })
       }
     }
 
     this.pc.onconnectionstatechange = () => {
       if (!this.pc) return
-      
+
       const state = this.pc.connectionState
       console.log('Connection state changed:', state)
-      
+
       switch (state) {
         case 'connected':
           console.log('WebRTC connection established successfully')
@@ -175,11 +175,10 @@ export class WebRTCSignaling {
 
     this.pc.ontrack = (event) => {
       console.log('Received track:', event.track.kind, event.track.readyState, event.track.enabled)
-      
+
       if (this.remoteStream) {
         this.remoteStream.addTrack(event.track)
         this.callbacks.onRemoteStream?.(this.remoteStream)
-        
       }
     }
   }
@@ -197,35 +196,35 @@ export class WebRTCSignaling {
             // Convert from Phoenix signaling format to WebRTC format
             const answer = new RTCSessionDescription({
               type: 'answer',
-              sdp: data.sdp || data
+              sdp: data.sdp || data,
             })
             await this.pc.setRemoteDescription(answer)
           }
           break
-          
+
         case 'sdp_offer':
           console.log('Received SDP offer:', data)
           if (this.pc && data) {
             // Convert from Phoenix signaling format to WebRTC format
             const offer = new RTCSessionDescription({
               type: 'offer',
-              sdp: data.sdp || data
+              sdp: data.sdp || data,
             })
             await this.pc.setRemoteDescription(offer)
             const answer = await this.pc.createAnswer()
             await this.pc.setLocalDescription(answer)
             // Send answer in the format expected by Phoenix signaling
-            this.sendMessage({ 
-              type: 'sdp_answer', 
+            this.sendMessage({
+              type: 'sdp_answer',
               data: {
                 type: answer.type,
-                sdp: answer.sdp
-              }
+                sdp: answer.sdp,
+              },
             })
             console.log('Sent SDP answer:', answer)
           }
           break
-          
+
         case 'ice_candidate':
           console.log('Received ICE candidate:', data)
           if (this.pc && data) {
@@ -233,18 +232,16 @@ export class WebRTCSignaling {
             const candidate = new RTCIceCandidate({
               candidate: data.candidate,
               sdpMLineIndex: data.sdpMLineIndex,
-              sdpMid: data.sdpMid
+              sdpMid: data.sdpMid,
             })
             await this.pc.addIceCandidate(candidate)
           }
           break
-          
+
         case 'asr_response':
           console.log('Received ASR response:', data)
           this.callbacks.onASRResponse?.(data.results || data)
           break
-          
-          
       }
     })
   }
@@ -270,13 +267,13 @@ export class WebRTCSignaling {
   disconnect(): void {
     // Stop local stream tracks
     if (this.localStream) {
-      this.localStream.getTracks().forEach(track => track.stop())
+      this.localStream.getTracks().forEach((track) => track.stop())
       this.localStream = null
     }
 
     // Clear remote stream
     if (this.remoteStream) {
-      this.remoteStream.getTracks().forEach(track => track.stop())
+      this.remoteStream.getTracks().forEach((track) => track.stop())
       this.remoteStream = null
     }
 
@@ -304,18 +301,18 @@ export class WebRTCSignaling {
   // Utility methods
   async toggleAudio(enabled?: boolean): Promise<void> {
     if (!this.localStream) return
-    
+
     const audioTracks = this.localStream.getAudioTracks()
-    audioTracks.forEach(track => {
+    audioTracks.forEach((track) => {
       track.enabled = enabled !== undefined ? enabled : !track.enabled
     })
   }
 
   toggleVideo(enabled?: boolean): void {
     if (!this.localStream) return
-    
+
     const videoTracks = this.localStream.getVideoTracks()
-    videoTracks.forEach(track => {
+    videoTracks.forEach((track) => {
       track.enabled = enabled !== undefined ? enabled : !track.enabled
     })
   }

@@ -54,7 +54,7 @@ export interface ToolExecutionResult {
  */
 export type ToolHandler = (
   args: Record<string, any>,
-  context: ToolHandlerContext
+  context: ToolHandlerContext,
 ) => ToolExecutionResult | Promise<ToolExecutionResult>
 
 /**
@@ -82,10 +82,10 @@ export const SUPPORTED_EMOTIONS = [
   'shy',
   'tired',
   'disappointed',
-  'laugh'
+  'laugh',
 ] as const
 
 /**
  * Type union of all supported emotions
  */
-export type EmotionType = typeof SUPPORTED_EMOTIONS[number]
+export type EmotionType = (typeof SUPPORTED_EMOTIONS)[number]
