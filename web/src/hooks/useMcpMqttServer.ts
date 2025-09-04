@@ -169,7 +169,7 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
     unsubscribe,
     messages,
     // MCP Server state
-    isMcpInitialized
+    isMcpInitialized,
   }
 }
 

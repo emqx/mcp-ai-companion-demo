@@ -2,7 +2,7 @@ import { useMcpMqttServer } from '@/hooks/useMcpMqttServer'
 import { useWebRTCMqtt } from '@/hooks/useWebRTCMqtt'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { ChatInterface } from '@/components/ChatInterface'
-import { appLogger } from '@/utils/logger'
+import { appLogger, mqttLogger } from '@/utils/logger'
 import { capturePhotoFromVideo } from '@/utils/photo-capture'
 import type { PhotoCaptureResult } from '@/tools/types'
 import { Toaster } from '@/components/ui/sonner'
@@ -117,6 +117,20 @@ function App() {
     callbacks,
   })
 
+  const onSendMessage = useCallback(async (message: string) => {
+    if (!mcpMqttClient) {
+      throw new Error('MQTT client is not available')
+    }
+    try {
+      const topic = `$message/${mcpMqttClient.getClientId()}/multimedia_proxy`
+      await mcpMqttClient.publish(topic, message)
+      mqttLogger.info(`Message sent to ${topic}: ${message}`)
+    } catch (error) {
+      mqttLogger.error('Failed to send MQTT message:', error)
+      throw error
+    }
+  }, [mcpMqttClient])
+
   const {
     remoteStream,
     isConnecting: isWebRTCConnecting,
@@ -191,6 +205,7 @@ function App() {
         isMuted={isMuted}
         mqttConfig={mqttConfig}
         onMqttConfigChange={onMqttConfigChange}
+        onSendMessage={onSendMessage}
       />
       <Toaster />
     </>

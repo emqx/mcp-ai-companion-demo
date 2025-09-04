@@ -6,7 +6,7 @@ import { MqttSettings } from './MqttSettings'
 import { useAudioPlaying } from '@/hooks/useAudioPlaying'
 import { useEffect, useRef, type RefObject } from 'react'
 import type { MqttConfig } from '@/utils/storage'
-import { appLogger } from '@/utils/logger'
+import { appLogger, mqttLogger } from '@/utils/logger'
 
 interface WebRTCState {
   remoteStream: MediaStream | null;
@@ -38,6 +38,7 @@ interface ChatInterfaceProps {
   isMuted: boolean;
   mqttConfig: MqttConfig;
   onMqttConfigChange: (config: MqttConfig) => void;
+  onSendMessage?: (message: string) => Promise<void>;
 }
 
 export function ChatInterface({ 
@@ -53,12 +54,35 @@ export function ChatInterface({
   volume,
   isMuted,
   mqttConfig,
-  onMqttConfigChange
+  onMqttConfigChange,
+  onSendMessage
 }: ChatInterfaceProps) {
   console.log('ChatInterface render - aiReplyText:', aiReplyText)
   
   const isSpeaking = useAudioPlaying(audioRef, 1000)
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const sendAvatarInteraction = async (interactionType: 'encourage' | 'tap') => {
+    if (!onSendMessage) {
+      appLogger.error('onSendMessage callback not provided')
+      return
+    }
+    const interactionMap = {
+      encourage: '鼓励了你一下，加油！！',
+      tap: '敲打了你一下'
+    }
+    
+    const message = JSON.stringify({
+      type: 'message',
+      payload: interactionMap[interactionType]
+    })
+
+    try {
+      await onSendMessage(message)
+    } catch (error) {
+      mqttLogger.error('Failed to send avatar interaction message:', error)
+    }
+  }
 
   useEffect(() => {
     if (webrtc.remoteStream) {
@@ -113,11 +137,11 @@ export function ChatInterface({
             clearTimeout(clickTimeoutRef.current)
             clickTimeoutRef.current = null
             appLogger.log('双击头像 - 鼓励')
-            // TODO: 发送鼓励事件到后端
+            sendAvatarInteraction('encourage')
           } else {
             clickTimeoutRef.current = setTimeout(() => {
               appLogger.log('单击头像 - 敲打')
-              // TODO: 发送敲打事件到后端
+              sendAvatarInteraction('tap')
               clickTimeoutRef.current = null
             }, 300)
           }
