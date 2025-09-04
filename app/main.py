@@ -5,8 +5,8 @@ import threading
 import queue
 
 import asyncio, anyio
-from lamindex import ConversationalAgent
-from lamindex import FuncCallEvent, MessageEvent
+from agents import ConversationalAgent
+from agents import FuncCallEvent, MessageEvent
 
 # 发送给 TTS 的消息队列
 tts_queue = queue.Queue()

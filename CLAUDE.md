@@ -71,5 +71,5 @@ pnpm dev         # 开发服务器
 ## 关键文件
 
 - `app/main.py` - 主程序入口，处理消息队列和事件循环
-- `app/lamindex.py` - MCP 客户端初始化和 Agent 集成
+- `app/agents.py` - MCP 客户端初始化和 Agent 集成
 - `app/mcp_client_init.py` - MCP MQTT 客户端初始化
