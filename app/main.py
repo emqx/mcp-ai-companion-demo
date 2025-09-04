@@ -19,7 +19,7 @@ next_request_id: int = 1
 
 agent: ConversationalAgent = None
 main_loop = None  # 主线程的事件循环引用
-
+mcp_server_name_prefix = "web-ui-hardware-controller/"
 
 def read_message():
     """Read a JSON message from stdin."""
@@ -275,9 +275,13 @@ async def handle_single(tg, msg):
         elif method == "set_device_id":
             device_id = params.get("device_id", "")
             suffix = device_id.split("-")[-1] if "-" in device_id else device_id
-            server_name_filter = "web-ui-hardware-controller/" + suffix
+            server_name_filter = mcp_server_name_prefix + suffix
             await agent.init_mcp(tg, server_name_filter=server_name_filter)
             print(f"MCP initialized with server name filter: {server_name_filter}")
+        elif method == "message_from_device":
+            payload = params.get("payload", "")
+            if payload:
+                asr_queue.put(payload)
         else:
             print(f"Unknown method: {method}")
     if "result" in msg:
