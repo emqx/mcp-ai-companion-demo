@@ -15,7 +15,7 @@ function App() {
   const [showVideo, setShowVideo] = useState<boolean>(false)
   const [selectedEmotion, setSelectedEmotion] = useState<string>('happy')
   const [volume, setVolume] = useState<number>(1.0) // 0.0 to 1.0
-  const [isMuted, setIsMuted] = useState<boolean>(false)
+  const [isMuted, setIsMuted] = useState<boolean>(true)
   const [mqttConfig, setMqttConfig] = useState<MqttConfig>(() => {
     const savedConfig = loadMqttConfig()
     if (savedConfig) {
@@ -33,14 +33,17 @@ function App() {
   const audioRef = useRef<HTMLAudioElement>(null)
 
   const onCameraControl = useCallback((enabled: boolean) => {
+    appLogger.info(`📷 Camera control: ${enabled ? 'ON' : 'OFF'}`)
     setShowVideo(enabled)
   }, [])
 
   const onEmotionChange = useCallback((emotion: string) => {
+    appLogger.info(`😊 Emotion changed: ${emotion}`)
     setSelectedEmotion(emotion)
   }, [])
 
   const onTakePhoto = useCallback(async (source: 'local' | 'remote', quality: number): Promise<PhotoCaptureResult> => {
+    appLogger.info(`📸 Taking photo: source=${source}, quality=${quality}`)
     if (!videoRef.current) {
       setShowVideo(true)
     }
@@ -56,6 +59,8 @@ function App() {
       }
     })
     
+    appLogger.info(`📸 Photo captured successfully: ${result.filename}`)
+
     // Auto close camera after successful capture with delay
     if (result.blob) {
       appLogger.info('📷 Camera auto-closed after photo capture')
@@ -209,6 +214,7 @@ function App() {
         setShowVideo={setShowVideo}
         selectedEmotion={selectedEmotion}
         setSelectedEmotion={setSelectedEmotion}
+        setIsMuted={setIsMuted}
         videoRef={videoRef}
         audioRef={audioRef}
         volume={volume}

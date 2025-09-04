@@ -32,6 +32,7 @@ interface ChatInterfaceProps {
   setShowVideo: (show: boolean) => void;
   selectedEmotion: string;
   setSelectedEmotion: (emotion: string) => void;
+  setIsMuted: (muted: boolean) => void;
   videoRef: RefObject<HTMLVideoElement | null>;
   audioRef: RefObject<HTMLAudioElement | null>;
   volume: number;
@@ -39,6 +40,7 @@ interface ChatInterfaceProps {
   mqttConfig: MqttConfig;
   onMqttConfigChange: (config: MqttConfig) => void;
   onSendMessage?: (message: string) => Promise<void>;
+  onVolumeControl?: (volume?: number, muted?: boolean) => void;
 }
 
 export function ChatInterface({ 
@@ -49,6 +51,7 @@ export function ChatInterface({
   setShowVideo,
   selectedEmotion,
   // setSelectedEmotion,
+  setIsMuted,
   videoRef,
   audioRef,
   volume,
@@ -86,22 +89,27 @@ export function ChatInterface({
 
   useEffect(() => {
     if (webrtc.remoteStream) {
+      // Auto unmute when RTC connection is established
+      if (isMuted) {
+        setIsMuted(false)
+      }
+      
       if (audioRef.current) {
         audioRef.current.srcObject = webrtc.remoteStream
         // Apply volume and mute state to audio element
         audioRef.current.volume = volume
-        audioRef.current.muted = isMuted
+        audioRef.current.muted = false // Auto unmute for RTC stream
       }
       
       if (showVideo && videoRef?.current) {
         videoRef.current.srcObject = webrtc.remoteStream
         // Also apply volume and mute state to video element
         videoRef.current.volume = volume
-        videoRef.current.muted = isMuted
+        videoRef.current.muted = false // Auto unmute for RTC stream
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webrtc.remoteStream, showVideo, volume, isMuted])
+  }, [webrtc.remoteStream, showVideo, volume])
 
   // Update volume and mute state when they change
   useEffect(() => {
@@ -160,6 +168,7 @@ export function ChatInterface({
         ref={audioRef}
         autoPlay
         playsInline
+        muted={isMuted}
         className="hidden"
       />
       
@@ -171,6 +180,7 @@ export function ChatInterface({
               autoPlay
               playsInline
               controls={false}
+              muted={isMuted}
               className="w-full h-80 object-cover"
             />
             {!webrtc.isConnected && (
@@ -216,24 +226,28 @@ export function ChatInterface({
           </button>
           
           <button 
-            onClick={async () => {
-              if (webrtc.isConnected) {
-                await webrtc.toggleVideo()
-              } else {
-                await webrtc.toggleVideo(true)
+            onClick={() => {
+              // Toggle mute state for audio output
+              const newMuteState = !isMuted
+              setIsMuted(newMuteState)
+              if (audioRef.current) {
+                audioRef.current.muted = newMuteState
+              }
+              if (videoRef?.current) {
+                videoRef.current.muted = newMuteState
               }
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
-              webrtc.isConnected && webrtc.isVideoEnabled 
+              !isMuted 
                 ? 'bg-button-active' 
                 : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
-            title="扬声器控制"
+            title={isMuted ? "开启扬声器" : "关闭扬声器"}
           >
             <Volume2 
               className={`w-6 h-6 ${
-                webrtc.isConnected && webrtc.isVideoEnabled ? 'text-button-active' : 'text-[#343741]'
-              }`} 
+                !isMuted ? 'text-button-active' : 'text-[#343741]'
+              }`}
             />
           </button>
           
