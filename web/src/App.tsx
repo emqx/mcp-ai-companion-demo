@@ -48,13 +48,23 @@ function App() {
     if (!videoRef?.current?.videoWidth || !videoRef?.current?.videoHeight) {
       throw new Error('Video not ready for capture')
     }
-    return await capturePhotoFromVideo(videoRef.current, source, { 
+    const result = await capturePhotoFromVideo(videoRef.current, source, { 
       quality,
       upload: {
         url: '/api/upload',
         formFieldName: 'file'
       }
     })
+    
+    // Auto close camera after successful capture with delay
+    if (result.blob) {
+      appLogger.info('📷 Camera auto-closed after photo capture')
+      setTimeout(() => {
+        setShowVideo(false)
+        appLogger.info('📷 Camera auto-closed after photo capture')
+      }, 3500)
+    }
+    return result
   }, [])
 
   const onVolumeControl = useCallback((newVolume?: number, muted?: boolean) => {

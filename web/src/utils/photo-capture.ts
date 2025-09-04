@@ -102,7 +102,7 @@ export async function capturePhotoFromVideo(
       result.downloadUrl = downloadUrl
       
       // Show success notification
-      toast.success('📸 Photo captured and uploaded successfully!')
+      toast.success('📸 Photo captured and uploaded successfully! Camera will close in 3 seconds...')
     } catch (error) {
       console.warn('Photo upload failed:', error)
       // Show error notification  
