@@ -28,6 +28,7 @@ from mcp.shared.mqtt import configure_logging
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.tools import FunctionTool
 from llama_index.core.settings import Settings
+from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.llms.openai_like import OpenAILike
 from tools import (
     process_tool_output,
@@ -51,7 +52,6 @@ mqtt_options = MqttOptions(
 )
 
 
-
 class FuncCallEvent(Event):
     tool_name: str
     tool_kwargs: dict[str, Any]
@@ -68,6 +68,8 @@ class ConversationalAgent(Workflow):
         super().__init__()
 
         self.mcp_client = mcp_client
+        
+        self.memory = ChatMemoryBuffer.from_defaults(token_limit=20000)
         self.llm = OpenAILike(
             model="deepseek-v3",
             api_key=api_key,
@@ -77,8 +79,8 @@ class ConversationalAgent(Workflow):
             temperature=0.6,
             top_p=0.95,
             max_tokens=60000,
-            timeout=600,
-            stream_timeout=300,
+            timeout=60,
+            stream_timeout=30,
         )
         Settings.llm = self.llm
 
@@ -105,60 +107,10 @@ class ConversationalAgent(Workflow):
 
     def _build_chat_messages(self, new_message: str) -> list:
         """Build structured chat message array"""
-        messages = []
-
-        # Add system prompt
-        messages.append(
-            ChatMessage(
-                role=MessageRole.SYSTEM,
-                content=self.system_prompt,
-                additional_kwargs={},
-            )
-        )
-
-        # Add conversation history (keep recent N rounds of conversation)
-        recent_history = (
-            self.conversation_history[-self.max_history_length :]
-            if len(self.conversation_history) > self.max_history_length
-            else self.conversation_history
-        )
-
-        # Clean history messages, completely remove tool_calls field and filter empty messages
-        for i, msg in enumerate(recent_history):
-            # Ensure content is valid (not None and not empty string)
-            content = msg.content or ""
-
-            if not content.strip():  # Skip empty messages
-                continue
-
-            # Use model_construct to create cleanest messages
-            clean_msg = ChatMessage.model_construct(
-                role=msg.role,
-                content=content,
-                additional_kwargs={},
-                blocks=[],  # Ensure no extra block data
-            )
-            messages.append(clean_msg)
-
-        # Add current user message
-        messages.append(
-            ChatMessage(
-                role=MessageRole.USER, content=new_message, additional_kwargs={}
-            )
-        )
-
-        # Final cleanup: ensure all messages have valid content
-        final_messages = []
-        for msg in messages:
-            # Check if content is valid
-            content = msg.content
-            if content is None or not str(content).strip():
-                continue  # Skip invalid messages
-            else:
-                # Add messages with valid content directly
-                final_messages.append(msg)
-
-        return final_messages
+        return [
+            ChatMessage(role=MessageRole.SYSTEM, content=self.system_prompt),
+            ChatMessage(role=MessageRole.USER, content=new_message)
+        ]
 
     def _emit_func_call_event(
         self, ctx: Context, name: str, args: dict[str, Any], result: str | None = None
@@ -179,7 +131,7 @@ class ConversationalAgent(Workflow):
                 llm=self.llm,
                 system_prompt=self.system_prompt,
                 verbose=False,
-                timeout=180,
+                timeout=30,
             )
 
             message = self._build_chat_messages(ev.user_input)
