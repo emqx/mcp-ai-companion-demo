@@ -19,6 +19,7 @@ next_request_id: int = 1
 
 agent: ConversationalAgent = None
 main_loop = None  # 主线程的事件循环引用
+current_device_id = None  # Store current device ID
 mcp_server_name_prefix = "web-ui-hardware-controller/"
 
 def read_message():
@@ -268,11 +269,13 @@ async def handle_asr_result(params):
 async def handle_set_device_id(params, tg):
     """Handle set device ID method"""
     global agent
+    global current_device_id
     device_id = params.get("device_id", "")
+    current_device_id = device_id  # Save device ID globally
     suffix = device_id.split("-")[-1] if "-" in device_id else device_id
     server_name_filter = mcp_server_name_prefix + suffix
-    await agent.init_mcp(tg, server_name_filter=server_name_filter)
-    print(f"MCP initialized with server name filter: {server_name_filter}")
+    await agent.init_mcp(tg, server_name_filter=server_name_filter, device_id=device_id)
+    print(f"MCP initialized with server name filter: {server_name_filter}, device_id: {device_id}")
 
 async def handle_message_from_device(params):
     """Handle message from device method"""

@@ -20,9 +20,10 @@ class McpServer(BaseModel):
     success: bool
 
 class McpMqttClient:
-    def __init__(self, mqtt_options: MqttOptions, client_name: str, server_name_filter: str, read_timeout: int = 10, clientid: str | None = None):
+    def __init__(self, mqtt_options: MqttOptions, client_name: str, server_name_filter: str, read_timeout: int = 10, clientid: str | None = None, device_id: str | None = None):
         self._mqtt_client = None
         self.clientid = clientid
+        self.device_id = device_id  # Store device ID
         self.mqtt_options = mqtt_options
         self.read_timeout = read_timeout
         self.client_name = client_name
@@ -57,6 +58,22 @@ class McpMqttClient:
 
     async def stop(self):
         self._stop_event.set()
+
+    async def publish_message(self, topic: str, message: str) -> bool:
+        """Publish a message to specified MQTT topic"""
+        if not self._mqtt_client:
+            logger.error("MQTT client not connected")
+            return False
+
+        if hasattr(self._mqtt_client, 'client'):
+            mqtt_client = self._mqtt_client.client
+            result = mqtt_client.publish(topic, message, qos=0)
+            if result.rc != 0:
+                logger.error(f"Publish failed with rc: {result.rc}")
+            return result.rc == 0
+        else:
+            logger.error("Cannot access internal MQTT client (client attribute not found)")
+        return False
 
     async def connect(self) -> bool | str:
         await self._connected_event.wait()

@@ -23,7 +23,9 @@ interface SignalingMessage {
     | 'tts_complete'
     | 'tts_terminate'
     | 'chat'
+    | 'message'
   data?: any
+  payload?: any
   reason?: string
   results?: string
   text?: string
@@ -48,8 +50,8 @@ export class MqttWebRTCSignaling {
 
   constructor(options: MqttWebRTCSignalingOptions) {
     this.mqttClient = options.mqttClient
-    this.isExternalClient = !!options.mqttClient // Mark if client was provided externally
-    this.clientId = options.clientId || `webrtc_client_${Math.random().toString(36).substring(7)}`
+    this.isExternalClient = !!options.mqttClient
+    this.clientId = options.clientId || ''
     this.config = { ...defaultWebRTCConfig, ...options.config }
     this.mediaConstraints = { ...defaultMediaConstraints, ...options.mediaConstraints }
     this.callbacks = options.callbacks || {}
@@ -167,7 +169,7 @@ export class MqttWebRTCSignaling {
     } else if (topic === this.messageTopic) {
       switch (message.type) {
         case 'asr_response':
-          webrtcLogger.info('🎤 ASR response received')
+          webrtcLogger.info('🎤 ASR response received:', message.results)
           this.callbacks.onASRResponse?.(message.results || '')
           break
 
@@ -190,6 +192,11 @@ export class MqttWebRTCSignaling {
 
         case 'tts_terminate':
           webrtcLogger.info('🔊 TTS terminated:', message.task_id)
+          break
+
+        case 'message':
+          webrtcLogger.info('🔊 Message:', message.payload || '')
+          this.callbacks.onMessage?.(message.payload || '')
           break
       }
     }

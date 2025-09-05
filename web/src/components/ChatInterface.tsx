@@ -28,6 +28,7 @@ interface ChatInterfaceProps {
   webrtc: WebRTCState & WebRTCActions
   isMqttConnected: boolean
   aiReplyText?: string
+  llmLoading?: 'processing' | 'waiting' | null
   showVideo: boolean
   setShowVideo: (show: boolean) => void
   selectedEmotion: string
@@ -47,6 +48,7 @@ export function ChatInterface({
   webrtc,
   isMqttConnected,
   aiReplyText,
+  llmLoading,
   showVideo,
   setShowVideo,
   selectedEmotion,
@@ -60,8 +62,6 @@ export function ChatInterface({
   onMqttConfigChange,
   onSendMessage,
 }: ChatInterfaceProps) {
-  console.log('ChatInterface render - aiReplyText:', aiReplyText)
-
   const isSpeaking = useAudioPlaying(audioRef, 1000)
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -135,7 +135,7 @@ export function ChatInterface({
       </div>
 
       <div
-        className="mb-2 select-none cursor-pointer"
+        className="mb-2 select-none cursor-pointer relative"
         onClick={() => {
           if (clickTimeoutRef.current) {
             clearTimeout(clickTimeoutRef.current)
@@ -154,7 +154,7 @@ export function ChatInterface({
         <EmotionAnimation emotion={selectedEmotion} />
       </div>
 
-      <ChatMessages isLoading={webrtc.isConnected && !isSpeaking} isSpeaking={isSpeaking} aiReplyText={aiReplyText} />
+      <ChatMessages isLoading={webrtc.isConnected && !isSpeaking} isSpeaking={isSpeaking} aiReplyText={aiReplyText} llmLoading={llmLoading} />
 
       <audio ref={audioRef} autoPlay playsInline muted={isMuted} className="hidden" />
 

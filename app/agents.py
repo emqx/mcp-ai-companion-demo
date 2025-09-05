@@ -4,6 +4,7 @@ import os
 from typing import Any
 import traceback
 from pathlib import Path
+from colorama import Fore, Style, init
 
 from llama_index.core.agent.workflow import (
     AgentOutput,
@@ -40,6 +41,9 @@ from tools import (
 
 configure_logging(level="DEBUG")
 logger = logging.getLogger(__name__)
+
+# Initialize colorama for colored output
+init(autoreset=True)
 
 client = None
 
@@ -119,6 +123,26 @@ class ConversationalAgent(Workflow):
         )
         ctx.write_event_to_stream(func_call_event)
 
+    async def message_to_device(self, message_type: str, payload: Any) -> bool:
+        """Send a message to device via MQTT"""
+        if not self.mcp_client or not self.mcp_client.device_id:
+            logger.debug("MCP client not initialized or no device_id")
+            return False
+
+        import json
+        topic = f"$message/{self.mcp_client.device_id}"
+        message = json.dumps({
+            "type": message_type,
+            "payload": payload
+        })
+
+        success = await self.mcp_client.publish_message(topic, message)
+        if success:
+            logger.info(f"{Fore.GREEN}Sent {message_type} to device{Style.RESET_ALL}")
+        else:
+            logger.error(f"{Fore.RED}Failed to send {message_type} to device{Style.RESET_ALL}")
+        return success
+
     @step
     async def chat(self, ctx: Context, ev: StartEvent) -> StopEvent:
         try:
@@ -132,15 +156,33 @@ class ConversationalAgent(Workflow):
                 timeout=30,
             )
 
+            # Step 1: Starting to process user request
+            logger.info(f"{Fore.GREEN}[1/3] Loading... Starting to process user request{Style.RESET_ALL}")
+            await self.message_to_device("message", {"type": "loading", "status": "processing"})
+
             message = self._build_chat_messages(ev.user_input)
+
+            # Step 2: Calling AI API and waiting for response
+            logger.info(f"{Fore.GREEN}[2/3] Loading... Waiting for AI API response{Style.RESET_ALL}")
+            await self.message_to_device("message", {"type": "loading", "status": "waiting"})
+
             handler = query_info.run(chat_history=message, stream=True)
 
             accumulated_response = ""
+            first_chunk_received = False
+
             async for event in handler.stream_events():
                 if isinstance(event, AgentStream):
                     # Handle streaming chunks
                     if hasattr(event, 'delta') and event.delta:
                         chunk = event.delta
+
+                        # Step 3: Log when first chunk is received
+                        if not first_chunk_received:
+                            logger.info(f"{Fore.GREEN}[3/3] Loading complete! First response received{Style.RESET_ALL}")
+                            await self.message_to_device("message", {"type": "loading", "status": "complete"})
+                            first_chunk_received = True
+
                         accumulated_response += chunk
                         ctx.write_event_to_stream(MessageEvent(message=chunk, is_chunk=True))
                         logger.debug(f"Stream chunk: {chunk}")
@@ -160,7 +202,7 @@ class ConversationalAgent(Workflow):
             # Send stream end signal if we were streaming
             if accumulated_response:
                 ctx.write_event_to_stream(MessageEvent(message="", is_chunk=True))  # End signal
-
+            
             return StopEvent
 
         except Exception as e:
@@ -168,12 +210,13 @@ class ConversationalAgent(Workflow):
             logger.error(error_msg)
             return StopEvent
 
-    async def init_mcp(self, tg: anyio.abc.TaskGroup, server_name_filter: str = "#") -> None:
+    async def init_mcp(self, tg: anyio.abc.TaskGroup, server_name_filter: str = "#", device_id: str = None) -> None:
         mcp_client = McpMqttClient(
             mqtt_options=mqtt_options,
             client_name="ai_companion_demo",
             server_name_filter=server_name_filter,
-            clientid=mqtt_clientid
+            clientid=mqtt_clientid,
+            device_id=device_id
         )
         tg.start_soon(mcp_client.start)
         await mcp_client.connect()
@@ -248,6 +291,11 @@ async def main():
     try:
         async with anyio.create_task_group() as tg:
             agent = ConversationalAgent()
+            # Initialize MCP client, it will auto-discover devices
+            # Using "#" to accept all MCP servers
+            # Fixed device_id for testing
+            await agent.init_mcp(tg, server_name_filter="#", device_id="companion-001")
+            print("MCP client initialized with device_id: companion-001")
             print_welcome()
             tg.start_soon(input_loop, agent)
     except Exception as e:

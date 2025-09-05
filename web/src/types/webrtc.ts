@@ -56,6 +56,7 @@ export interface WebRTCCallbacks {
   onError?: (error: Error) => void
   onASRResponse?: (results: string) => void
   onTTSText?: (text: string) => void
+  onMessage?: (message: string) => void
 }
 
 export interface UseWebRTCOptions {
@@ -65,6 +66,7 @@ export interface UseWebRTCOptions {
   autoConnect?: boolean
   onASRResponse?: (results: string) => void
   onTTSText?: (text: string) => void
+  onMessage?: (message: string) => void
 }
 
 export interface UseWebRTCReturn {

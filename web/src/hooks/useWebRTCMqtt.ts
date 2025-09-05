@@ -24,6 +24,7 @@ export function useWebRTCMqtt({
   },
   onASRResponse,
   onTTSText,
+  onMessage,
 }: UseWebRTCMqttOptions): UseWebRTCReturn {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
@@ -76,6 +77,7 @@ export function useWebRTCMqtt({
           onError: setError,
           onASRResponse: onASRResponse,
           onTTSText: onTTSText,
+          onMessage: onMessage,
         },
       })
 
@@ -86,7 +88,7 @@ export function useWebRTCMqtt({
       setError(err as Error)
       setConnectionState('failed')
     }
-  }, [config, mediaConstraints, onASRResponse, onTTSText])
+  }, [config, mediaConstraints, onASRResponse, onTTSText, onMessage])
 
   const disconnect = useCallback(() => {
     webrtcLogger.info('🔌 WebRTC: Manual disconnect initiated')

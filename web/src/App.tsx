@@ -12,6 +12,7 @@ import { loadMqttConfig, saveMqttConfig, type MqttConfig } from '@/utils/storage
 
 function App() {
   const [aiReplyText, setAiReplyText] = useState<string>('')
+  const [llmLoading, setLlmLoading] = useState<'processing' | 'waiting' | null>()
   const [showVideo, setShowVideo] = useState<boolean>(false)
   const [selectedEmotion, setSelectedEmotion] = useState<string>('happy')
   const [volume, setVolume] = useState<number>(1.0) // 0.0 to 1.0
@@ -165,16 +166,26 @@ function App() {
     isVideoEnabled,
     cleanup: cleanupWebRTC,
   } = useWebRTCMqtt({
-    mqttClient: mcpMqttClient?.getMqttClient(), // Share the MCP MQTT client
-    onASRResponse: (results: string) => {
-      console.log('🎤 ASR Response received:', results)
-      // Clear AI reply text when user starts speaking
+    mqttClient: mcpMqttClient?.getMqttClient(),
+    onASRResponse: () => {
       setAiReplyText('')
     },
     onTTSText: (text: string) => {
-      console.log('🔊 TTS Text received:', text)
-      console.log('Setting aiReplyText to:', text)
       setAiReplyText(text)
+    },
+    onMessage: (message: any) => {
+      appLogger.info('🔊 Message:', message)
+      
+      // Handle loading messages
+      if (message && typeof message === 'object' && message.type === 'loading') {
+        const status = message.status
+        if (status === 'processing' || status === 'waiting') {
+          setLlmLoading(status)
+          setAiReplyText('')
+        } else if (status === 'complete') {
+          setLlmLoading(null)
+        }
+      }
     },
   })
 
@@ -216,6 +227,7 @@ function App() {
         }}
         isMqttConnected={isMqttConnected}
         aiReplyText={aiReplyText}
+        llmLoading={llmLoading}
         showVideo={showVideo}
         setShowVideo={setShowVideo}
         selectedEmotion={selectedEmotion}
