@@ -21,8 +21,8 @@ export function ChatMessages({ isLoading = false, isSpeaking = false, aiReplyTex
 
   // Get loading text based on llmLoading status
   const getLoadingText = () => {
-    if (llmLoading === 'processing') return '正在理解你的问题...'
-    if (llmLoading === 'waiting') return '思考中...'
+    if (llmLoading === 'processing') return '理解中...'
+    if (llmLoading === 'waiting') return '回复中...'
     return '我在听...'
   }
 
