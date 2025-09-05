@@ -1,7 +1,5 @@
 {
   "python.defaultInterpreterPath": "${workspaceFolder}/app/.venv/bin/python",
   "python.terminal.activateEnvironment": true,
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}/app"
-  ]
+  "python.analysis.extraPaths": ["${workspaceFolder}/app"]
 }

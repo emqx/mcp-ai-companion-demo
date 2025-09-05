@@ -53,11 +53,11 @@ def tts_worker():
         tts_msg = tts_queue.get()
         if tts_msg is None:
             break
-        
+
         # Check if this is a streaming chunk
         is_chunk = isinstance(tts_msg, dict) and tts_msg.get('is_chunk', False)
         text = tts_msg.get('text', '') if isinstance(tts_msg, dict) else tts_msg
-        
+
         if is_chunk:
             # For streaming chunks, reuse the same task_id
             if current_task_id is None:
@@ -74,7 +74,7 @@ def tts_worker():
                 }
                 inflight_requests[next_request_id] = start_request
                 send_message([start_request])
-            
+
             # Send the chunk
             next_request_id = next_request_id + 1
             chunk_request = {
@@ -88,7 +88,7 @@ def tts_worker():
             }
             inflight_requests[next_request_id] = chunk_request
             send_message([chunk_request])
-            
+
             # Check if this is the last chunk
             if isinstance(tts_msg, dict) and tts_msg.get('is_final', False):
                 next_request_id = next_request_id + 1
@@ -106,7 +106,7 @@ def tts_worker():
         else:
             # Non-streaming message (complete message)
             task_id = random.randint(1, 999999)
-            
+
             current_request_0 = {
                 "jsonrpc": "2.0",
                 "id": next_request_id,

@@ -68,7 +68,7 @@ class ConversationalAgent(Workflow):
         super().__init__()
 
         self.mcp_client = mcp_client
-        
+
         self.memory = ChatMemoryBuffer.from_defaults(token_limit=20000)
         self.llm = OpenAILike(
             model="deepseek-v3",
@@ -158,7 +158,7 @@ class ConversationalAgent(Workflow):
                     self._emit_func_call_event(
                         ctx, event.tool_name, event.tool_kwargs, text
                     )
-            
+
             # Send stream end signal if we were streaming
             if accumulated_response:
                 ctx.write_event_to_stream(MessageEvent(message="", is_chunk=True))  # End signal
