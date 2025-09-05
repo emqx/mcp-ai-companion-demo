@@ -158,14 +158,12 @@ def asr_worker():
 
         async def _run_and_consume():
             handler = agent.run(user_input=tts_msg)
-            has_streamed = False
             async for ev in handler.stream_events():
                 if isinstance(ev, FuncCallEvent):
                     # INSERT_YOUR_CODE
                     pass
                 elif isinstance(ev, MessageEvent):
                     if ev.is_chunk:
-                        has_streamed = True
                         if ev.message:  # Non-empty chunk
                             tts_queue.put({
                                 'text': ev.message,
@@ -262,39 +260,64 @@ async def main():
         main_task.cancel()
 
 
-async def handle_single(tg, msg):
-    global inflight_requests
+async def handle_asr_result(params):
+    """Handle ASR result method"""
+    recognized_text = params.get("text", "")
+    asr_queue.put(recognized_text)
+
+async def handle_set_device_id(params, tg):
+    """Handle set device ID method"""
     global agent
+    device_id = params.get("device_id", "")
+    suffix = device_id.split("-")[-1] if "-" in device_id else device_id
+    server_name_filter = mcp_server_name_prefix + suffix
+    await agent.init_mcp(tg, server_name_filter=server_name_filter)
+    print(f"MCP initialized with server name filter: {server_name_filter}")
+
+async def handle_message_from_device(params):
+    """Handle message from device method"""
+    payload = params.get("payload", "")
+    if payload:
+        asr_queue.put(payload)
+
+async def handle_method_request(msg, tg):
+    """Handle method requests"""
+    params = msg.get("params", {})
+    method = msg["method"]
+
+    method_handlers = {
+        "asr_result": lambda: handle_asr_result(params),
+        "set_device_id": lambda: handle_set_device_id(params, tg),
+        "message_from_device": lambda: handle_message_from_device(params)
+    }
+
+    handler = method_handlers.get(method)
+    if handler:
+        await handler()
+    else:
+        print(f"Unknown method: {method}")
+
+async def handle_result_response(msg):
+    """Handle result responses"""
+    global inflight_requests
+
+    if msg["id"] not in inflight_requests:
+        print(f"Unknown id in response: {msg['id']}")
+        exit(1)
+
+    if "error" in msg:
+        params = msg.get("params", "")
+        print(f"Got error response: {msg['error']}, params: {params}")
+        exit(1)
+
+    current_request = inflight_requests.pop(msg["id"])
+    print(f"Received result: {msg['result']} for request: {current_request}")
+
+async def handle_single(tg, msg):
     if "method" in msg:
-        params = msg.get("params", {})
-        method = msg["method"]
-        if method == "asr_result":
-            # Extract the recognized text from the asr_result message and put it into the asr_queue
-            recognized_text = params.get("text", "")
-            asr_queue.put(recognized_text)
-        elif method == "set_device_id":
-            device_id = params.get("device_id", "")
-            suffix = device_id.split("-")[-1] if "-" in device_id else device_id
-            server_name_filter = mcp_server_name_prefix + suffix
-            await agent.init_mcp(tg, server_name_filter=server_name_filter)
-            print(f"MCP initialized with server name filter: {server_name_filter}")
-        elif method == "message_from_device":
-            payload = params.get("payload", "")
-            if payload:
-                asr_queue.put(payload)
-        else:
-            print(f"Unknown method: {method}")
+        await handle_method_request(msg, tg)
     if "result" in msg:
-        if msg["id"] not in inflight_requests:
-            print(f"Unknown id in response: {msg['id']}")
-            exit(1)
-        if "error" in msg:
-            params = msg["params"] if "params" in msg else ""
-            print(f"Got error response: {msg['error']}, params: {params}")
-            exit(1)
-        else:
-            current_request = inflight_requests.pop(msg["id"])
-            print(f"Received result: {msg['result']} for request: {current_request}")
+        await handle_result_response(msg)
 
 
 async def handle_batch(tg, msgs):

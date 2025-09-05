@@ -77,10 +77,8 @@ class ConversationalAgent(Workflow):
             is_chat_model=True,
             is_function_calling_model=True,
             temperature=0.6,
-            top_p=0.95,
             max_tokens=60000,
             timeout=60,
-            stream_timeout=30,
         )
         Settings.llm = self.llm
 
@@ -173,7 +171,7 @@ class ConversationalAgent(Workflow):
     async def init_mcp(self, tg: anyio.abc.TaskGroup, server_name_filter: str = "#") -> None:
         mcp_client = McpMqttClient(
             mqtt_options=mqtt_options,
-            client_name=f"ai_companion_demo",
+            client_name="ai_companion_demo",
             server_name_filter=server_name_filter,
             clientid=mqtt_clientid
         )
@@ -181,51 +179,77 @@ class ConversationalAgent(Workflow):
         await mcp_client.connect()
         self.mcp_client = mcp_client
 
+def print_welcome():
+    """Print welcome message"""
+    print("input 'exit' or 'quit' exit")
+    print("input 'tools' show available tools")
+    print("=" * 50)
+
+
+def should_exit(user_input: str) -> bool:
+    """Check if user wants to exit"""
+    return user_input.lower() in ["exit", "quit"]
+
+
+def display_tools(agent):
+    """Display available tools"""
+    tools = agent.tools + agent.mcp_client.mcp_tools
+    print(f"available tools: {len(tools)}")
+    for tool in tools:
+        tool_name = getattr(tool.metadata, "name", str(tool))
+        tool_desc = getattr(tool.metadata, "description", "No description")
+        print(f"- {tool_name}: {tool_desc}")
+
+
+async def process_user_input(agent, user_input: str):
+    """Process user input and run agent"""
+    handler = agent.run(user_input=user_input)
+    async for event in handler.stream_events():
+        if hasattr(event, "message"):
+            print(f"assistant: {event.message}")
+        elif hasattr(event, "tool_output"):
+            print(f"tool output: {event.tool_output}")
+
+
+async def handle_single_input(agent, user_input: str) -> bool:
+    """Handle a single user input, return True if should continue"""
+    user_input = user_input.strip()
+
+    if should_exit(user_input):
+        return False
+
+    if user_input.lower() == "tools":
+        display_tools(agent)
+        return True
+
+    if not user_input:
+        return True
+
+    await process_user_input(agent, user_input)
+    return True
+
+
+async def input_loop(agent):
+    """Main input loop for the agent"""
+    while True:
+        try:
+            user_input = input("\nuser: ")
+            should_continue = await handle_single_input(agent, user_input)
+            if not should_continue:
+                break
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            error_msg = traceback.format_exc()
+            print(f"error: {e}, traceback: {error_msg}")
+
+
 async def main():
     try:
-        tg = anyio.create_task_group()
-        await tg.__aenter__()
-        agent = ConversationalAgent()
-        print("input 'exit' or 'quit' exit")
-        print("input 'tools' show available tools")
-        print("=" * 50)
-        async def get_input(self):
-            while True:
-                try:
-                    user_input = input("\nuser: ")
-                    user_input = user_input.strip()
-                    if user_input.lower() in ["exit", "quit"]:
-                        break
-
-                    if user_input.lower() == "tools":
-                        tools = agent.tools + agent.mcp_client.mcp_tools
-                        print(f"available tools: {len(tools)}")
-                        for tool in tools:
-                            tool_name = getattr(tool.metadata, "name", str(tool))
-                            tool_desc = getattr(
-                                tool.metadata, "description", "No description"
-                            )
-                            print(f"- {tool_name}: {tool_desc}")
-                        continue
-
-                    if not user_input:
-                        continue
-                    handler = agent.run(user_input=user_input)
-                    async for event in handler.stream_events():
-                        if hasattr(event, "message"):
-                            print(f"assistant: {event.message}")
-                        elif hasattr(event, "tool_output"):
-                            print(f"tool output: {event.tool_output}")
-
-                except KeyboardInterrupt:
-                    break
-                except Exception as e:
-                    error_msg = traceback.format_exc()
-                    print(f"error: {e}, traceback: {error_msg}")
-        tg.start_soon(get_input, None)
-        #wait for the input task to complete
-        await tg.__aexit__(None, None, None)
-
+        async with anyio.create_task_group() as tg:
+            agent = ConversationalAgent()
+            print_welcome()
+            tg.start_soon(input_loop, agent)
     except Exception as e:
         print(f"agent init error: {e}")
 
