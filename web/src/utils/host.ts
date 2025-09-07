@@ -55,10 +55,16 @@ export function buildWebSocketUrl(path: string, port: number = 4000): string {
 
 /**
  * Build a MQTT over WebSocket URL with the current host
+ * Automatically determines port based on protocol:
+ * - ws (http): port 8083
+ * - wss (https): port 8084
  * @param path - The MQTT path (e.g., '/mqtt')
- * @param port - MQTT WebSocket port (defaults to 8083 for EMQX)
+ * @param port - Optional MQTT WebSocket port (auto-determined by default)
  * @returns The full MQTT WebSocket URL
  */
-export function buildMqttWebSocketUrl(path: string = '/mqtt', port: number = 8083): string {
-  return buildWebSocketUrl(path, port)
+export function buildMqttWebSocketUrl(path: string = '/mqtt', port?: number): string {
+  // Auto-determine port based on protocol if not specified
+  const defaultPort = window.location.protocol === 'https:' ? 8084 : 8083
+  const actualPort = port ?? defaultPort
+  return buildWebSocketUrl(path, actualPort)
 }

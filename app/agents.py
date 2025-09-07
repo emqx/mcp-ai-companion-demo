@@ -202,7 +202,7 @@ class ConversationalAgent(Workflow):
             # Send stream end signal if we were streaming
             if accumulated_response:
                 ctx.write_event_to_stream(MessageEvent(message="", is_chunk=True))  # End signal
-            
+
             return StopEvent
 
         except Exception as e:
