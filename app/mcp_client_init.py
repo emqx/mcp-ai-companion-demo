@@ -147,10 +147,13 @@ class McpMqttClient:
                     def create_mcp_tool_wrapper(client_ref, tool_name):
                         async def mcp_tool_wrapper(**kwargs):
                             try:
+                                print(f"[MCP Tool Call] {tool_name} with args: {kwargs}")
+                                
                                 result = await client_ref.call_tool(
                                     tool_name, kwargs
                                 )
                                 if result is False:
+                                    print(f"[MCP Tool Failed] {tool_name} returned False")
                                     return f"call {tool_name} failed"
 
                                 call_result = cast(types.CallToolResult, result)
@@ -189,10 +192,13 @@ class McpMqttClient:
                                         hasattr(call_result, "isError")
                                         and call_result.isError
                                     ):
+                                        print(f"[MCP Tool Error] {tool_name}: {result_text}")
                                         return f"tool return error: {result_text}"
                                     else:
+                                        print(f"[MCP Tool Success] {tool_name}: {result_text}")
                                         return result_text
                                 else:
+                                    print(f"[MCP Tool Success] {tool_name}: {str(call_result)}")
                                     return str(call_result)
 
                             except Exception as e:
