@@ -61,7 +61,7 @@ export class McpMqttServer {
       },
       properties: {
         userProperties: {
-          'MCP-COMPONENT-TYPE': 'mcp-client',
+          'MCP-COMPONENT-TYPE': 'mcp-server',
           'MCP-META': JSON.stringify({
             version: '1.0.0',
             implementation: 'mcp-ai-companion-demo-web-ui',
