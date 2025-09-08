@@ -8,7 +8,7 @@ import { SUPPORTED_EMOTIONS } from './types'
 export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
   control_camera: {
     name: 'control_camera',
-    description: 'Control the camera (enable/disable video feed)',
+    description: 'Control the camera video feed. Usage: Call with enabled=true to turn on camera, enabled=false to turn off',
     inputSchema: {
       type: 'object',
       properties: {
@@ -23,13 +23,13 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
 
   change_emotion: {
     name: 'change_emotion',
-    description: 'Change the avatar emotion/animation',
+    description: 'MANDATORY TOOL: Change the avatar emotion/animation. MUST be called with emotion parameter. Usage: change_emotion(emotion="happy") where emotion must be one of: happy, sad, angry, surprised, thinking, playful, relaxed, serious, shy, tired, disappointed, laugh. NEVER call without emotion parameter!',
     inputSchema: {
       type: 'object',
       properties: {
         emotion: {
           type: 'string',
-          description: 'The emotion to display',
+          description: 'REQUIRED: The emotion to display. Must be one of the supported emotions. Cannot be empty or undefined.',
           enum: SUPPORTED_EMOTIONS as unknown as string[],
         },
       },
@@ -39,7 +39,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
 
   take_photo: {
     name: 'take_photo',
-    description: 'Capture a photo from the video stream',
+    description: 'Capture a photo from the video stream. Usage: Call without parameters or with source="remote" to take photo, returns photo URL',
     inputSchema: {
       type: 'object',
       properties: {
@@ -63,7 +63,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
 
   control_volume: {
     name: 'control_volume',
-    description: 'Control the audio volume and mute state',
+    description: 'Control audio volume. Usage: Call with muted=true/false to mute/unmute, or volume=0-100 to set volume level',
     inputSchema: {
       type: 'object',
       properties: {

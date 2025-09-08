@@ -64,7 +64,7 @@ class FuncCallEvent(Event):
 
 class MessageEvent(Event):
     message: str
-    is_chunk: bool = False  # 标记是否为流式片段
+    is_chunk: bool = False  # Mark whether it's a streaming chunk
 
 
 class ConversationalAgent(Workflow):
