@@ -1,3 +1,7 @@
+# DEPRECATED: This is the old agent implementation using LlamaIndex Workflow pattern
+# This file is kept for reference only. The active implementation is in conversation_agent.py
+# DO NOT USE - main.py has been migrated to use ConversationAgent from conversation_agent.py
+
 import anyio
 import logging
 import os
@@ -68,6 +72,16 @@ class MessageEvent(Event):
 
 
 class ConversationalAgent(Workflow):
+    """
+    DEPRECATED: Old workflow-based conversation agent implementation.
+    
+    This class uses LlamaIndex's Workflow pattern with complex event handling.
+    It has been replaced by the simpler ConversationAgent in conversation_agent.py
+    which uses FunctionAgent for better maintainability and performance.
+    
+    Migration status: main.py has been updated to use the new implementation.
+    This class is kept for reference and potential rollback if needed.
+    """
     def __init__(self, mcp_client: McpMqttClient | None = None):
         super().__init__()
 
@@ -288,6 +302,14 @@ async def input_loop(agent):
 
 
 async def main():
+    """
+    DEPRECATED: This main function is for testing the old ConversationalAgent only.
+    The production main.py now uses ConversationAgent from conversation_agent.py.
+    """
+    print("WARNING: You are running the deprecated agent implementation!")
+    print("The production system uses ConversationAgent from conversation_agent.py")
+    print("This is for reference/testing the old implementation only.\n")
+    
     try:
         async with anyio.create_task_group() as tg:
             agent = ConversationalAgent()
@@ -303,4 +325,6 @@ async def main():
 
 
 if __name__ == "__main__":
+    # DEPRECATED: Use `python conversation_agent.py` or `python test_agent.py` instead
+    # This runs the old workflow-based implementation for reference only
     anyio.run(main)
