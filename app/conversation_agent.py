@@ -51,7 +51,7 @@ class ConversationAgent:
         if not self.api_key:
             raise ValueError("API key is required")
 
-        # LLM 初始化
+        # LLM initialization
         self.llm = OpenAILike(
             model=model,
             api_key=self.api_key,
@@ -70,29 +70,29 @@ class ConversationAgent:
         self._init_base_tools()
 
         self.memory = Memory.from_defaults(
-            token_limit=1000,  # 减少上下文避免 LlamaIndex scratchpad 污染
+            token_limit=1000,  # Reduce context to avoid LlamaIndex scratchpad pollution
             session_id=f"session_{device_id or 'default'}"
         )
 
-        # MCP 相关
+        # MCP related
         self.device_id = device_id
         self.mcp_client: Optional[McpMqttClient] = None
 
-        # Agent 实例
+        # Agent instance
         self.agent: Optional[FunctionAgent] = None
         self._initialize_agent()
 
     def _load_system_prompt(self, prompt_file: str) -> str:
-        """加载系统提示词"""
+        """Load system prompt"""
         prompt_path = Path(__file__).parent / prompt_file
         if prompt_path.exists():
             with open(prompt_path, "r", encoding="utf-8") as f:
                 return f.read().strip()
         logger.warning(f"System prompt file not found: {prompt_path}")
-        return "你是一个智能助手。"
+        return "You are an intelligent assistant."
 
     def _init_base_tools(self):
-        """初始化基础工具"""
+        """Initialize base tools"""
         photo_tool = FunctionTool.from_defaults(
             fn=explain_photo,
             name="explain_photo",
@@ -107,10 +107,10 @@ class ConversationAgent:
         self.tools.append(photo_tool)
 
     def _initialize_agent(self):
-        """初始化代理"""
+        """Initialize agent"""
         all_tools = self.tools + self.mcp_tools
 
-        # 根据最佳实践配置 FunctionAgent
+        # Configure FunctionAgent according to best practices
         self.agent = FunctionAgent(
             tools=all_tools,
             llm=self.llm,
@@ -128,7 +128,7 @@ class ConversationAgent:
         server_name_filter: str = "#",
         device_id: Optional[str] = None
     ):
-        """初始化 MCP 客户端"""
+        """Initialize MCP client"""
         device_to_use = device_id or self.device_id
 
         mqtt_options = MqttOptions(
@@ -148,16 +148,16 @@ class ConversationAgent:
             device_id=device_to_use
         )
 
-        # 启动 MCP
+        # Start MCP
         tg.start_soon(self.mcp_client.start)
 
-        # 等待连接
+        # Wait for connection
         connected = await self.mcp_client.connect()
         if connected:
             logger.info(f"MCP connected with device_id: {device_to_use}")
             self.device_id = device_to_use
 
-            # 更新 MCP 工具
+            # Update MCP tools
             if self.mcp_client.mcp_tools:
                 self.mcp_tools = self.mcp_client.mcp_tools
                 self._initialize_agent()
@@ -165,7 +165,7 @@ class ConversationAgent:
             logger.error("Failed to connect MCP")
 
     async def message_to_device(self, message_type: str, payload: any) -> bool:
-        """发送消息到设备"""
+        """Send message to device"""
         if not self.mcp_client or not self.device_id:
             return False
 
@@ -180,7 +180,7 @@ class ConversationAgent:
 
     async def stream_chat(self, user_input: str) -> AsyncGenerator[AgentResponse, None]:
         try:
-            # 每次对话都重新创建 LLM 实例
+            # Recreate LLM instance for each conversation
             self.llm = OpenAILike(
                 model="deepseek-v3",
                 api_key=self.api_key,
@@ -192,7 +192,7 @@ class ConversationAgent:
                 timeout=60,
             )
             
-            # 重新初始化 Agent
+            # Reinitialize Agent
             self._initialize_agent()
             
             await self.message_to_device("message", {"type": "loading", "status": "processing"})
@@ -205,9 +205,9 @@ class ConversationAgent:
                 memory=self.memory
             )
 
-            # 流式输出
+            # Streaming output
             async for event in handler.stream_events():
-                # 从事件中提取内容
+                # Extract content from event
                 token = None
                 if hasattr(event, 'delta') and event.delta:
                     token = event.delta
@@ -215,7 +215,7 @@ class ConversationAgent:
                     token = event.chunk
 
                 if token:
-                    # 第一个块时更新状态
+                    # Update status on first chunk
                     if not first_chunk:
                         await self.message_to_device("message", {"type": "loading", "status": "waiting"})
                         first_chunk = True
@@ -226,7 +226,7 @@ class ConversationAgent:
                         content=token
                     )
 
-            # 流结束
+            # End of stream
             await self.message_to_device("message", {"type": "loading", "status": "complete"})
             yield AgentResponse(type=ResponseType.STREAM_END)
 
@@ -238,10 +238,10 @@ class ConversationAgent:
             )
 
     def clear_history(self):
-        """清空历史"""
+        """Clear history"""
         self.memory.reset()
 
     async def shutdown(self):
-        """关闭"""
+        """Shutdown"""
         if self.mcp_client:
             await self.mcp_client.stop()

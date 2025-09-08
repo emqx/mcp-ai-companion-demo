@@ -5,20 +5,20 @@ import threading
 import queue
 
 import asyncio, anyio
-from agents import ConversationalAgent
-from agents import FuncCallEvent, MessageEvent
+from conversation_agent import ConversationAgent
+from conversation_agent import ResponseType, AgentResponse
 
-# 发送给 TTS 的消息队列
+# Message queue for sending to TTS
 tts_queue = queue.Queue()
 
-# 接收 ASR 结果，让 LLM 回答用户问题
+# Receive ASR results for LLM to answer user questions
 asr_queue = queue.Queue()
 
 inflight_requests: dict[int, dict] = {}
 next_request_id: int = 1
 
-agent: ConversationalAgent = None
-main_loop = None  # 主线程的事件循环引用
+agent: ConversationAgent = None
+main_loop = None  # Reference to main thread's event loop
 current_device_id = None  # Store current device ID
 mcp_server_name_prefix = "web-ui-hardware-controller/"
 
@@ -158,29 +158,28 @@ def asr_worker():
         tts_msg = asr_queue.get()
 
         async def _run_and_consume():
-            handler = agent.run(user_input=tts_msg)
-            async for ev in handler.stream_events():
-                if isinstance(ev, FuncCallEvent):
-                    # INSERT_YOUR_CODE
+            async for response in agent.stream_chat(user_input=tts_msg):
+                if response.type == ResponseType.STREAM_CHUNK:
+                    if response.content:  # Non-empty chunk
+                        tts_queue.put({
+                            'text': response.content,
+                            'is_chunk': True,
+                            'is_final': False
+                        })
+                elif response.type == ResponseType.STREAM_END:
+                    # Empty chunk signals end of stream
+                    tts_queue.put({
+                        'text': '',
+                        'is_chunk': True,
+                        'is_final': True
+                    })
+                elif response.type == ResponseType.TOOL_CALL:
+                    # Handle tool calls if needed
                     pass
-                elif isinstance(ev, MessageEvent):
-                    if ev.is_chunk:
-                        if ev.message:  # Non-empty chunk
-                            tts_queue.put({
-                                'text': ev.message,
-                                'is_chunk': True,
-                                'is_final': False
-                            })
-                        else:  # Empty chunk signals end of stream
-                            tts_queue.put({
-                                'text': '',
-                                'is_chunk': True,
-                                'is_final': True
-                            })
-                    elif ev.message:  # Non-streaming complete message
-                        tts_queue.put(ev.message)
+                elif response.type == ResponseType.ERROR:
+                    print(f"Agent error: {response.content}", file=sys.stderr)
 
-        # 将异步任务提交到主线程事件循环执行
+        # Submit async task to main thread event loop for execution
         if main_loop and main_loop.is_running():
             asyncio.run_coroutine_threadsafe(_run_and_consume(), main_loop)
         else:
@@ -200,7 +199,7 @@ async def main():
     await tg.__aenter__()
 
     global agent
-    agent = ConversationalAgent()
+    agent = ConversationAgent()
 
     send_message(
         {
@@ -216,7 +215,8 @@ async def main():
     result = await asyncio.to_thread(read_message)
     if not result:
         print("No more input, exiting.")
-        await agent.mcp_client.stop()
+        if hasattr(agent, 'mcp_client') and agent.mcp_client:
+            await agent.mcp_client.stop()
         sys.exit(0)
 
     # Handle JSON decode errors gracefully
@@ -228,13 +228,14 @@ async def main():
         print(f"Failed to initialize agent, got: {result}")
         sys.exit(1)
 
-    # 将主循环放到后台任务中，让主事件循环保持活跃
+    # Put main loop in background task to keep main event loop active
     async def main_loop_task():
         while True:
             msg = await asyncio.to_thread(read_message)
             if msg is None:
                 print("No more input, exiting...")
-                await agent.mcp_client.stop()
+                if hasattr(agent, 'mcp_client') and agent.mcp_client:
+                    await agent.mcp_client.stop()
                 break
             if not msg:
                 # Skip None messages (empty lines, JSON decode errors, etc.)
@@ -246,12 +247,12 @@ async def main():
             if isinstance(msg, dict):
                 await handle_single(tg, msg)
 
-    # 创建后台任务，不阻塞主协程
+    # Create background task without blocking main coroutine
     main_task = asyncio.create_task(main_loop_task())
 
-    # 主协程现在可以处理其他异步任务
+    # Main coroutine can now handle other async tasks
     try:
-        # 等待主循环任务完成
+        # Wait for main loop task to complete
         await main_task
     except KeyboardInterrupt:
         print("\nReceived interrupt, exiting...")
