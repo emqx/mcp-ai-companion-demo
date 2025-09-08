@@ -157,10 +157,25 @@ class ConversationAgent:
             logger.info(f"MCP connected with device_id: {device_to_use}")
             self.device_id = device_to_use
 
-            # Update MCP tools
-            if self.mcp_client.mcp_tools:
-                self.mcp_tools = self.mcp_client.mcp_tools
-                self._initialize_agent()
+            # Wait for tools to be loaded with timeout
+            max_wait_time = 10  # seconds
+            wait_interval = 0.5  # seconds
+            waited_time = 0
+            
+            while waited_time < max_wait_time:
+                if self.mcp_client.mcp_tools:
+                    logger.info(f"MCP tools loaded: {len(self.mcp_client.mcp_tools)} tools found")
+                    self.mcp_tools = self.mcp_client.mcp_tools
+                    self._initialize_agent()
+                    break
+                    
+                await anyio.sleep(wait_interval)
+                waited_time += wait_interval
+                logger.debug(f"Waiting for MCP tools... ({waited_time:.1f}s)")
+            
+            if not self.mcp_client.mcp_tools:
+                logger.warning(f"No MCP tools loaded after {max_wait_time}s timeout")
+                
         else:
             logger.error("Failed to connect MCP")
 
