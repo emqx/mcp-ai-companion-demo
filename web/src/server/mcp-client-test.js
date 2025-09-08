@@ -88,6 +88,7 @@ class McpMqttClient {
           properties: {
             userProperties: {
               'MCP-MQTT-CLIENT-ID': this.clientId,
+              'MCP-COMPONENT-TYPE': 'mcp-client',
             },
           },
         },

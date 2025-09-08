@@ -183,6 +183,7 @@ export class McpMqttServer {
           properties: {
             userProperties: {
               'MCP-MQTT-CLIENT-ID': this.connectionOptions.clientId || '',
+              'MCP-COMPONENT-TYPE': 'mcp-server',
             },
           },
         },
