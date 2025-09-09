@@ -1,13 +1,6 @@
 import asyncio
 import anyio
-import logging
 from conversation_agent import ConversationAgent, ResponseType
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 
 
 async def test_agent():
