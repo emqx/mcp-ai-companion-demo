@@ -1,5 +1,4 @@
 import os
-import time
 import anyio
 import logging
 from typing import List, Optional, AsyncGenerator, Dict, Any
@@ -196,11 +195,7 @@ class ConversationAgent:
 
     async def stream_chat(self, user_input: str) -> AsyncGenerator[AgentResponse, None]:
         try:
-            start_time = time.time()
-            logger.info(f"💬 LLAMAINDEX CHAT START: '{user_input}'")
-            
             # Recreate LLM instance for each conversation
-            llm_init_start = time.time()
             self.llm = OpenAILike(
                 model="deepseek-v3",
                 api_key=self.api_key,
@@ -211,31 +206,21 @@ class ConversationAgent:
                 max_tokens=60000,
                 timeout=60,
             )
-            llm_init_end = time.time()
-            logger.info(f"🔧 LLM INIT: {llm_init_end - llm_init_start:.3f}s")
             
             # Reinitialize Agent
-            agent_init_start = time.time()
             self._initialize_agent()
-            agent_init_end = time.time()
-            logger.info(f"🤖 AGENT INIT: {agent_init_end - agent_init_start:.3f}s")
             
             await self.message_to_device("message", {"type": "loading", "status": "processing"})
 
             accumulated = ""
             first_chunk = False
-            first_token_time = None
 
-            agent_run_start = time.time()
             handler = self.agent.run(
                 user_msg=user_input,
                 memory=self.memory
             )
-            agent_run_end = time.time()
-            logger.info(f"🚀 AGENT RUN: {agent_run_end - agent_run_start:.3f}s")
 
             # Streaming output
-            stream_start = time.time()
             async for event in handler.stream_events():
                 # Extract content from event
                 token = None
@@ -245,12 +230,6 @@ class ConversationAgent:
                     token = event.chunk
 
                 if token:
-                    # Record first token time
-                    if first_token_time is None:
-                        first_token_time = time.time()
-                        time_to_first_token = first_token_time - start_time
-                        logger.info(f"⚡ FIRST TOKEN: {time_to_first_token:.3f}s")
-                    
                     # Update status on first chunk
                     if not first_chunk:
                         await self.message_to_device("message", {"type": "loading", "status": "waiting"})
@@ -262,20 +241,12 @@ class ConversationAgent:
                         content=token
                     )
 
-            stream_end = time.time()
-            total_time = stream_end - start_time
-            stream_time = stream_end - stream_start
-            
-            logger.info(f"📤 STREAM TIME: {stream_time:.3f}s | chars: {len(accumulated)}")
-            logger.info(f"🏁 LLAMAINDEX COMPLETE: {total_time:.3f}s total")
-
             # End of stream
             await self.message_to_device("message", {"type": "loading", "status": "complete"})
             yield AgentResponse(type=ResponseType.STREAM_END)
 
         except Exception as e:
-            error_time = time.time()
-            logger.error(f"❌ LLAMAINDEX ERROR: {error_time - start_time:.3f}s | {e}")
+            logger.error(f"Stream chat error: {e}")
             yield AgentResponse(
                 type=ResponseType.ERROR,
                 content=str(e)

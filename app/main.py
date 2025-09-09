@@ -5,8 +5,8 @@ import threading
 import queue
 
 import asyncio, anyio
-from new_conversation_agent import NewConversationAgent
-from new_conversation_agent import ResponseType, AgentResponse
+from conversation_agent import ConversationAgent
+from conversation_agent import ResponseType, AgentResponse
 
 # Message queue for sending to TTS
 tts_queue = queue.Queue()
@@ -17,7 +17,7 @@ asr_queue = queue.Queue()
 inflight_requests: dict[int, dict] = {}
 next_request_id: int = 1
 
-agent: NewConversationAgent = None
+agent: ConversationAgent = None
 main_loop = None  # Reference to main thread's event loop
 current_device_id = None  # Store current device ID
 mcp_server_name_prefix = "web-ui-hardware-controller/"
@@ -199,7 +199,7 @@ async def main():
     await tg.__aenter__()
 
     global agent
-    agent = NewConversationAgent()
+    agent = ConversationAgent()
 
     send_message(
         {
@@ -215,8 +215,8 @@ async def main():
     result = await asyncio.to_thread(read_message)
     if not result:
         print("No more input, exiting.")
-        if agent:
-            await agent.shutdown()
+        if hasattr(agent, 'mcp_client') and agent.mcp_client:
+            await agent.mcp_client.stop()
         sys.exit(0)
 
     # Handle JSON decode errors gracefully
@@ -234,8 +234,8 @@ async def main():
             msg = await asyncio.to_thread(read_message)
             if msg is None:
                 print("No more input, exiting...")
-                if agent:
-                    await agent.shutdown()
+                if hasattr(agent, 'mcp_client') and agent.mcp_client:
+                    await agent.mcp_client.stop()
                 break
             if not msg:
                 # Skip None messages (empty lines, JSON decode errors, etc.)
