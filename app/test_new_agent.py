@@ -1,34 +1,25 @@
 import asyncio
 import anyio
 import logging
-import os
-from native_conversation_agent import NativeConversationAgent, ResponseType
+from new_conversation_agent import NewConversationAgent, ResponseType
 
-# 设置日志级别以显示时延分析
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
-async def test_native_agent():
-    """Test Native Conversation Agent with parallel processing"""
-    
-    # Check for API key
-    if not os.environ.get("DASHSCOPE_API_KEY"):
-        print("❌ DASHSCOPE_API_KEY environment variable is required")
-        print("Please set your API key: export DASHSCOPE_API_KEY=your_key_here")
-        print("Then run this test again")
-        return
+async def test_new_agent():
+    """Test New Conversation Agent with parallel processing"""
 
     print("=" * 50)
-    print("Native Conversation Agent Test (Parallel Processing)")
+    print("New Conversation Agent Test (Parallel Processing)")
     print("Type 'exit' to quit")
     print("Type 'stats' to view agent statistics")
     print("Type 'history' to clear history")
     print("=" * 50)
 
     async with anyio.create_task_group() as tg:
-        # Create Native conversation agent
-        agent = NativeConversationAgent(device_id="native-companion-001")
+        # Create New conversation agent
+        agent = NewConversationAgent(device_id="native-companion-001")
 
         # Initialize MCP
         await agent.init_mcp(tg, server_name_filter="#")
@@ -81,4 +72,4 @@ async def test_native_agent():
 
 
 if __name__ == "__main__":
-    asyncio.run(test_native_agent())
+    asyncio.run(test_new_agent())

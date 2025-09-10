@@ -1,33 +1,28 @@
-import os
-import logging
 from typing import List, Optional, Dict, Any
-from pathlib import Path
 
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.agent import FunctionAgent
-from llama_index.core.tools import BaseTool, FunctionTool
 
 from mcp_client_init import McpMqttClient
+from prompt_loader import load_system_prompt
+from colored_logger import get_agent_logger
 
-logger = logging.getLogger(__name__)
+logger = get_agent_logger("emotion")
 
 
 class EmotionAgent:
     """Agent specialized in emotion control - manages avatar facial expressions"""
-    
+
     def __init__(
         self,
-        api_key: str = None,
-        api_base: str = "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        model: str = "deepseek-v3",
-        temperature: float = 0.3,  # Lower temperature for more consistent emotion control
-        max_tokens: int = 1000,    # Shorter responses for emotion control
+        api_key: str,
+        api_base: str,
+        model: str,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
         system_prompt_file: str = "prompts/emotion_system_prompt.txt",
     ):
-        # API Key
-        self.api_key = api_key or os.environ.get("DASHSCOPE_API_KEY")
-        if not self.api_key:
-            raise ValueError("API key is required")
+        self.api_key = api_key
 
         # LLM initialization for emotion control
         self.llm = OpenAILike(
@@ -42,26 +37,13 @@ class EmotionAgent:
         )
 
         # Load system prompt from file
-        self.system_prompt = self._load_system_prompt(system_prompt_file)
+        self.system_prompt = load_system_prompt(system_prompt_file)
 
         # MCP tools and emotion agent
         self.mcp_tools: List = []
         self.mcp_client: Optional[McpMqttClient] = None
         self.agent: Optional[FunctionAgent] = None
 
-    def _load_system_prompt(self, prompt_file: str) -> str:
-        """Load system prompt"""
-        prompt_path = Path(__file__).parent / prompt_file
-        if prompt_path.exists():
-            with open(prompt_path, "r", encoding="utf-8") as f:
-                return f.read().strip()
-        logger.warning(f"System prompt file not found: {prompt_path}")
-        return """你是一个智能助手的表情控制器。
-根据用户的输入和对话情境，智能判断是否需要改变头像表情。
-
-可用的情绪: happy, sad, angry, surprised, thinking, playful, relaxed, serious, shy, tired, disappointed, laugh
-
-你只需要调用 change_emotion 工具，不需要生成文本回复。"""
 
     def set_mcp_client(self, mcp_client: McpMqttClient):
         """Set MCP client"""
@@ -73,42 +55,49 @@ class EmotionAgent:
     def _initialize_agent(self):
         """Initialize FunctionAgent"""
         if self.mcp_tools:
-            # 只使用 change_emotion 工具
             filtered_tools = []
             for tool in self.mcp_tools:
-                tool_name = getattr(tool.metadata, "name", str(tool))
+                tool_name = tool.metadata.name if hasattr(tool, 'metadata') and hasattr(tool.metadata, 'name') else str(tool)
+                logger.debug(f"checking tool: {tool_name}")
                 if tool_name == "change_emotion":
                     filtered_tools.append(tool)
-            
+                    logger.debug(f"included emotion tool: {tool_name}")
+                else:
+                    logger.debug(f"skipped tool: {tool_name}")
+
             self.agent = FunctionAgent(
                 tools=filtered_tools,
                 llm=self.llm,
                 verbose=False,
-                system_prompt=self.system_prompt
+                system_prompt=self.system_prompt,
+                max_function_calls=2,
+                timeout=8.0,
             )
+
+            logger.info(f"initialized with {len(filtered_tools)} tools")
 
     async def determine_and_call_tools(self, user_input: str, context: str = "") -> Optional[Dict[str, Any]]:
         try:
             if not self.agent:
-                logger.warning("FunctionAgent not initialized")
+                logger.warning("not initialized")
                 return None
-            
-            logger.info("🤖 FunctionAgent processing user input...")
-            
+
+            logger.info("processing user input...")
+
             import asyncio
             try:
-                response = await asyncio.wait_for(self.agent.run(user_input), timeout=10.0)
-                logger.info(f"FunctionAgent completed: {response}")
-                
+                response = await asyncio.wait_for(self.agent.run(user_input), timeout=8.0)
+                logger.info(f"completed: {response}")
+
                 return {
-                    "tool_name": "function_agent", 
+                    "tool_name": "function_agent",
                     "tool_args": {"user_input": user_input},
                     "tool_result": str(response)
                 }
             except asyncio.TimeoutError:
-                logger.error("🤖 FunctionAgent timeout after 10s")
+                logger.error("timeout after 8s")
                 return None
-            
+
         except Exception as e:
-            logger.error(f"Error in FunctionAgent: {e}")
+            logger.error(f"error: {e}")
             return None

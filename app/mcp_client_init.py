@@ -20,7 +20,7 @@ class McpServer(BaseModel):
     success: bool
 
 class McpMqttClient:
-    def __init__(self, mqtt_options: MqttOptions, client_name: str, server_name_filter: str, read_timeout: int = 10, clientid: str | None = None, device_id: str | None = None):
+    def __init__(self, mqtt_options: MqttOptions, client_name: str, server_name_filter: str, read_timeout: int = 10, clientid: str | None = None, device_id: str | None = None, on_tools_updated=None):
         self._mqtt_client = None
         self.clientid = clientid
         self.device_id = device_id  # Store device ID
@@ -32,6 +32,7 @@ class McpMqttClient:
         self.mcp_tools: list[BaseTool] = []
         self._stop_event = anyio.Event()
         self._connected_event = anyio.Event()
+        self.on_tools_updated = on_tools_updated  # Tools update callback
 
     def is_connected(self) -> bool:
         return self._mqtt_client.is_connected() if self._mqtt_client else False
@@ -125,6 +126,11 @@ class McpMqttClient:
             ## note that we only support 1 MCP server now
             self.mcp_tools = await self._get_mcp_tools(server_name)
             logger.info(f"loaded tools: {[tool.metadata.name for tool in self.mcp_tools]}")
+
+            # Notify tools updated callback
+            if self.on_tools_updated:
+                self.on_tools_updated()
+
         except Exception:
             logger.error(f"load tool error: {traceback.format_exc()}")
 
@@ -148,7 +154,7 @@ class McpMqttClient:
                         async def mcp_tool_wrapper(**kwargs):
                             try:
                                 print(f"[MCP Tool Call] {tool_name} with args: {kwargs}")
-                                
+
                                 result = await client_ref.call_tool(
                                     tool_name, kwargs
                                 )

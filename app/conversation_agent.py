@@ -40,7 +40,7 @@ class ConversationAgent:
         self,
         api_key: str = None,
         api_base: str = "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        model: str = "deepseek-v3",
+        model: str = "qwen-flash",
         system_prompt_file: str = "prompts/conversational_system_prompt.txt",
         temperature: float = 0.6,
         max_tokens: int = 60000,
@@ -162,21 +162,21 @@ class ConversationAgent:
             max_wait_time = 10  # seconds
             wait_interval = 0.5  # seconds
             waited_time = 0
-            
+
             while waited_time < max_wait_time:
                 if self.mcp_client.mcp_tools:
                     logger.info(f"MCP tools loaded: {len(self.mcp_client.mcp_tools)} tools found")
                     self.mcp_tools = self.mcp_client.mcp_tools
                     self._initialize_agent()
                     break
-                    
+
                 await anyio.sleep(wait_interval)
                 waited_time += wait_interval
                 logger.debug(f"Waiting for MCP tools... ({waited_time:.1f}s)")
-            
+
             if not self.mcp_client.mcp_tools:
                 logger.warning(f"No MCP tools loaded after {max_wait_time}s timeout")
-                
+
         else:
             logger.error("Failed to connect MCP")
 
@@ -198,11 +198,11 @@ class ConversationAgent:
         try:
             start_time = time.time()
             logger.info(f"💬 LLAMAINDEX CHAT START: '{user_input}'")
-            
+
             # Recreate LLM instance for each conversation
             llm_init_start = time.time()
             self.llm = OpenAILike(
-                model="deepseek-v3",
+                model="qwen-flash",
                 api_key=self.api_key,
                 api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
                 is_chat_model=True,
@@ -213,13 +213,13 @@ class ConversationAgent:
             )
             llm_init_end = time.time()
             logger.info(f"🔧 LLM INIT: {llm_init_end - llm_init_start:.3f}s")
-            
+
             # Reinitialize Agent
             agent_init_start = time.time()
             self._initialize_agent()
             agent_init_end = time.time()
             logger.info(f"🤖 AGENT INIT: {agent_init_end - agent_init_start:.3f}s")
-            
+
             await self.message_to_device("message", {"type": "loading", "status": "processing"})
 
             accumulated = ""
@@ -250,7 +250,7 @@ class ConversationAgent:
                         first_token_time = time.time()
                         time_to_first_token = first_token_time - start_time
                         logger.info(f"⚡ FIRST TOKEN: {time_to_first_token:.3f}s")
-                    
+
                     # Update status on first chunk
                     if not first_chunk:
                         await self.message_to_device("message", {"type": "loading", "status": "waiting"})
@@ -265,7 +265,7 @@ class ConversationAgent:
             stream_end = time.time()
             total_time = stream_end - start_time
             stream_time = stream_end - stream_start
-            
+
             logger.info(f"📤 STREAM TIME: {stream_time:.3f}s | chars: {len(accumulated)}")
             logger.info(f"🏁 LLAMAINDEX COMPLETE: {total_time:.3f}s total")
 

@@ -6,7 +6,7 @@ import queue
 
 import asyncio, anyio
 from new_conversation_agent import NewConversationAgent
-from new_conversation_agent import ResponseType, AgentResponse
+from new_conversation_agent import ResponseType
 
 # Message queue for sending to TTS
 tts_queue = queue.Queue()
