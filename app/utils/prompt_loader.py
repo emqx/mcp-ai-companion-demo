@@ -19,7 +19,7 @@ def load_system_prompt(prompt_file: str) -> str:
         FileNotFoundError: If prompt file doesn't exist
         ValueError: If prompt file is empty
     """
-    prompt_path = Path(__file__).parent / prompt_file
+    prompt_path = Path(__file__).parent.parent / prompt_file
 
     if not prompt_path.exists():
         raise FileNotFoundError(f"System prompt file not found: {prompt_path}")

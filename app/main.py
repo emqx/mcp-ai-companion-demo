@@ -5,8 +5,7 @@ import threading
 import queue
 
 import asyncio, anyio
-from new_conversation_agent import NewConversationAgent
-from new_conversation_agent import ResponseType
+from conversation_workflow import ConversationWorkflow, ResponseType
 
 # Message queue for sending to TTS
 tts_queue = queue.Queue()
@@ -17,7 +16,7 @@ asr_queue = queue.Queue()
 inflight_requests: dict[int, dict] = {}
 next_request_id: int = 1
 
-agent: NewConversationAgent = None
+workflow: ConversationWorkflow = None
 main_loop = None  # Reference to main thread's event loop
 current_device_id = None  # Store current device ID
 mcp_server_name_prefix = "web-ui-hardware-controller/"
@@ -152,13 +151,13 @@ def tts_worker():
 def asr_worker():
     global next_request_id
     global inflight_requests
-    global agent
+    global workflow
     global main_loop
     while True:
         tts_msg = asr_queue.get()
 
         async def _run_and_consume():
-            async for response in agent.stream_chat(user_input=tts_msg):
+            async for response in workflow.stream_chat(user_input=tts_msg):
                 if response.type == ResponseType.STREAM_CHUNK:
                     if response.content:  # Non-empty chunk
                         tts_queue.put({
@@ -198,8 +197,8 @@ async def main():
     tg = anyio.create_task_group()
     await tg.__aenter__()
 
-    global agent
-    agent = NewConversationAgent()
+    global workflow
+    workflow = ConversationWorkflow()
 
     send_message(
         {
@@ -215,8 +214,8 @@ async def main():
     result = await asyncio.to_thread(read_message)
     if not result:
         print("No more input, exiting.")
-        if agent:
-            await agent.shutdown()
+        if workflow:
+            await workflow.shutdown()
         sys.exit(0)
 
     # Handle JSON decode errors gracefully
@@ -234,8 +233,8 @@ async def main():
             msg = await asyncio.to_thread(read_message)
             if msg is None:
                 print("No more input, exiting...")
-                if agent:
-                    await agent.shutdown()
+                if workflow:
+                    await workflow.shutdown()
                 break
             if not msg:
                 # Skip None messages (empty lines, JSON decode errors, etc.)
@@ -269,13 +268,13 @@ async def handle_asr_result(params):
 
 async def handle_set_device_id(params, tg):
     """Handle set device ID method"""
-    global agent
+    global workflow
     global current_device_id
     device_id = params.get("device_id", "")
     current_device_id = device_id  # Save device ID globally
     suffix = device_id.split("-")[-1] if "-" in device_id else device_id
     server_name_filter = mcp_server_name_prefix + suffix
-    await agent.init_mcp(tg, server_name_filter=server_name_filter, device_id=device_id)
+    await workflow.init_mcp(tg, server_name_filter=server_name_filter, device_id=device_id)
     print(f"MCP initialized with server name filter: {server_name_filter}, device_id: {device_id}")
 
 async def handle_message_from_device(params):

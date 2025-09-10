@@ -8,7 +8,10 @@ from llama_index.core.tools import BaseTool, FunctionTool
 from llama_index.core.memory import Memory
 
 from tools import explain_photo, explain_photo_async
-from colored_logger import get_agent_logger
+
+from utils.prompt_loader import load_system_prompt
+from utils.colored_logger import get_agent_logger
+
 from mcp_client_init import McpMqttClient
 
 logger = get_agent_logger("voice")
@@ -22,9 +25,8 @@ class VoiceAgent:
         api_key: str,
         api_base: str,
         model: str,
-        temperature: float = 0.7,
-        max_tokens: int = 60000,
-        max_history_length: int = 20,
+        temperature: float = 0.6,
+        max_tokens: int = 5000,
         system_prompt_file: str = "prompts/voice_reply_system_prompt.txt",
         device_id: Optional[str] = None,
     ):
@@ -42,7 +44,7 @@ class VoiceAgent:
             timeout=60,
         )
 
-        self.system_prompt = self._load_system_prompt(system_prompt_file)
+        self.system_prompt = load_system_prompt(system_prompt_file)
 
         # Tools and agent
         self.tools: List[BaseTool] = []
@@ -58,15 +60,6 @@ class VoiceAgent:
         # Agent instance
         self.agent: Optional[FunctionAgent] = None
         self._initialize_agent()
-
-    def _load_system_prompt(self, prompt_file: str) -> str:
-        """Load system prompt"""
-        prompt_path = Path(__file__).parent / prompt_file
-        if prompt_path.exists():
-            with open(prompt_path, "r", encoding="utf-8") as f:
-                return f.read().strip()
-        logger.warning(f"System prompt file not found: {prompt_path}")
-        return "You are an intelligent assistant. Please answer user questions in a friendly manner."
 
     def _init_base_tools(self):
         """Initialize base tools"""
@@ -170,11 +163,3 @@ class VoiceAgent:
         """Clear conversation history"""
         logger.info("history cleared")
         self.memory.reset()
-
-    def get_stats(self) -> dict:
-        """Get conversation statistics"""
-        return {
-            "agent_type": "Voice Agent (FunctionAgent)",
-            "tools_count": len(self.tools) + len(self.mcp_tools),
-            "agent_initialized": self.agent is not None
-        }

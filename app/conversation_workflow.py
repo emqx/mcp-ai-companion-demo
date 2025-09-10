@@ -8,9 +8,9 @@ from enum import Enum
 
 from mcp_client_init import McpMqttClient
 from mcp.shared.mqtt import MqttOptions
-from emotion_agent import EmotionAgent
-from voice_agent import VoiceAgent
-from colored_logger import get_agent_logger
+from agents.emotion_agent import EmotionAgent
+from agents.voice_agent import VoiceAgent
+from utils.colored_logger import get_agent_logger
 
 logger = get_agent_logger("chat")
 
@@ -31,8 +31,8 @@ class AgentResponse:
     tool_result: Optional[str] = None
 
 
-class NewConversationAgent:
-    """New conversation agent that coordinates voice responses and tool calls"""
+class ConversationWorkflow:
+    """Conversation workflow that coordinates voice responses and tool calls"""
 
     def __init__(
         self,
@@ -42,8 +42,7 @@ class NewConversationAgent:
         voice_prompt_file: str = "prompts/voice_reply_system_prompt.txt",
         tool_prompt_file: str = "prompts/emotion_system_prompt.txt",
         temperature: float = 0.6,
-        max_tokens: int = 10000,
-        max_history_length: int = 20,
+        max_tokens: int = 5000,
         device_id: Optional[str] = None,
     ):
         self.api_key = api_key or os.environ.get("DASHSCOPE_API_KEY")
@@ -59,7 +58,6 @@ class NewConversationAgent:
             system_prompt_file=voice_prompt_file,
             temperature=temperature,
             max_tokens=max_tokens,
-            max_history_length=max_history_length,
             device_id=device_id,
         )
 
@@ -218,19 +216,6 @@ class NewConversationAgent:
         """Clear conversation history"""
         logger.info("clearing conversation history")
         self.voice_agent.clear_history()
-
-
-    def get_stats(self) -> dict:
-        """Get conversation statistics"""
-        voice_stats = self.voice_agent.get_stats()
-
-        return {
-            "agent_type": "New Conversation Agent",
-            "device_id": self.device_id,
-            "mcp_connected": self.mcp_client is not None,
-            "mcp_tools_count": len(self.emotion_agent.mcp_tools) if self.emotion_agent.mcp_tools else 0,
-            **voice_stats
-        }
 
 
     async def shutdown(self):
