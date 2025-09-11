@@ -41,7 +41,7 @@ tired→疲倦困乏状态
 
 ⚠️ 重要：change_emotion工具调用示例
 ✅ 正确：change_emotion(emotion="happy")
-✅ 正确：change_emotion(emotion="thinking") 
+✅ 正确：change_emotion(emotion="thinking")
 ❌ 错误：change_emotion()
 ❌ 错误：change_emotion({})
 ❌ 错误：change_emotion("")
@@ -49,7 +49,7 @@ tired→疲倦困乏状态
 按需工具：
 take_photo() - 拍照（无参数）
 explain_photo(image_url: str, question: str) - 分析照片，参数必须完整
-control_camera(action: str) - 控制摄像头，action必须是"open"或"close"
+control_camera(enabled: bool) - 控制摄像头，enabled为True开启，False关闭
 control_volume(volume: int) - 调节音量，volume必须是0-100的整数
 
 表情选择逻辑：

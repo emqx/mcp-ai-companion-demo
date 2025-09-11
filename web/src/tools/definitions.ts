@@ -8,9 +8,10 @@ import { SUPPORTED_EMOTIONS } from './types'
 export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
   control_camera: {
     name: 'control_camera',
-    description: 'Control the camera video feed. Usage: Call with enabled=true to turn on camera, enabled=false to turn off',
+    description: 'Control the camera video feed when user requests camera operations. Call with enabled=true to turn on camera, enabled=false to turn off.',
     inputSchema: {
       type: 'object',
+      
       properties: {
         enabled: {
           type: 'boolean',
@@ -23,13 +24,13 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
 
   change_emotion: {
     name: 'change_emotion',
-    description: 'MANDATORY TOOL: Change the avatar emotion/animation. MUST be called with emotion parameter. Usage: change_emotion(emotion="happy") where emotion must be one of: happy, sad, angry, surprised, thinking, playful, relaxed, serious, shy, tired, disappointed, laugh. NEVER call without emotion parameter!',
+    description: 'Change the avatar emotion/animation when appropriate to match conversation context. Available emotions: happy, sad, angry, surprised, thinking, playful, relaxed, serious, shy, tired, disappointed, laugh.',
     inputSchema: {
       type: 'object',
       properties: {
         emotion: {
           type: 'string',
-          description: 'REQUIRED: The emotion to display. Must be one of the supported emotions. Cannot be empty or undefined.',
+          description: 'The emotion to display. Must be one of the supported emotions.',
           enum: SUPPORTED_EMOTIONS as unknown as string[],
         },
       },
@@ -39,7 +40,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
 
   take_photo: {
     name: 'take_photo',
-    description: 'Capture a photo from the video stream. Usage: Call without parameters or with source="remote" to take photo, returns photo URL',
+    description: 'Capture a photo from the video stream when user requests taking a photo. Call without parameters or with source="remote" to take photo.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -63,7 +64,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
 
   control_volume: {
     name: 'control_volume',
-    description: 'Control audio volume. Usage: Call with muted=true/false to mute/unmute, or volume=0-100 to set volume level',
+    description: 'Control audio volume when user requests volume changes. Call with muted=true/false to mute/unmute, or volume=0-100 to set volume level.',
     inputSchema: {
       type: 'object',
       properties: {
