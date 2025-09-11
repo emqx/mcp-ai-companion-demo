@@ -1,6 +1,5 @@
 import time
 from typing import List, AsyncGenerator, Optional
-from pathlib import Path
 
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.agent import FunctionAgent
@@ -96,10 +95,10 @@ class VoiceAgent:
             tools=all_tools,
             llm=self.llm,
             system_prompt=self.system_prompt,
-            verbose=False,
+            verbose=True,
             streaming=True,
-            timeout=15.0,
-            max_function_calls=3,
+            timeout=20.0,
+            max_function_calls=5,
         )
 
         logger.info(f"initialized with {len(all_tools)} tools: {[tool.metadata.name if hasattr(tool, 'metadata') else str(tool) for tool in all_tools]}")
