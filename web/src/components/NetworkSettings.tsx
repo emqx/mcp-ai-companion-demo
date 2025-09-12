@@ -18,6 +18,7 @@ import {
 import type { MqttConfig, IceServersConfig } from '@/utils/storage'
 import { clearMqttConfig, saveIceServersConfig, loadIceServersConfig, clearIceServersConfig } from '@/utils/storage'
 import { defaultMqttConfig } from '@/config/mqtt'
+import { getDefaultIceServersConfig } from '@/utils/ice-servers'
 
 interface NetworkSettingsProps {
   config: MqttConfig
@@ -37,15 +38,7 @@ export function NetworkSettings({ config, onConfigChange }: NetworkSettingsProps
   )
   const [iceServersConfig, setIceServersConfig] = useState<IceServersConfig>(() => {
     const saved = loadIceServersConfig()
-    const currentHost = window.location.hostname
-    return (
-      saved || {
-        stunUrl: '',
-        turnUrl: `turn:${currentHost}:13478`,
-        turnUsername: 'emqx-demo-x',
-        turnPassword: 'abcd/1234.$#@!',
-      }
-    )
+    return saved || getDefaultIceServersConfig()
   })
   const [isOpen, setIsOpen] = useState(false)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
@@ -85,13 +78,7 @@ export function NetworkSettings({ config, onConfigChange }: NetworkSettingsProps
       connectTimeout: defaultMqttConfig.connectTimeout,
       reconnectPeriod: defaultMqttConfig.reconnectPeriod,
     }
-    const currentHost = window.location.hostname
-    const defaultIceServers: IceServersConfig = {
-      stunUrl: '',
-      turnUrl: `turn:${currentHost}:13478`,
-      turnUsername: 'emqx-demo-x',
-      turnPassword: 'abcd/1234.$#@!',
-    }
+    const defaultIceServers: IceServersConfig = getDefaultIceServersConfig()
     setTempConfig(defaultConfig)
     setIceServersConfig(defaultIceServers)
     onConfigChange(defaultConfig)
@@ -100,7 +87,6 @@ export function NetworkSettings({ config, onConfigChange }: NetworkSettingsProps
     toast.success('已恢复默认配置，页面即将刷新')
     setIsOpen(false)
     setShowResetDialog(false)
-    // 延迟刷新让用户看到提示
     setTimeout(() => {
       window.location.reload()
     }, 1000)
