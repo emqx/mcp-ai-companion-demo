@@ -42,8 +42,8 @@ export function NetworkSettings({ config, onConfigChange }: NetworkSettingsProps
       saved || {
         stunUrl: '',
         turnUrl: `turn:${currentHost}:13478`,
-        turnUsername: '',
-        turnPassword: '',
+        turnUsername: 'emqx-demo-x',
+        turnPassword: 'abcd/1234.$#@!',
       }
     )
   })
@@ -89,8 +89,8 @@ export function NetworkSettings({ config, onConfigChange }: NetworkSettingsProps
     const defaultIceServers: IceServersConfig = {
       stunUrl: '',
       turnUrl: `turn:${currentHost}:13478`,
-      turnUsername: '',
-      turnPassword: '',
+      turnUsername: 'emqx-demo-x',
+      turnPassword: 'abcd/1234.$#@!',
     }
     setTempConfig(defaultConfig)
     setIceServersConfig(defaultIceServers)
