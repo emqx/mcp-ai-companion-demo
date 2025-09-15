@@ -3,6 +3,7 @@ import { type MqttClient as BaseMqttClient } from 'mqtt'
 import { MqttWebRTCSignaling } from '@/services/mqtt-webrtc-signaling'
 import type { ConnectionState, UseWebRTCOptions, UseWebRTCReturn } from '@/types/webrtc'
 import { webrtcLogger } from '@/utils/logger'
+import { buildIceServers, ensureIceServersConfig } from '@/utils/ice-servers'
 
 export interface UseWebRTCMqttOptions extends Omit<UseWebRTCOptions, 'signalingId'> {
   mqttClient?: BaseMqttClient | null // Accept external MQTT client
@@ -65,10 +66,19 @@ export function useWebRTCMqtt({
         throw new Error('Cannot get client ID from MQTT client')
       }
 
+      // Ensure ICE servers configuration exists with defaults
+      const iceServersConfig = ensureIceServersConfig()
+      const iceServers = buildIceServers(iceServersConfig)
+
+      webrtcLogger.info('🧊 Using ICE servers configuration:', iceServers)
+
       signalingRef.current = new MqttWebRTCSignaling({
         mqttClient: mqttClientRef.current,
         clientId,
-        config,
+        config: {
+          ...config,
+          iceServers,
+        },
         mediaConstraints,
         callbacks: {
           onConnectionStateChange: setConnectionState,

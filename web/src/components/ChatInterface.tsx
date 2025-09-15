@@ -2,7 +2,7 @@ import { Mic, Volume2, Camera } from 'lucide-react'
 import { EmotionAnimation } from './EmotionAnimation'
 // import { EmotionSelector } from './EmotionSelector'
 import { ChatMessages } from './ChatMessages'
-import { MqttSettings } from './MqttSettings'
+import { NetworkSettings } from './NetworkSettings'
 import { useAudioPlaying } from '@/hooks/useAudioPlaying'
 import { useEffect, useRef, type RefObject } from 'react'
 import type { MqttConfig } from '@/utils/storage'
@@ -127,7 +127,7 @@ export function ChatInterface({
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">
       <div className="fixed top-4 right-4 flex items-center gap-2">
-        <MqttSettings config={mqttConfig} onConfigChange={onMqttConfigChange} isConnected={isMqttConnected} />
+        <NetworkSettings config={mqttConfig} onConfigChange={onMqttConfigChange} isConnected={isMqttConnected} />
         {/*<EmotionSelector
           selectedEmotion={selectedEmotion}
           onEmotionSelect={setSelectedEmotion}
@@ -154,7 +154,12 @@ export function ChatInterface({
         <EmotionAnimation emotion={selectedEmotion} />
       </div>
 
-      <ChatMessages isLoading={webrtc.isConnected && !isSpeaking} isSpeaking={isSpeaking} aiReplyText={aiReplyText} llmLoading={llmLoading} />
+      <ChatMessages
+        isLoading={webrtc.isConnected && !isSpeaking}
+        isSpeaking={isSpeaking}
+        aiReplyText={aiReplyText}
+        llmLoading={llmLoading}
+      />
 
       <audio ref={audioRef} autoPlay playsInline muted={isMuted} className="hidden" />
 

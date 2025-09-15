@@ -41,7 +41,7 @@ class ConversationWorkflow:
         model: str = "qwen-flash",
         voice_prompt_file: str = "prompts/voice_reply_system_prompt.txt",
         tool_prompt_file: str = "prompts/emotion_system_prompt.txt",
-        temperature: float = 0.6,
+        temperature: float = 0.5,
         max_tokens: int = 5000,
         device_id: Optional[str] = None,
     ):
