@@ -130,8 +130,6 @@ function App() {
     brokerUrl: mqttConfig.brokerUrl,
     username: mqttConfig.username,
     password: mqttConfig.password,
-    connectTimeout: mqttConfig.connectTimeout,
-    reconnectPeriod: mqttConfig.reconnectPeriod,
     autoConnect: true,
     callbacks,
   })
@@ -166,7 +164,7 @@ function App() {
     isVideoEnabled,
     cleanup: cleanupWebRTC,
   } = useWebRTCMqtt({
-    mqttClient: mcpMqttClient?.getMqttClient(),
+    mqttClient: mcpMqttClient?.getMqttClient() || null,
     onASRResponse: () => {
       setAiReplyText('')
     },
@@ -175,7 +173,7 @@ function App() {
     },
     onMessage: (message: any) => {
       appLogger.info('🔊 Message:', message)
-      
+
       // Handle loading messages
       if (message && typeof message === 'object' && message.type === 'loading') {
         const status = message.status

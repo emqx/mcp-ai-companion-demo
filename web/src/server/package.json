@@ -2,13 +2,13 @@
   "name": "mcp-client-test",
   "version": "1.0.0",
   "description": "Test MCP Client for testing Web UI MCP Server",
-  "main": "mcp-client-test.js",
+  "main": "mcp-client-test.mjs",
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
-    "test": "node mcp-client-test.js",
-    "start": "node mcp-client-test.js"
+    "test": "node mcp-client-test.mjs",
+    "start": "node mcp-client-test.mjs"
   },
   "dependencies": {
     "mqtt": "^5.0.0",
