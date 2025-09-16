@@ -194,9 +194,6 @@ async def main():
     asr_thread = threading.Thread(target=asr_worker, daemon=True)
     asr_thread.start()
 
-    tg = anyio.create_task_group()
-    await tg.__aenter__()
-
     global workflow
     workflow = ConversationWorkflow()
 
@@ -242,9 +239,9 @@ async def main():
                 await asyncio.sleep(0.01)
                 continue
             if isinstance(msg, list):
-                await handle_batch(tg, msg)
+                await handle_batch(msg)
             if isinstance(msg, dict):
-                await handle_single(tg, msg)
+                await handle_single(msg)
 
     # Create background task without blocking main coroutine
     main_task = asyncio.create_task(main_loop_task())
@@ -266,7 +263,7 @@ async def handle_asr_result(params):
     recognized_text = params.get("text", "")
     asr_queue.put(recognized_text)
 
-async def handle_set_device_id(params, tg):
+async def handle_set_device_id(params):
     """Handle set device ID method"""
     global workflow
     global current_device_id
@@ -274,7 +271,7 @@ async def handle_set_device_id(params, tg):
     current_device_id = device_id  # Save device ID globally
     suffix = device_id.split("-")[-1] if "-" in device_id else device_id
     server_name_filter = mcp_server_name_prefix + suffix
-    await workflow.init_mcp(tg, server_name_filter=server_name_filter, device_id=device_id)
+    await workflow.init_mcp(server_name_filter=server_name_filter, device_id=device_id)
     print(f"MCP initialized with server name filter: {server_name_filter}, device_id: {device_id}")
 
 async def handle_message_from_device(params):
@@ -283,14 +280,14 @@ async def handle_message_from_device(params):
     if payload:
         asr_queue.put(payload)
 
-async def handle_method_request(msg, tg):
+async def handle_method_request(msg):
     """Handle method requests"""
     params = msg.get("params", {})
     method = msg["method"]
 
     method_handlers = {
         "asr_result": lambda: handle_asr_result(params),
-        "set_device_id": lambda: handle_set_device_id(params, tg),
+        "set_device_id": lambda: handle_set_device_id(params),
         "message_from_device": lambda: handle_message_from_device(params)
     }
 
@@ -316,16 +313,16 @@ async def handle_result_response(msg):
     current_request = inflight_requests.pop(msg["id"])
     print(f"Received result: {msg['result']} for request: {current_request}")
 
-async def handle_single(tg, msg):
+async def handle_single(msg):
     if "method" in msg:
-        await handle_method_request(msg, tg)
+        await handle_method_request(msg)
     if "result" in msg:
         await handle_result_response(msg)
 
 
-async def handle_batch(tg, msgs):
+async def handle_batch(msgs):
     for msg in msgs:
-       await handle_single(tg, msg)
+       await handle_single(msg)
 
 
 if __name__ == "__main__":

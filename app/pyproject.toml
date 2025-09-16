@@ -14,6 +14,7 @@ dependencies = [
     "mcp",
     "openai>=1.99.9",
     "requests>=2.32.4",
+    "websockets>=15.0.1",
 ]
 
 [[tool.uv.index]]
