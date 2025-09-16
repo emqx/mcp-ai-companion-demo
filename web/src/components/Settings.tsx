@@ -21,6 +21,7 @@ import type { MqttConfig, IceServersConfig } from '@/utils/storage'
 import { clearMqttConfig, saveIceServersConfig, loadIceServersConfig, clearIceServersConfig } from '@/utils/storage'
 import { defaultMqttConfig } from '@/config/mqtt'
 import { getDefaultIceServersConfig } from '@/utils/ice-servers'
+import { appLogger } from '@/utils/logger'
 
 interface SettingsProps {
   config: MqttConfig
@@ -32,6 +33,11 @@ interface SettingsProps {
 const languages = [
   { code: 'en', name: 'English' },
   { code: 'zh', name: '中文' },
+]
+
+const voiceOptions = [
+  { value: 'longhua_v2', name: 'Longhua V2 (Chinese)' },
+  { value: 'loongluna_v2', name: 'Loongluna V2 (English)' },
 ]
 
 export function Settings({ config, onConfigChange, className }: SettingsProps) {
@@ -46,6 +52,8 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
     },
   )
   const [tempLanguage, setTempLanguage] = useState<string>(i18n.language)
+  const [currentVoice, setCurrentVoice] = useState<string>('longhua_v2')
+  const [tempVoice, setTempVoice] = useState<string>('longhua_v2')
   const [iceServersConfig, setIceServersConfig] = useState<IceServersConfig>(() => {
     const saved = loadIceServersConfig()
     return saved || getDefaultIceServersConfig()
@@ -64,14 +72,59 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
     setTempLanguage(i18n.language)
   }, [i18n.language])
 
+  useEffect(() => {
+    const fetchCurrentVoice = async () => {
+      try {
+        const response = await fetch('/api/get_tts_voice')
+        const data = await response.json()
+        if (data.voice_type) {
+          setCurrentVoice(data.voice_type)
+          setTempVoice(data.voice_type)
+        }
+      } catch (error) {
+        console.error('Failed to fetch current voice:', error)
+      }
+    }
+    fetchCurrentVoice()
+  }, [])
+
+  const handleLanguageChange = (newLanguage: string) => {
+    setTempLanguage(newLanguage)
+    if (newLanguage === 'en') {
+      setTempVoice('loongluna_v2')
+    } else if (newLanguage === 'zh') {
+      setTempVoice('longhua_v2')
+    }
+  }
+
   const handleSave = () => {
     setShowSaveDialog(true)
   }
 
-  const confirmSave = () => {
+  const confirmSave = async () => {
     // Change language if it's different
     if (tempLanguage !== i18n.language) {
       i18n.changeLanguage(tempLanguage)
+    }
+
+    // Change voice if it's different
+    if (tempVoice !== currentVoice) {
+      try {
+        const response = await fetch('/api/set_tts_voice', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ voice_type: tempVoice }),
+        })
+        const data = await response.json()
+        if (data.success) {
+          setCurrentVoice(tempVoice)
+          appLogger.info(`TTS Voice changed to ${tempVoice}`)
+        }
+      } catch (error) {
+        console.error('Failed to change voice:', error)
+      }
     }
 
     onConfigChange(tempConfig)
@@ -118,8 +171,9 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
-      // Reset temp language when closing without saving
+      // Reset temp values when closing without saving
       setTempLanguage(i18n.language)
+      setTempVoice(currentVoice)
     }
     setIsOpen(open)
   }
@@ -148,7 +202,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
             <div className="space-y-6">
               <div className="space-y-4">
                 <h3 className="text-base font-semibold">{t('settings.language')}</h3>
-                <Select value={tempLanguage} onValueChange={setTempLanguage}>
+                <Select value={tempLanguage} onValueChange={handleLanguageChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -156,6 +210,22 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
                     {languages.map((language) => (
                       <SelectItem key={language.code} value={language.code}>
                         {language.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold">{t('settings.ttsVoice', 'TTS Voice')}</h3>
+                <Select value={tempVoice} onValueChange={setTempVoice}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {voiceOptions.map((voice) => (
+                      <SelectItem key={voice.value} value={voice.value}>
+                        {voice.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
