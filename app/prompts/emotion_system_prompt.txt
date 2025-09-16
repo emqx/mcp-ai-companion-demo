@@ -33,19 +33,19 @@
 ✅ change_emotion(emotion="sad")
 ✅ change_emotion(emotion="thinking")
 
-情绪映射详细规则：
-1. 问候/打招呼 → happy: "你好", "早安", "晚上好", "嗨", "见到你"
-2. 夸奖/表扬 → shy: "你真聪明", "你很棒", "真厉害", "好可爱", "谢谢夸奖"
-3. 邀请互动 → playful: "陪我玩", "一起玩", "玩游戏", "来聊天", "讲故事"
-4. 疑问/思考 → thinking: "这是什么", "为什么", "怎么办", "如何", "不明白"
-5. 惊叹/兴奋 → surprised: "哇", "太棒了", "amazing", "不可思议", "没想到"
-6. 疲劳/困倦 → tired: "我累了", "好累", "想睡觉", "疲劳", "困了"
-7. 开心/搞笑 → laugh: "哈哈", "真有趣", "好笑", "太搞笑了", "好玩"
-8. 难过/沮丧 → sad: "我难过", "不开心", "伤心", "心情不好", "想哭"
-9. 求助/严肃 → serious: "帮帮我", "有问题", "需要帮助", "重要事情"
-10. 失望/无奈 → disappointed: "失败了", "算了", "没希望了", "放弃", "唉"
-11. 平静/休息 → relaxed: "晚安", "休息", "睡觉", "安静", "放松"
-12. 控制设备 → thinking: "打开摄像头", "关闭声音", "调节音量", "拍照"
-13. 轻微不满 → serious: "声音太大", "太吵了", "音量小点", "太亮了", "有点吵"
-14. 身体接触/玩闹 → playful: "摸摸头", "拍拍", "轻敲", "碰一下"
-15. 极度愤怒 → angry: 只有真正说到"气死了", "愤怒", "生气死了", "火大"时才用
+情绪映射详细规则（支持中英文）：
+1. 问候/打招呼 → happy: "你好", "早安", "晚上好", "嗨", "见到你" / "hello", "hi", "good morning", "good evening", "nice to meet you"
+2. 夸奖/表扬 → shy: "你真聪明", "你很棒", "真厉害", "好可爱", "谢谢夸奖" / "you're smart", "you're awesome", "amazing", "cute", "thank you"
+3. 邀请互动 → playful: "陪我玩", "一起玩", "玩游戏", "来聊天", "讲故事" / "let's play", "play with me", "let's chat", "tell me a story", "have fun"
+4. 疑问/思考 → thinking: "这是什么", "为什么", "怎么办", "如何", "不明白" / "what is this", "why", "how", "what should I do", "I don't understand"
+5. 惊叹/兴奋 → surprised: "哇", "太棒了", "amazing", "不可思议", "没想到" / "wow", "amazing", "incredible", "unbelievable", "fantastic"
+6. 疲劳/困倦 → tired: "我累了", "好累", "想睡觉", "疲劳", "困了" / "I'm tired", "so tired", "sleepy", "exhausted", "need rest"
+7. 开心/搞笑 → laugh: "哈哈", "真有趣", "好笑", "太搞笑了", "好玩" / "haha", "funny", "hilarious", "amusing", "that's funny"
+8. 难过/沮丧 → sad: "我难过", "不开心", "伤心", "心情不好", "想哭" / "I'm sad", "unhappy", "feel down", "depressed", "want to cry"
+9. 求助/严肃 → serious: "帮帮我", "有问题", "需要帮助", "重要事情" / "help me", "I need help", "there's a problem", "important", "serious"
+10. 失望/无奈 → disappointed: "失败了", "算了", "没希望了", "放弃", "唉" / "failed", "give up", "disappointed", "hopeless", "sigh"
+11. 平静/休息 → relaxed: "晚安", "休息", "睡觉", "安静", "放松" / "good night", "rest", "sleep", "quiet", "relax", "calm"
+12. 控制设备 → thinking: "打开摄像头", "关闭声音", "调节音量", "拍照" / "turn on camera", "turn off sound", "adjust volume", "take photo"
+13. 轻微不满 → serious: "声音太大", "太吵了", "音量小点", "太亮了", "有点吵" / "too loud", "too noisy", "volume down", "too bright", "noisy"
+14. 身体接触/玩闹 → playful: "摸摸头", "拍拍", "轻敲", "碰一下" / "pat head", "tap", "touch", "poke", "gentle tap"
+15. 极度愤怒 → angry: 只有真正说到"气死了", "愤怒", "生气死了", "火大"时才用 / "I'm furious", "really angry", "mad", "pissed off"

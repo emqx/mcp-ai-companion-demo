@@ -1,8 +1,9 @@
+import { useTranslation } from 'react-i18next'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Emotion {
   name: string
-  label: string
+  labelKey: string
 }
 
 interface EmotionSelectorProps {
@@ -11,30 +12,32 @@ interface EmotionSelectorProps {
 }
 
 const emotions: Emotion[] = [
-  { name: 'happy', label: '开心 Happy' },
-  { name: 'sad', label: '难过 Sad' },
-  { name: 'angry', label: '生气 Angry' },
-  { name: 'surprised', label: '惊讶 Surprised' },
-  { name: 'thinking', label: '思考 Thinking' },
-  { name: 'shy', label: '害羞 Shy' },
-  { name: 'relaxed', label: '放松 Relaxed' },
-  { name: 'playful', label: '调皮 Playful' },
-  { name: 'tired', label: '疲倦 Tired' },
-  { name: 'serious', label: '严肃 Serious' },
-  { name: 'disappointed', label: '失望 Disappointed' },
-  { name: 'laug', label: '大笑 Laughing' },
+  { name: 'happy', labelKey: 'emotion.happy' },
+  { name: 'sad', labelKey: 'emotion.sad' },
+  { name: 'angry', labelKey: 'emotion.angry' },
+  { name: 'surprised', labelKey: 'emotion.surprised' },
+  { name: 'thinking', labelKey: 'emotion.thinking' },
+  { name: 'shy', labelKey: 'emotion.shy' },
+  { name: 'relaxed', labelKey: 'emotion.relaxed' },
+  { name: 'playful', labelKey: 'emotion.playful' },
+  { name: 'tired', labelKey: 'emotion.tired' },
+  { name: 'serious', labelKey: 'emotion.serious' },
+  { name: 'disappointed', labelKey: 'emotion.disappointed' },
+  { name: 'laughing', labelKey: 'emotion.laughing' },
 ]
 
 export function EmotionSelector({ onEmotionSelect, selectedEmotion }: EmotionSelectorProps) {
+  const { t } = useTranslation()
+
   return (
     <Select value={selectedEmotion} onValueChange={onEmotionSelect}>
       <SelectTrigger className="w-48">
-        <SelectValue placeholder="选择表情" />
+        <SelectValue placeholder={t('emotion.placeholder')} />
       </SelectTrigger>
       <SelectContent>
         {emotions.map((emotion) => (
           <SelectItem key={emotion.name} value={emotion.name}>
-            {emotion.label}
+            {t(emotion.labelKey)}
           </SelectItem>
         ))}
       </SelectContent>

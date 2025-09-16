@@ -1,0 +1,65 @@
+{
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "connecting": "连接中...",
+    "notConnected": "未连接",
+    "clickToConnect": "点击连接",
+    "resetToDefault": "恢复默认"
+  },
+  "chat": {
+    "greeting": "你好，我是 EMQ 机器人，打开麦克风开始对话！",
+    "processing": "理解中...",
+    "waiting": "回复中...",
+    "listening": "我在听...",
+    "encourage": "鼓励了你一下，加油！！",
+    "tap": "敲打了你一下",
+    "instruction": "双击头像表示鼓励，单击头像表示敲打"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "mqtt": "MQTT 配置",
+    "broker": "服务器",
+    "webrtcIceServers": "WebRTC ICE Servers 配置",
+    "turnServerUrl": "TURN 服务器地址",
+    "turnUsername": "TURN 用户名",
+    "turnPassword": "TURN 密码",
+    "stunServerUrl": "STUN 服务器地址（可选，不设置将使用默认）",
+    "saveConfigTitle": "确认保存配置",
+    "saveConfigDesc": "保存配置将断开所有连接并刷新页面，确认继续？",
+    "resetConfigTitle": "确认恢复默认配置",
+    "resetConfigDesc": "恢复默认配置将断开所有连接并刷新页面，确认继续？",
+    "configSaved": "配置已保存，页面即将刷新",
+    "configReset": "已恢复默认配置，页面即将刷新"
+  },
+  "audio": {
+    "mute": "关闭扬声器",
+    "unmute": "开启扬声器",
+    "muteMic": "关闭麦克风",
+    "unmuteMic": "开启麦克风",
+    "muted": "音频已静音",
+    "unmuted": "音频已取消静音",
+    "volumeSet": "音量调至"
+  },
+  "video": {
+    "turnOn": "开启视频聊天",
+    "turnOff": "关闭视频聊天"
+  },
+  "emotion": {
+    "happy": "开心",
+    "sad": "难过",
+    "angry": "生气",
+    "surprised": "惊讶",
+    "thinking": "思考",
+    "shy": "害羞",
+    "relaxed": "放松",
+    "playful": "调皮",
+    "tired": "疲倦",
+    "serious": "严肃",
+    "disappointed": "失望",
+    "laughing": "大笑",
+    "placeholder": "选择表情"
+  }
+}

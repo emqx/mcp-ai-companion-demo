@@ -1,6 +1,7 @@
 import { useMcpMqttServer } from '@/hooks/useMcpMqttServer'
 import { useWebRTCMqtt } from '@/hooks/useWebRTCMqtt'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChatInterface } from '@/components/ChatInterface'
 import { appLogger, mqttLogger } from '@/utils/logger'
 import { capturePhotoFromVideo } from '@/utils/photo-capture'
@@ -11,6 +12,7 @@ import { defaultMqttConfig } from '@/config/mqtt'
 import { loadMqttConfig, saveMqttConfig, type MqttConfig } from '@/utils/storage'
 
 function App() {
+  const { t } = useTranslation()
   const [aiReplyText, setAiReplyText] = useState<string>('')
   const [llmLoading, setLlmLoading] = useState<'processing' | 'waiting' | null>()
   const [showVideo, setShowVideo] = useState<boolean>(false)
@@ -79,7 +81,7 @@ function App() {
       setVolume(newVolume)
       const volumePercent = Math.round(newVolume * 100)
       appLogger.info(`🔊 Volume set to ${volumePercent}%`)
-      toast(`音量调至 ${volumePercent}%`, {
+      toast(`${t('audio.volumeSet')} ${volumePercent}%`, {
         duration: 3000,
       })
     }
@@ -87,7 +89,7 @@ function App() {
     // Update muted state if provided
     if (muted !== undefined) {
       setIsMuted(muted)
-      const message = muted ? '音频已静音' : '音频已取消静音'
+      const message = muted ? t('audio.muted') : t('audio.unmuted')
       appLogger.info(`🔊 Audio ${muted ? 'muted' : 'unmuted'}`)
       toast(message, {
         duration: 3000,
