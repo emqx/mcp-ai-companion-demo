@@ -73,6 +73,7 @@ class ConversationWorkflow:
         self.mcp_client: Optional[McpMqttClient] = None
 
         logger.info("initialized")
+        self.tg = anyio.create_task_group()
 
     def _reinit_agents(self):
         """Simple reinit function when MCP tools are updated"""
@@ -88,7 +89,6 @@ class ConversationWorkflow:
 
     async def init_mcp(
         self,
-        tg: anyio.abc.TaskGroup,
         server_name_filter: str = "#",
         device_id: Optional[str] = None
     ):
@@ -114,7 +114,8 @@ class ConversationWorkflow:
         )
 
         # Start MCP
-        tg.start_soon(self.mcp_client.start)
+        await self.tg.__aenter__()
+        self.tg.start_soon(self.mcp_client.start)
 
         # Wait for connection
         connected = await self.mcp_client.connect()
