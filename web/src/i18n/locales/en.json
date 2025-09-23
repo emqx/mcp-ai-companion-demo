@@ -1,0 +1,65 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "connecting": "Connecting...",
+    "notConnected": "Not connected",
+    "clickToConnect": "Click to connect",
+    "resetToDefault": "Reset to Default"
+  },
+  "chat": {
+    "greeting": "Hello, I'm EMQ Robot, turn on the microphone to start talking!",
+    "processing": "Processing...",
+    "waiting": "Responding...",
+    "listening": "I'm listening...",
+    "encourage": "Encouraged you, keep going!!",
+    "tap": "Tapped you gently",
+    "instruction": "Double-click avatar to encourage, single-click to tap"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "mqtt": "MQTT Configuration",
+    "broker": "Broker",
+    "webrtcIceServers": "WebRTC ICE Servers Configuration",
+    "turnServerUrl": "TURN Server URL",
+    "turnUsername": "TURN Username",
+    "turnPassword": "TURN Password",
+    "stunServerUrl": "STUN Server URL (Optional, default will be used if not set)",
+    "saveConfigTitle": "Confirm Save Configuration",
+    "saveConfigDesc": "Saving configuration will disconnect all connections and refresh the page, continue?",
+    "resetConfigTitle": "Confirm Reset to Default Configuration",
+    "resetConfigDesc": "Resetting to default will disconnect all connections and refresh the page, continue?",
+    "configSaved": "Configuration saved, page will refresh shortly",
+    "configReset": "Reset to default configuration, page will refresh shortly"
+  },
+  "audio": {
+    "mute": "Mute Speaker",
+    "unmute": "Unmute Speaker",
+    "muteMic": "Mute Microphone",
+    "unmuteMic": "Unmute Microphone",
+    "muted": "Audio muted",
+    "unmuted": "Audio unmuted",
+    "volumeSet": "Volume set to"
+  },
+  "video": {
+    "turnOn": "Turn on video chat",
+    "turnOff": "Turn off video chat"
+  },
+  "emotion": {
+    "happy": "Happy",
+    "sad": "Sad",
+    "angry": "Angry",
+    "surprised": "Surprised",
+    "thinking": "Thinking",
+    "shy": "Shy",
+    "relaxed": "Relaxed",
+    "playful": "Playful",
+    "tired": "Tired",
+    "serious": "Serious",
+    "disappointed": "Disappointed",
+    "laughing": "Laughing",
+    "placeholder": "Select emotion"
+  }
+}

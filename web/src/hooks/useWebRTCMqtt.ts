@@ -6,7 +6,7 @@ import { webrtcLogger } from '@/utils/logger'
 import { buildIceServers, ensureIceServersConfig } from '@/utils/ice-servers'
 
 export interface UseWebRTCMqttOptions extends Omit<UseWebRTCOptions, 'signalingId'> {
-  mqttClient?: BaseMqttClient | null // Accept external MQTT client
+  mqttClient?: BaseMqttClient | null // Accept external MQTT client (including MCP SDK client)
 }
 
 export function useWebRTCMqtt({

@@ -17,11 +17,3 @@ export const defaultMediaConstraints: MediaConstraints = {
     channelCount: 2,
   },
 }
-
-export const voiceTypes = [
-  { id: 'default', name: '默认', icon: '🎤' },
-  { id: 'male', name: '男声', icon: '👨' },
-  { id: 'female', name: '女声', icon: '👩' },
-  { id: 'child', name: '童声', icon: '👶' },
-  { id: 'elder', name: '长者', icon: '👴' },
-]

@@ -1,8 +1,9 @@
 import { Mic, Volume2, Camera } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { EmotionAnimation } from './EmotionAnimation'
 // import { EmotionSelector } from './EmotionSelector'
 import { ChatMessages } from './ChatMessages'
-import { NetworkSettings } from './NetworkSettings'
+import { Settings } from './Settings'
 import { useAudioPlaying } from '@/hooks/useAudioPlaying'
 import { useEffect, useRef, type RefObject } from 'react'
 import type { MqttConfig } from '@/utils/storage'
@@ -62,6 +63,7 @@ export function ChatInterface({
   onMqttConfigChange,
   onSendMessage,
 }: ChatInterfaceProps) {
+  const { t } = useTranslation()
   const isSpeaking = useAudioPlaying(audioRef, 1000)
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -71,8 +73,8 @@ export function ChatInterface({
       return
     }
     const interactionMap = {
-      encourage: '鼓励了你一下，加油！！',
-      tap: '敲打了你一下',
+      encourage: t('chat.encourage'),
+      tap: t('chat.tap'),
     }
 
     const message = JSON.stringify({
@@ -127,7 +129,7 @@ export function ChatInterface({
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">
       <div className="fixed top-4 right-4 flex items-center gap-2">
-        <NetworkSettings config={mqttConfig} onConfigChange={onMqttConfigChange} isConnected={isMqttConnected} />
+        <Settings config={mqttConfig} onConfigChange={onMqttConfigChange} isConnected={isMqttConnected} />
         {/*<EmotionSelector
           selectedEmotion={selectedEmotion}
           onEmotionSelect={setSelectedEmotion}
@@ -177,7 +179,7 @@ export function ChatInterface({
             {!webrtc.isConnected && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50">
                 <div className="text-white text-center">
-                  <p className="mb-2">{webrtc.isConnecting ? '连接中...' : '未连接'}</p>
+                  <p className="mb-2">{webrtc.isConnecting ? t('common.connecting') : t('common.notConnected')}</p>
                   {webrtc.error && <p className="text-sm text-red-300">{webrtc.error.message}</p>}
                 </div>
               </div>
@@ -210,12 +212,12 @@ export function ChatInterface({
             }`}
             title={
               webrtc.isConnecting
-                ? '连接中...'
+                ? t('common.connecting')
                 : !webrtc.isConnected
-                  ? '点击连接'
+                  ? t('common.clickToConnect')
                   : webrtc.isAudioEnabled
-                    ? '关闭麦克风'
-                    : '开启麦克风'
+                    ? t('audio.muteMic')
+                    : t('audio.unmuteMic')
             }
           >
             <Mic
@@ -244,7 +246,7 @@ export function ChatInterface({
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
               !isMuted ? 'bg-button-active' : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
-            title={isMuted ? '开启扬声器' : '关闭扬声器'}
+            title={isMuted ? t('audio.unmute') : t('audio.mute')}
           >
             <Volume2 className={`w-6 h-6 ${!isMuted ? 'text-button-active' : 'text-[#343741]'}`} />
           </button>
@@ -263,7 +265,7 @@ export function ChatInterface({
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
               showVideo ? 'bg-button-active' : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
-            title={showVideo ? '关闭视频聊天' : '开启视频聊天'}
+            title={showVideo ? t('video.turnOff') : t('video.turnOn')}
           >
             <Camera className={`w-6 h-6 ${showVideo ? 'text-button-active' : 'text-[#343741]'}`} />
           </button>
@@ -271,7 +273,7 @@ export function ChatInterface({
 
         <div className="text-center mt-4">
           <p className="text-sm" style={{ color: '#707070' }}>
-            双击头像表示鼓励，单击头像表示敲打
+            {t('chat.instruction')}
           </p>
         </div>
       </div>
