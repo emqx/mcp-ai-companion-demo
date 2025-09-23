@@ -1,6 +1,6 @@
 # Hardware Intelligence Agent Demo Project
 
-[中文版](./README-zh.md)
+[中文](./README-zh.md)
 
 A hardware intelligence agent demo project based on EMQX MCP, Agent, LLM, VLM, ASR, and TTS technologies. Suitable for applications such as emotional companion toys, smart appliances, smart homes, and embodied intelligence.
 
@@ -27,11 +27,30 @@ This project implements a fully functional intelligent agent that enables users 
 
 ## Quick Start
 
+1. Download the repository code
+
 ```shell
-git clone git@github.com:mqtt-ai/mcp-ai-companion-demo.git
+git clone https://github.com/emqx/mcp-ai-companion-demo.git
 cd mcp-ai-companion-demo
-# todo ...
 ```
+
+2. Add `DASHSCOPE_API_KEY`
+
+Please add your `DASHSCOPE_API_KEY` in `docker/.env`:
+
+```env
+DASHSCOPE_API_KEY=your_dashscope_api_key
+```
+
+3. Start the services
+
+```shell
+docker compose -f docker/docker-compose.yml up -d
+```
+
+4. Access the frontend interface
+
+Open your browser and visit `http://localhost:4000/demo` to see the demo app's frontend interface.
 
 ## Project Structure
 

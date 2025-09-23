@@ -25,11 +25,30 @@
 
 ## 快速开始
 
+1. 下载仓库代码
+
 ```shell
-git clone git@github.com:mqtt-ai/mcp-ai-companion-demo.git
+git clone https://github.com/emqx/mcp-ai-companion-demo.git
 cd mcp-ai-companion-demo
-# todo ...
 ```
+
+2. 添加 `DASHSCOPE_API_KEY`
+
+请在 `docker/.env` 中添加您的 `DASHSCOPE_API_KEY`:
+
+```env
+DASHSCOPE_API_KEY=your_dashscope_api_key
+```
+
+3. 启动服务
+
+```shell
+docker compose -f docker/docker-compose.yml up -d
+```
+
+4. 访问前端界面
+
+打开浏览器，访问 `http://localhost:4000/demo`，即可看到 demo 应用的前端界面。
 
 ## 项目结构
 
