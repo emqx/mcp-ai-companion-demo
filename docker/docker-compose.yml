@@ -1,0 +1,96 @@
+########
+services:
+  postgres:
+    image: postgres:17.6-alpine3.22
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: my_app_dev
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - media_server_network
+
+  media_server:
+    image: emqx/media-server:latest
+    container_name: media_server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ## Database
+      DATABASE_URL: "ecto://postgres:postgres@postgres:5432/my_app_dev"
+      ## Phoenix
+      PHX_HOST: "localhost"
+      PHX_PORT: 4000
+      HTTP_PORT: 4000
+      #HTTPS_PORT: 443
+      SECRET_KEY_BASE: "Ozdvq+mFfwQDdfjpCPail0xnXazUFTltsEliRlASV39ENQue6NZ3WZg6mx/xIlAO"
+      ## Multimedia Proxy
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
+      MQTT_BROKER_HOST: "node1.emqx.com"
+      # Only enable SSL if you have valid certs
+      #APP_SSL_KEY_PATH: /etc/letsencrypt/live/demo.emqx.com/privkey.pem
+      #APP_SSL_CERT_PATH: /etc/letsencrypt/live/demo.emqx.com/fullchain.pem
+      ## TURN Server
+      #TURN_SERVER_URL: "turn:demo.emqx.com:13478"
+      #TURN_SERVER_USERNAME: ${TURN_SERVER_USERNAME}
+      #TURN_SERVER_CREDENTIAL: ${TURN_SERVER_CREDENTIAL}
+    env_file:
+      - .env
+    ports:
+      - "4000:4000"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - media_server_network
+
+  emqx:
+    image: emqx/emqx:5.8.8
+    container_name: emqx
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - "EMQX_NODE_NAME=emqx@node1.emqx.com"
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
+      interval: 5s
+      timeout: 25s
+      retries: 5
+    networks:
+      media_server_network:
+        aliases:
+          - node1.emqx.com
+    # Only enable SSL if you have valid certs
+    # volumes:
+    #   - ./certs/cacert.pem:/opt/emqx/etc/certs/cacert.pem
+    #   - ./certs/cert.pem:/opt/emqx/etc/certs/cert.pem
+    #   - ./certs/key.pem:/opt/emqx/etc/certs/key.pem
+    ports:
+      - 1883:1883
+      - 8083:8083
+      - 8084:8084
+      - 8883:8883
+      - 18083:18083
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  media_server_network:
+    driver: bridge
