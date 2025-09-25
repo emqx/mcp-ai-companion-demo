@@ -90,24 +90,31 @@ export function ChatInterface({
   }
 
   useEffect(() => {
-    if (webrtc.remoteStream) {
-      // Auto unmute when RTC connection is established
-      if (isMuted) {
+    // Use remote stream for both audio and video display
+    const currentStream = webrtc.remoteStream
+
+    if (currentStream) {
+      appLogger.info('🎥 Using remote WebRTC stream for media display')
+
+      // Auto unmute when stream is available
+      if (isMuted && webrtc.remoteStream) {
         setIsMuted(false)
+        appLogger.info('🔊 Auto unmuted due to remote stream availability')
       }
 
-      if (audioRef.current) {
+      if (audioRef.current && webrtc.remoteStream) {
+        // Use remote stream for audio
         audioRef.current.srcObject = webrtc.remoteStream
-        // Apply volume and mute state to audio element
         audioRef.current.volume = volume
-        audioRef.current.muted = false // Auto unmute for RTC stream
+        audioRef.current.muted = false
+        appLogger.info('🔊 Remote stream connected to audio element')
       }
 
       if (showVideo && videoRef?.current) {
-        videoRef.current.srcObject = webrtc.remoteStream
-        // Also apply volume and mute state to video element
+        videoRef.current.srcObject = currentStream
         videoRef.current.volume = volume
-        videoRef.current.muted = false // Auto unmute for RTC stream
+        videoRef.current.muted = false
+        appLogger.info('📺 Remote stream connected to video element')
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -252,9 +259,10 @@ export function ChatInterface({
           </button>
 
           <button
-            onClick={() => {
+            onClick={async () => {
               if (!showVideo) {
                 setShowVideo(true)
+                // Connect WebRTC if needed
                 if (isMqttConnected && !webrtc.isConnected && !webrtc.isConnecting) {
                   webrtc.connect()
                 }
