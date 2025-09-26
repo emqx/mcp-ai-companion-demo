@@ -1,10 +1,10 @@
 import { useMcpMqttServer } from '@/hooks/useMcpMqttServer'
 import { useWebRTCMqtt } from '@/hooks/useWebRTCMqtt'
+import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChatInterface } from '@/components/ChatInterface'
 import { appLogger, mqttLogger } from '@/utils/logger'
-import { capturePhotoFromVideo } from '@/utils/photo-capture'
 import type { PhotoCaptureResult } from '@/tools/types'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
@@ -45,35 +45,17 @@ function App() {
     setSelectedEmotion(emotion)
   }, [])
 
-  const onTakePhoto = useCallback(async (source: 'local' | 'remote', quality: number): Promise<PhotoCaptureResult> => {
-    appLogger.info(`📸 Taking photo: source=${source}, quality=${quality}`)
-    if (!videoRef.current) {
-      setShowVideo(true)
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500)) // Wait for video to be ready
-    if (!videoRef?.current?.videoWidth || !videoRef?.current?.videoHeight) {
-      throw new Error('Video not ready for capture')
-    }
-    const result = await capturePhotoFromVideo(videoRef.current, source, {
-      quality,
-      upload: {
-        url: '/api/upload',
-        formFieldName: 'file',
-      },
-    })
+  const { captureFromLocalCamera } = usePhotoCapture()
 
-    appLogger.info(`📸 Photo captured successfully: ${result.filename}`)
-
-    // Auto close camera after successful capture with delay
-    if (result.blob) {
-      appLogger.info('📷 Camera auto-closed after photo capture')
-      setTimeout(() => {
-        setShowVideo(false)
-        appLogger.info('📷 Camera auto-closed after photo capture')
-      }, 3500)
-    }
-    return result
-  }, [])
+  // Photo capture function that always uses local camera
+  const onTakePhoto = useCallback(
+    async (source: 'local' | 'remote', quality: number): Promise<PhotoCaptureResult> => {
+      appLogger.info(`📸 Taking photo: source=${source}, quality=${quality}`)
+      // Always use local camera for photo capture regardless of source parameter
+      return await captureFromLocalCamera(quality)
+    },
+    [captureFromLocalCamera],
+  )
 
   const onVolumeControl = useCallback((newVolume?: number, muted?: boolean) => {
     // Update volume if provided (0.0 to 1.0)
@@ -114,6 +96,7 @@ function App() {
     // TODO: Reconnect MQTT with new config
   }, [])
 
+  // Temporarily use original callback - will be updated after enhancedOnTakePhoto is defined
   const callbacks = useMemo(
     () => ({
       onCameraControl,
@@ -202,6 +185,7 @@ function App() {
   }, [isWebRTCConnected])
 
   // Cleanup WebRTC when component unmounts
+
   useEffect(() => {
     return () => {
       if (cleanupWebRTC) {

@@ -35,10 +35,7 @@ const languages = [
   { code: 'zh', name: '中文' },
 ]
 
-const voiceOptions = [
-  { value: 'longhua_v2', name: 'Longhua V2 (Chinese)' },
-  { value: 'loongluna_v2', name: 'Loongluna V2 (English)' },
-]
+const voiceOptions = [{ value: 'longhua_v2', name: 'Longhua V2 (Chinese)' }]
 
 export function Settings({ config, onConfigChange, className }: SettingsProps) {
   const { t, i18n } = useTranslation()
@@ -90,11 +87,6 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
 
   const handleLanguageChange = (newLanguage: string) => {
     setTempLanguage(newLanguage)
-    if (newLanguage === 'en') {
-      setTempVoice('loongluna_v2')
-    } else if (newLanguage === 'zh') {
-      setTempVoice('longhua_v2')
-    }
   }
 
   const handleSave = () => {
