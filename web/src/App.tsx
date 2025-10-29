@@ -87,7 +87,7 @@ function App() {
         audioRef.current.muted = muted
       }
     }
-  }, [])
+  }, [t])
 
   const onMqttConfigChange = useCallback((newConfig: MqttConfig) => {
     setMqttConfig(newConfig)
