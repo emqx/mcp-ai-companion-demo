@@ -43,6 +43,9 @@ This Web UI acts as an **MCP Server** that exposes hardware control functionalit
 ## Setup
 
 ```bash
+# Copy environment variables
+cp .env.example .env
+
 # Install dependencies
 pnpm install
 
@@ -51,6 +54,30 @@ pnpm dev
 
 # Build for production  
 pnpm build
+```
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_AIGC_PROXY_HOST` | `http://localhost:3001` | Bun voice proxy (`volc-server`) address used to fetch scene config and Start/StopVoiceChat |
+
+> If the Bun service runs on a different host or port, update this value in `.env`.
+
+## AIGC Voice Proxy Integration
+
+- `src/api/` wraps communication with the Bun `volc-server`:
+  - `fetchScenes` -> `POST /getScenes`
+  - `startVoiceChat` / `stopVoiceChat` -> `POST /proxy?Action=...`
+- Type definitions live in `src/types/aigc.ts`; from there you can connect Zustand state and the UI.
+
+After you start `volc-server`, you can verify with the following commands:
+
+```bash
+curl -X POST "$VITE_AIGC_PROXY_HOST/getScenes"
+curl -X POST "$VITE_AIGC_PROXY_HOST/proxy?Action=StartVoiceChat" \
+  -H 'Content-Type: application/json' \
+  -d '{"SceneID":"emq-mcp-ai-companion"}'
 ```
 
 ## MCP over MQTT Integration
