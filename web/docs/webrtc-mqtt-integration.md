@@ -1,93 +1,93 @@
 # WebRTC over MQTT Integration Guide
 
-## 概述
+## Overview
 
-本项目实现了 WebRTC over MQTT 的完整集成，通过 MQTT 作为信令通道，实现浏览器与后端的音视频通信。
+This project implements a complete WebRTC over MQTT integration, using MQTT as the signaling channel to enable audio and video communication between browsers and the backend.
 
-## 实现原理
+## Implementation Principles
 
-### WebRTC 基础原理
+### WebRTC Fundamentals
 
-WebRTC (Web Real-Time Communication) 是一个开放标准，允许浏览器之间进行点对点的音视频通信。但 WebRTC 建立连接需要信令交换过程：
+WebRTC (Web Real-Time Communication) is an open standard that allows peer-to-peer audio and video communication between browsers. However, establishing WebRTC connections requires a signaling exchange process:
 
-1. **信令交换 (Signaling)**：交换 SDP (Session Description Protocol) 和 ICE (Interactive Connectivity Establishment) 候选者
-2. **NAT 穿透**：通过 STUN/TURN 服务器处理网络地址转换
-3. **媒体传输**：建立直接的 P2P 连接传输音视频数据
+1. **Signaling**: Exchange SDP (Session Description Protocol) and ICE (Interactive Connectivity Establishment) candidates
+2. **NAT Traversal**: Handle network address translation through STUN/TURN servers
+3. **Media Transmission**: Establish direct P2P connections for audio/video data transmission
 
-### MQTT 作为信令通道的优势
+### Advantages of MQTT as Signaling Channel
 
-传统的 WebRTC 信令通常使用 WebSocket，但使用 MQTT 有以下优势：
+Traditional WebRTC signaling typically uses WebSocket, but using MQTT offers the following advantages:
 
-1. **低延迟**：MQTT 协议专为物联网设计，延迟更低
-2. **可靠性**：支持 QoS 质量保证和消息重传
-3. **扩展性**：broker 架构支持大规模设备连接
-4. **统一协议**：与 MCP over MQTT 共用同一套基础设施
+1. **Low Latency**: MQTT protocol is designed for IoT with lower latency
+2. **Reliability**: Supports QoS guarantees and message retransmission
+3. **Scalability**: Broker architecture supports large-scale device connections
+4. **Unified Protocol**: Shares the same infrastructure with MCP over MQTT
 
-### 信令交换流程
+### Signaling Exchange Flow
 
 ```mermaid
 sequenceDiagram
-    participant Browser as 浏览器
+    participant Browser as Browser
     participant MQTT as MQTT Broker
-    participant Backend as 后端服务
-    
-    Browser->>MQTT: 1. 连接 MQTT (ws://localhost:8083)
-    Backend->>MQTT: 2. 连接 MQTT (tcp://localhost:1883)
-    
-    Browser->>MQTT: 3. 订阅 $webrtc/{client-id}
-    Backend->>MQTT: 4. 订阅 $webrtc/+/multimedia_proxy
-    
-    Browser->>Browser: 5. getUserMedia() 获取摄像头/麦克风
-    Browser->>Browser: 6. 创建 RTCPeerConnection
-    Browser->>Browser: 7. createOffer() 生成 SDP offer
-    Browser->>MQTT: 8. 发布 offer 到 $webrtc/{client-id}/multimedia_proxy
-    
-    MQTT->>Backend: 9. 转发 offer
-    Backend->>Backend: 10. 创建 WebRTC pipeline
-    Backend->>Backend: 11. createAnswer() 生成 SDP answer
-    Backend->>MQTT: 12. 发布 answer 到 $webrtc/{client-id}
-    
-    MQTT->>Browser: 13. 转发 answer
+    participant Backend as Backend Service
+
+    Browser->>MQTT: 1. Connect to MQTT (ws://localhost:8083)
+    Backend->>MQTT: 2. Connect to MQTT (tcp://localhost:1883)
+
+    Browser->>MQTT: 3. Subscribe to $webrtc/{client-id}
+    Backend->>MQTT: 4. Subscribe to $webrtc/+/multimedia_proxy
+
+    Browser->>Browser: 5. getUserMedia() get camera/microphone
+    Browser->>Browser: 6. Create RTCPeerConnection
+    Browser->>Browser: 7. createOffer() generate SDP offer
+    Browser->>MQTT: 8. Publish offer to $webrtc/{client-id}/multimedia_proxy
+
+    MQTT->>Backend: 9. Forward offer
+    Backend->>Backend: 10. Create WebRTC pipeline
+    Backend->>Backend: 11. createAnswer() generate SDP answer
+    Backend->>MQTT: 12. Publish answer to $webrtc/{client-id}
+
+    MQTT->>Browser: 13. Forward answer
     Browser->>Browser: 14. setRemoteDescription(answer)
-    
-    Note over Browser,Backend: ICE 候选者交换
-    Browser->>MQTT: 15. 发布 ICE candidates
-    Backend->>MQTT: 16. 发布 ICE candidates
-    
-    Note over Browser,Backend: WebRTC 连接建立
-    Browser<-->Backend: 17. 直接 P2P 音视频传输
+
+    Note over Browser,Backend: ICE candidate exchange
+    Browser->>MQTT: 15. Publish ICE candidates
+    Backend->>MQTT: 16. Publish ICE candidates
+
+    Note over Browser,Backend: WebRTC connection established
+    Browser<-->Backend: 17. Direct P2P audio/video transmission
 ```
 
-### 双协议架构原理
+### Dual Protocol Architecture
 
-项目采用双协议设计，避免协议冲突：
+The project uses a dual protocol design to avoid protocol conflicts:
 
-#### MCP over MQTT 协议栈
+#### MCP over MQTT Protocol Stack
 
 ```shell
-应用层: 硬件控制命令 (Camera ON/OFF, Emotion Change)
-协议层: MCP (Model Context Protocol) 
-传输层: MQTT 5.0 with User Properties
-网络层: WebSocket (ws://localhost:8083/mqtt)
+Application Layer: Hardware control commands (Camera ON/OFF, Emotion Change)
+Protocol Layer: MCP (Model Context Protocol)
+Transport Layer: MQTT 5.0 with User Properties
+Network Layer: WebSocket (ws://localhost:8083/mqtt)
 ```
 
-#### WebRTC over MQTT 协议栈  
+#### WebRTC over MQTT Protocol Stack
 
 ```shell
-应用层: 音视频数据流
-协议层: WebRTC (SDP/ICE signaling)
-传输层: MQTT 5.0 (纯消息传递)
-网络层: WebSocket (ws://localhost:8083/mqtt)
+Application Layer: Audio/video data streams
+Protocol Layer: WebRTC (SDP/ICE signaling)
+Transport Layer: MQTT 5.0 (pure message passing)
+Network Layer: WebSocket (ws://localhost:8083/mqtt)
 ```
 
-### 连接管理原理
+### Connection Management
 
-#### 独立连接设计
+#### Independent Connection Design
 
-每个协议使用独立的 MQTT 客户端连接：
+Each protocol uses an independent MQTT client connection:
 
 ```typescript
-// MCP 连接
+// MCP connection
 const mcpClient = mqtt.connect(brokerUrl, {
   clientId: 'mcp-ai-web-ui-random',
   protocolVersion: 5,
@@ -98,113 +98,113 @@ const mcpClient = mqtt.connect(brokerUrl, {
   }
 })
 
-// WebRTC 连接
+// WebRTC connection
 const webrtcClient = mqtt.connect(brokerUrl, {
   clientId: 'webrtc_client_random',
   protocolVersion: 5,
-  // 无特殊属性，标准 MQTT 连接
+  // No special properties, standard MQTT connection
 })
 ```
 
-#### 生命周期管理
+#### Lifecycle Management
 
-使用 React Hooks 模式管理连接生命周期：
+Using React Hooks pattern to manage connection lifecycle:
 
-1. **初始化阶段**：创建 MQTT 客户端和 WebRTC peer connection
-2. **连接阶段**：建立 MQTT 连接，订阅必要主题
-3. **信令阶段**：交换 SDP 和 ICE 候选者
-4. **通信阶段**：P2P 音视频传输
-5. **清理阶段**：断开所有连接，释放媒体资源
+1. **Initialization Phase**: Create MQTT client and WebRTC peer connection
+2. **Connection Phase**: Establish MQTT connection, subscribe to necessary topics
+3. **Signaling Phase**: Exchange SDP and ICE candidates
+4. **Communication Phase**: P2P audio/video transmission
+5. **Cleanup Phase**: Disconnect all connections, release media resources
 
-### 关键技术原理
+### Key Technical Principles
 
-#### 1. MQTT 5.0 协议特性
+#### 1. MQTT 5.0 Protocol Features
 
-- **User Properties**：MCP 使用自定义属性标识组件类型
-- **Clean Session**：确保连接干净，不保留会话状态
-- **Will Message**：连接意外断开时的遗言消息
-- **Retain Flag**：MCP 服务器在线通知使用 retain 确保新连接的客户端能收到
+- **User Properties**: MCP uses custom properties to identify component types
+- **Clean Session**: Ensures clean connections without preserving session state
+- **Will Message**: Last will message sent when connection unexpectedly disconnects
+- **Retain Flag**: MCP server online notifications use retain to ensure newly connected clients receive them
 
-#### 2. WebRTC 信令同步机制
+#### 2. WebRTC Signaling Synchronization
 
-- **异步信令**：offer/answer 通过 MQTT 异步交换
-- **ICE 收集**：onicecandidate 事件触发后立即通过 MQTT 发送
-- **状态同步**：connection state 变化通过回调同步到 React 状态
+- **Asynchronous Signaling**: offer/answer exchanged asynchronously via MQTT
+- **ICE Collection**: Immediately send via MQTT when onicecandidate event triggers
+- **State Synchronization**: Connection state changes synchronized to React state via callbacks
 
-#### 3. 媒体流处理原理
+#### 3. Media Stream Processing
 
 ```typescript
-// 本地流获取
+// Local stream acquisition
 const localStream = await navigator.mediaDevices.getUserMedia(constraints)
 
-// 添加到 peer connection
+// Add to peer connection
 for (const track of localStream.getTracks()) {
   pc.addTrack(track, localStream)
 }
 
-// 接收远程流
+// Receive remote stream
 pc.ontrack = (event) => {
   const remoteStream = new MediaStream()
   remoteStream.addTrack(event.track)
 }
 ```
 
-#### 4. React 状态管理原理
+#### 4. React State Management
 
-- **useRef**：存储不变的连接实例，避免重复创建
-- **useState**：管理连接状态和错误状态
-- **useCallback**：缓存函数，避免不必要的重新渲染
-- **useEffect**：处理副作用和清理逻辑
+- **useRef**: Store immutable connection instances, avoid repeated creation
+- **useState**: Manage connection state and error state
+- **useCallback**: Cache functions, avoid unnecessary re-renders
+- **useEffect**: Handle side effects and cleanup logic
 
-#### 5. 错误处理和重连机制
+#### 5. Error Handling and Reconnection
 
 ```typescript
-// MQTT 自动重连
-reconnectPeriod: 1000, // 1秒后重连
+// MQTT automatic reconnection
+reconnectPeriod: 1000, // Reconnect after 1 second
 
-// WebRTC 连接失败处理
+// WebRTC connection failure handling
 pc.onconnectionstatechange = () => {
   if (pc.connectionState === 'failed') {
-    // 触发重新建立连接
+    // Trigger reconnection
     this.handleError(new Error('Connection failed'))
   }
 }
 
-// 超时保护
-const timeoutPromise = new Promise((_, reject) => 
+// Timeout protection
+const timeoutPromise = new Promise((_, reject) =>
   setTimeout(() => reject(new Error('Operation timeout')), 5000)
 )
 await Promise.race([operation, timeoutPromise])
 ```
 
-## 架构设计
+## Architecture Design
 
-### 双协议系统
+### Dual Protocol System
 
-项目同时运行两个独立的 MQTT 连接：
+The project simultaneously runs two independent MQTT connections:
 
-1. **MCP over MQTT** - 用于硬件控制（摄像头、表情切换）
-2. **WebRTC over MQTT** - 用于音视频流传输信令
+1. **MCP over MQTT** - For hardware control (camera, emotion switching)
+2. **WebRTC over MQTT** - For audio/video stream transmission signaling
 
-### 系统组件
+### System Components
 
 ```shell
 Frontend (React)
 ├── MCP MQTT Client (useMcpMqttServer)
-│   ├── 主题: $mcp-server/{server-id}/{server-name}
-│   └── 功能: 硬件控制、工具调用
+│   ├── Topics: $mcp-server/{server-id}/{server-name}
+│   └── Functions: Hardware control, tool invocation
 └── WebRTC MQTT Client (useWebRTCMqtt)
-    ├── 订阅: $webrtc/{client-id}
-    ├── 发布: $webrtc/{client-id}/multimedia_proxy
-    └── 功能: 音视频信令交换
+    ├── Subscribes: $webrtc/{client-id}
+    ├── Publishes: $webrtc/{client-id}/multimedia_proxy
+    └── Functions: Audio/video signaling exchange
 ```
 
-## 配置系统
+## Configuration System
 
-### 统一配置文件 (`src/config/mqtt.ts`)
+### Unified Configuration File (`src/config/mqtt.ts`)
 
 ```typescript
-// 基础 MQTT 配置
+// Basic MQTT configuration
 export const defaultMqttConfig = {
   brokerUrl: 'ws://localhost:8083/mqtt',
   username: 'emqx-mcp-webrtc-web-ui',
@@ -214,75 +214,75 @@ export const defaultMqttConfig = {
   protocolVersion: 5
 }
 
-// MCP 服务器配置
+// MCP server configuration
 export const mcpServerConfig = {
   ...defaultMqttConfig,
   serverId: 'web-ui-hardware-server',
   serverName: 'web-ui-hardware-controller'
 }
 
-// WebRTC 客户端配置
+// WebRTC client configuration
 export const webrtcClientConfig = {
   ...defaultMqttConfig
-  // 使用相同 broker，独立连接
+  // Use same broker, independent connection
 }
 ```
 
-## WebRTC 集成使用
+## WebRTC Integration Usage
 
-### 1. Hook 使用 (`useWebRTCMqtt`)
+### 1. Hook Usage (`useWebRTCMqtt`)
 
 ```typescript
 import { useWebRTCMqtt } from '@/hooks/useWebRTCMqtt'
 
 const {
-  localStream,           // 本地媒体流
-  remoteStream,          // 远程媒体流
-  connectionState,       // 连接状态
-  mqttConnected,        // MQTT 连接状态
-  isConnecting,         // 是否连接中
-  isConnected,          // 是否已连接
-  error,                // 错误信息
-  connect,              // 连接函数
-  disconnect,           // 断开函数
-  toggleAudio,          // 音频开关
-  toggleVideo,          // 视频开关
-  isAudioEnabled,       // 音频状态
-  isVideoEnabled        // 视频状态
+  localStream,           // Local media stream
+  remoteStream,          // Remote media stream
+  connectionState,       // Connection state
+  mqttConnected,        // MQTT connection state
+  isConnecting,         // Is connecting
+  isConnected,          // Is connected
+  error,                // Error information
+  connect,              // Connect function
+  disconnect,           // Disconnect function
+  toggleAudio,          // Audio toggle
+  toggleVideo,          // Video toggle
+  isAudioEnabled,       // Audio state
+  isVideoEnabled        // Video state
 } = useWebRTCMqtt({
-  autoConnect: false,   // 手动控制连接
+  autoConnect: false,   // Manual connection control
   onASRResponse: (text) => console.log('ASR:', text)
 })
 ```
 
-### 2. 连接流程
+### 2. Connection Flow
 
 ```typescript
-// 1. 确保 MQTT 连接成功
+// 1. Ensure MQTT connection is successful
 if (isMqttConnected) {
-  // 2. 启动 WebRTC 连接
+  // 2. Start WebRTC connection
   await connect()
-  
-  // 3. 连接状态监听
+
+  // 3. Connection state monitoring
   useEffect(() => {
     if (isConnected) {
-      console.log('WebRTC 连接成功')
+      console.log('WebRTC connection successful')
     }
   }, [isConnected])
 }
 ```
 
-### 3. 媒体流处理
+### 3. Media Stream Handling
 
 ```typescript
-// 本地流（摄像头/麦克风）
+// Local stream (camera/microphone)
 useEffect(() => {
   if (localStream && localVideoRef.current) {
     localVideoRef.current.srcObject = localStream
   }
 }, [localStream])
 
-// 远程流（来自后端）
+// Remote stream (from backend)
 useEffect(() => {
   if (remoteStream) {
     if (audioRef.current) {
@@ -295,17 +295,17 @@ useEffect(() => {
 }, [remoteStream, showVideo])
 ```
 
-## MQTT 主题规范
+## MQTT Topic Specifications
 
-### WebRTC 信令主题
+### WebRTC Signaling Topics
 
-| 主题类型 | 格式 | 方向 | 说明 |
-|---------|------|------|------|
-| 接收信令 | `$webrtc/{client-id}` | Backend→Frontend | 接收 answer、ICE candidates |
-| 发送信令 | `$webrtc/{client-id}/multimedia_proxy` | Frontend→Backend | 发送 offer、ICE candidates |
-| ASR/TTS | `$message/{client-id}` | 双向 | 语音识别和合成消息 |
+| Topic Type | Format | Direction | Description |
+|------------|-------|-----------|-------------|
+| Receive Signaling | `$webrtc/{client-id}` | Backend→Frontend | Receive answer, ICE candidates |
+| Send Signaling | `$webrtc/{client-id}/multimedia_proxy` | Frontend→Backend | Send offer, ICE candidates |
+| ASR/TTS | `$message/{client-id}` | Bidirectional | Speech recognition and synthesis messages |
 
-### 信令消息格式
+### Signaling Message Formats
 
 ```typescript
 // SDP Offer
@@ -319,7 +319,7 @@ useEffect(() => {
 
 // SDP Answer
 {
-  type: "sdp_answer", 
+  type: "sdp_answer",
   data: {
     sdp: "<SDP payload>",
     type: "answer"
@@ -336,36 +336,36 @@ useEffect(() => {
   }
 }
 
-// 连接终止
+// Connection Termination
 {
   type: "webrtc_terminated",
   reason: "<termination reason>"
 }
 ```
 
-## 日志系统
+## Logging System
 
-### 日志分类
+### Log Categories
 
 ```typescript
 import { webrtcLogger, mqttLogger, mcpLogger, appLogger } from '@/utils/logger'
 
-// WebRTC 相关日志
+// WebRTC related logs
 webrtcLogger.info('🎥 WebRTC connected')
 
-// MQTT 连接日志  
+// MQTT connection logs
 mqttLogger.info('📡 MQTT connected')
 
-// MCP 协议日志
+// MCP protocol logs
 mcpLogger.info('🚀 MCP Server ready')
 
-// 应用层日志
+// Application layer logs
 appLogger.info('✅ System ready')
 ```
 
-### 连接过程追踪
+### Connection Process Tracking
 
-WebRTC 连接会显示详细的步骤日志：
+WebRTC connections show detailed step logs:
 
 ```shell
 📡 WebRTC: Step 1/2 - Establishing MQTT connection
@@ -380,18 +380,18 @@ WebRTC 连接会显示详细的步骤日志：
 ✅ WebRTC connection established
 ```
 
-## 组件集成示例
+## Component Integration Examples
 
-### App.tsx 集成
+### App.tsx Integration
 
 ```typescript
 function App() {
-  // MCP 服务器（硬件控制）
+  // MCP server (hardware control)
   const { isConnected: isMqttConnected, isMcpInitialized } = useMcpMqttServer({
     autoConnect: true
   })
 
-  // WebRTC 客户端（音视频）
+  // WebRTC client (audio/video)
   const {
     remoteStream,
     mqttConnected: isWebRTCMqttConnected,
@@ -405,7 +405,7 @@ function App() {
   })
 
   return (
-    <ChatInterface 
+    <ChatInterface
       webrtc={{
         remoteStream,
         isConnected: isWebRTCConnected,
@@ -420,7 +420,7 @@ function App() {
 }
 ```
 
-### ChatInterface 组件
+### ChatInterface Component
 
 ```typescript
 interface ChatInterfaceProps {
@@ -434,17 +434,17 @@ export function ChatInterface({ webrtc, isMqttConnected }) {
       webrtc.connect()
     }
   }
-  
+
   const handleRecord = () => {
     if (webrtc.isConnected) {
       webrtc.toggleAudio(true)
     }
   }
-  
+
   return (
     <div>
-      <button onClick={handleConnect}>连接</button>
-      <button onClick={handleRecord}>录音</button>
+      <button onClick={handleConnect}>Connect</button>
+      <button onClick={handleRecord}>Record</button>
       <video ref={videoRef} />
       <audio ref={audioRef} />
     </div>
@@ -452,30 +452,30 @@ export function ChatInterface({ webrtc, isMqttConnected }) {
 }
 ```
 
-## 错误处理和调试
+## Error Handling and Debugging
 
-### 常见问题
+### Common Issues
 
-1. **MQTT 连接失败**
-   - 检查 broker URL 和认证信息
-   - 确认防火墙端口开放
+1. **MQTT Connection Failure**
+   - Check broker URL and authentication information
+   - Confirm firewall ports are open
 
-2. **WebRTC 信令失败**
-   - 查看浏览器网络面板
-   - 检查 MQTT 主题订阅状态
+2. **WebRTC Signaling Failure**
+   - Check browser network panel
+   - Verify MQTT topic subscription status
 
-3. **媒体流获取失败**
-   - 确认浏览器权限设置
-   - 检查设备访问权限
+3. **Media Stream Acquisition Failure**
+   - Confirm browser permission settings
+   - Check device access permissions
 
-### 调试技巧
+### Debugging Tips
 
 ```typescript
-// 启用详细日志
+// Enable detailed logging
 webrtcLogger.setEnabled(true)
 mqttLogger.setEnabled(true)
 
-// 监听连接状态变化
+// Monitor connection state changes
 useEffect(() => {
   console.log('Connection state:', connectionState)
   if (error) {
@@ -484,46 +484,46 @@ useEffect(() => {
 }, [connectionState, error])
 ```
 
-## 断开和清理
+## Disconnection and Cleanup
 
-系统提供完整的资源清理机制：
+The system provides a complete resource cleanup mechanism:
 
 ```typescript
-// 手动断开
+// Manual disconnection
 disconnect()
 
-// 组件卸载时自动清理
+// Automatic cleanup on component unmount
 useEffect(() => {
   return () => {
-    // 自动清理所有连接和媒体流
+    // Automatically clean up all connections and media streams
   }
 }, [])
 ```
 
-清理过程包括：
+Cleanup process includes:
 
-- 🎥 停止本地媒体流
-- 📺 停止远程媒体流  
-- 🔗 关闭 WebRTC 连接
-- 📡 取消 MQTT 主题订阅
-- 🔌 断开 MQTT 客户端
-- 🧹 重置所有状态
+- 🎥 Stop local media stream
+- 📺 Stop remote media stream
+- 🔗 Close WebRTC connection
+- 📡 Cancel MQTT topic subscriptions
+- 🔌 Disconnect MQTT client
+- 🧹 Reset all states
 
-## 性能优化
+## Performance Optimization
 
-1. **独立连接** - MCP 和 WebRTC 使用独立的 MQTT 连接，避免协议冲突
-2. **智能重连** - 自动重连机制，连接中断时自动恢复
-3. **资源管理** - 完善的清理机制，防止内存泄漏
-4. **日志优化** - 分级日志系统，生产环境可关闭详细日志
+1. **Independent Connections** - MCP and WebRTC use independent MQTT connections to avoid protocol conflicts
+2. **Smart Reconnection** - Automatic reconnection mechanism that recovers when connection is interrupted
+3. **Resource Management** - Comprehensive cleanup mechanism prevents memory leaks
+4. **Log Optimization** - Tiered logging system allows disabling detailed logs in production
 
-## 技术实现细节
+## Technical Implementation Details
 
-### 1. 异步编程模式
+### 1. Asynchronous Programming Pattern
 
-整个系统大量使用 Promise 和 async/await 来处理异步操作：
+The system extensively uses Promise and async/await to handle asynchronous operations:
 
 ```typescript
-// MQTT 连接封装为 Promise
+// MQTT connection wrapped as Promise
 const connectMqtt = async (): Promise<void> => {
   return new Promise((resolve, reject) => {
     const client = mqtt.connect(brokerUrl, options)
@@ -532,30 +532,30 @@ const connectMqtt = async (): Promise<void> => {
   })
 }
 
-// WebRTC 操作也是异步的
+// WebRTC operations are also asynchronous
 const offer = await pc.createOffer()
 await pc.setLocalDescription(offer)
 ```
 
-### 2. 事件驱动架构
+### 2. Event-Driven Architecture
 
-系统采用事件驱动模式，通过回调函数解耦组件：
+The system uses an event-driven pattern, decoupling components through callbacks:
 
 ```typescript
-// MQTT 事件处理
+// MQTT event handling
 mqttClient.on('message', (topic, payload) => {
   const message = JSON.parse(payload.toString())
   this.handleSignalingMessage(topic, message)
 })
 
-// WebRTC 事件处理
+// WebRTC event handling
 pc.onicecandidate = (event) => {
   if (event.candidate) {
     this.sendSignal('ice_candidate', event.candidate)
   }
 }
 
-// React 回调传递
+// React callback passing
 const callbacks = {
   onConnectionStateChange: setConnectionState,
   onLocalStream: setLocalStream,
@@ -563,22 +563,22 @@ const callbacks = {
 }
 ```
 
-### 3. 类型安全设计
+### 3. Type Safety Design
 
-使用 TypeScript 确保类型安全：
+Using TypeScript to ensure type safety:
 
 ```typescript
-// 严格的接口定义
+// Strict interface definitions
 interface SignalingMessage {
   type: 'sdp_offer' | 'sdp_answer' | 'ice_candidate' | 'webrtc_terminated'
   data?: any
   reason?: string
 }
 
-// 联合类型保证状态一致性
+// Union types ensure state consistency
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'failed' | 'closed'
 
-// 泛型约束
+// Generic constraints
 interface UseWebRTCReturn {
   localStream: MediaStream | null
   remoteStream: MediaStream | null
@@ -586,29 +586,29 @@ interface UseWebRTCReturn {
 }
 ```
 
-### 4. 内存管理和资源清理
+### 4. Memory Management and Resource Cleanup
 
 ```typescript
-// 媒体流清理
+// Media stream cleanup
 localStream?.getTracks().forEach(track => {
-  track.stop()           // 停止硬件访问
-  track.enabled = false  // 禁用轨道
+  track.stop()           // Stop hardware access
+  track.enabled = false  // Disable track
 })
 
-// MQTT 连接清理
-mqttClient.removeListener('message', handler)  // 移除监听器
-mqttClient.unsubscribe(topics)                // 取消订阅
-mqttClient.end(true)                          // 强制断开
+// MQTT connection cleanup
+mqttClient.removeListener('message', handler)  // Remove listeners
+mqttClient.unsubscribe(topics)                // Unsubscribe
+mqttClient.end(true)                          // Force disconnect
 
-// WebRTC 连接清理
-pc.close()              // 关闭 peer connection
-pc = null              // 释放引用
+// WebRTC connection cleanup
+pc.close()              // Close peer connection
+pc = null              // Release reference
 ```
 
-### 5. 并发控制
+### 5. Concurrency Control
 
 ```typescript
-// 使用 ref 防止竞态条件
+// Use ref to prevent race conditions
 const hasConnectedRef = useRef(false)
 
 if (!hasConnectedRef.current) {
@@ -616,60 +616,60 @@ if (!hasConnectedRef.current) {
   connect()
 }
 
-// 连接状态检查
+// Connection state check
 if (!this.mqttClient?.connected) {
   throw new Error('MQTT not connected')
 }
 ```
 
-## 后端集成要求
+## Backend Integration Requirements
 
-### MQTT Broker 配置
+### MQTT Broker Configuration
 
-- **协议版本**：MQTT 5.0
-- **端口配置**：
-  - TCP: 1883 (后端连接)
-  - WebSocket: 8083 (前端连接)
-- **认证**：username/password = emqx-mcp-webrtc-web-ui/public
+- **Protocol Version**: MQTT 5.0
+- **Port Configuration**:
+  - TCP: 1883 (backend connection)
+  - WebSocket: 8083 (frontend connection)
+- **Authentication**: username/password = emqx-mcp-webrtc-web-ui/public
 
-### WebRTC 后端实现
+### WebRTC Backend Implementation
 
-- **信令处理**：监听 `$webrtc/+/multimedia_proxy` 主题
-- **SDP 处理**：接收 offer，生成并发送 answer
-- **ICE 处理**：收集和交换 ICE candidates
-- **媒体处理**：建立 WebRTC pipeline，处理音视频流
-- **ASR/TTS**：通过 `$message/{client-id}` 主题处理语音
+- **Signaling Handling**: Listen to `$webrtc/+/multimedia_proxy` topic
+- **SDP Processing**: Receive offer, generate and send answer
+- **ICE Processing**: Collect and exchange ICE candidates
+- **Media Processing**: Establish WebRTC pipeline, handle audio/video streams
+- **ASR/TTS**: Handle speech through `$message/{client-id}` topic
 
-### 后端响应格式
+### Backend Response Format
 
 ```elixir
-# Elixir 后端示例
+# Elixir backend example
 def handle_webrtc_offer(client_id, offer) do
-  # 创建 WebRTC pipeline
+  # Create WebRTC pipeline
   pipeline = create_webrtc_pipeline(offer)
-  
-  # 生成 answer
+
+  # Generate answer
   answer = generate_answer(pipeline)
-  
-  # 发送到前端
+
+  # Send to frontend
   topic = "$webrtc/#{client_id}"
   message = %{type: "sdp_answer", data: answer}
   :emqtt.publish(client, topic, Jason.encode!(message))
 end
 ```
 
-## 调试和监控
+## Debugging and Monitoring
 
-### 开发环境调试
+### Development Environment Debugging
 
-1. **EMQX Dashboard**：<http://localhost:18083> 监控 MQTT 连接
-2. **浏览器 Console**：查看详细的分类日志
-3. **Chrome DevTools**：WebRTC internals (chrome://webrtc-internals)
-4. **Network Tab**：监控 WebSocket 连接状态
+1. **EMQX Dashboard**: <http://localhost:18083> monitor MQTT connections
+2. **Browser Console**: View detailed categorized logs
+3. **Chrome DevTools**: WebRTC internals (chrome://webrtc-internals)
+4. **Network Tab**: Monitor WebSocket connection status
 
-### 生产环境监控
+### Production Environment Monitoring
 
-- MQTT 连接状态监控
-- WebRTC 连接成功率统计
-- 音视频质量指标
-- 错误日志聚合分析
+- MQTT connection status monitoring
+- WebRTC connection success rate statistics
+- Audio/video quality metrics
+- Error log aggregation and analysis

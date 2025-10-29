@@ -1,58 +1,58 @@
-# MCP over MQTT 实现文档
+# MCP over MQTT Implementation Documentation
 
-## 架构概述
+## Architecture Overview
 
-本项目实现了 MCP (Model Context Protocol) over MQTT 规范，让 Web UI 作为 MCP Server 提供硬件控制能力，供 AI Agent 调用。
+This project implements the MCP (Model Context Protocol) over MQTT specification, allowing the Web UI to act as an MCP Server providing hardware control capabilities for AI Agents to call.
 
-### 系统角色
+### System Roles
 
-- **Web UI** = **MCP Server** - 提供硬件控制工具（摄像头、表情）
-- **App Agent (Python)** = **MCP Client** - 接收语音，调用 LLM，执行工具调用
-- **MQTT Broker** = **消息路由** - 负责消息传递和路由
+- **Web UI** = **MCP Server** - Provides hardware control tools (camera, emotions)
+- **App Agent (Python)** = **MCP Client** - Receives voice, calls LLM, executes tool calls
+- **MQTT Broker** = **Message Router** - Responsible for message delivery and routing
 
-### 数据流向
+### Data Flow
 
 ```
-用户语音 → App Agent → LLM 推理 → 调用 Web UI 工具 → 硬件控制
+User Voice → App Agent → LLM Reasoning → Call Web UI Tools → Hardware Control
                 ↓                        ↓
-            ASR 识别              通过 MQTT 发送请求
+            ASR Recognition          Send requests via MQTT
 ```
 
-## 核心组件实现
+## Core Component Implementation
 
-### 1. MCP Server 类 (`lib/mcp-mqtt-server.ts`)
+### 1. MCP Server Class (`lib/mcp-mqtt-server.ts`)
 
 ```typescript
 export class McpMqttServer {
-  private mqttClient: BaseMqttClient       // MQTT 底层连接
-  private serverId: string                 // 服务器唯一标识
-  private serverName: string               // 服务器名称
-  private callbacks: {                     // 硬件控制回调函数
+  private mqttClient: BaseMqttClient       // MQTT underlying connection
+  private serverId: string                 // Server unique identifier
+  private serverName: string               // Server name
+  private callbacks: {                     // Hardware control callback functions
     onCameraControl?: (enabled: boolean) => void
     onEmotionChange?: (emotion: string) => void
   }
 }
 ```
 
-**关键点**：
+**Key Points**:
 
-- 使用 `mqttClient` 命名避免与 MCP Client 概念混淆
-- 通过 `callbacks` 将硬件控制逻辑与协议层解耦
+- Use `mqttClient` naming to avoid confusion with MCP Client concept
+- Decouple hardware control logic from protocol layer through `callbacks`
 
-### 2. 服务注册与发现
+### 2. Service Registration and Discovery
 
-Server 启动时需要：
+Server needs to perform the following on startup:
 
-1. 订阅控制主题接收请求
-2. 发布在线通知让 Client 发现
+1. Subscribe to control topics to receive requests
+2. Publish online notification for Client discovery
 
 ```typescript
 private async subscribeToMcpTopics(): Promise<void> {
-  // 1. 订阅控制主题，接收 initialize 请求
+  // 1. Subscribe to control topics to receive initialize requests
   const controlTopic = `$mcp-server/${this.serverId}/${this.serverName}`
   await this.subscribe(controlTopic)
-  
-  // 2. 发布在线通知（带 RETAIN 标志，保证新连接的 Client 能收到）
+
+  // 2. Publish online notification (with RETAIN flag to ensure new connected Clients can receive it)
   const presenceTopic = `$mcp-server/presence/${this.serverId}/${this.serverName}`
   const onlineNotification = {
     jsonrpc: '2.0',
@@ -66,27 +66,27 @@ private async subscribeToMcpTopics(): Promise<void> {
 }
 ```
 
-### 3. 请求处理机制
+### 3. Request Handling Mechanism
 
-Server 需要处理三种核心请求：
+Server needs to handle three core request types:
 
 ```typescript
 private handleMcpMessage(message: MqttMessage): void {
   const data = JSON.parse(message.payload) as JsonRpcRequest
   
-  // 从主题中提取 Client ID 用于响应路由
+  // Extract Client ID from topic for response routing
   const topicParts = message.topic.split('/')
   let clientId = ''
-  
+
   if (message.topic.startsWith('$mcp-server/')) {
-    // 控制主题 - 初始化请求
-    clientId = 'unknown' // 将在 initialize 后更新
+    // Control topic - initialization request
+    clientId = 'unknown' // Will be updated after initialize
   } else if (message.topic.startsWith('$mcp-rpc/')) {
-    // RPC 主题 - 格式: $mcp-rpc/{client-id}/{server-id}/{server-name}
+    // RPC topic - format: $mcp-rpc/{client-id}/{server-id}/{server-name}
     clientId = topicParts[1]
   }
-  
-  // 根据方法分发处理
+
+  // Dispatch handling based on method
   switch (data.method) {
     case 'initialize':
       this.handleInitializeRequest(data, clientId)
@@ -101,12 +101,12 @@ private handleMcpMessage(message: MqttMessage): void {
 }
 ```
 
-### 4. 工具定义与注册
+### 4. Tool Definition and Registration
 
-Server 提供两个硬件控制工具：
+Server provides two hardware control tools:
 
 ```typescript
-// 在 handleToolsListRequest 中返回
+// Returned in handleToolsListRequest
 const tools = [
   {
     name: 'control_camera',
@@ -142,9 +142,9 @@ const tools = [
 ]
 ```
 
-### 5. 工具执行逻辑
+### 5. Tool Execution Logic
 
-接收到工具调用请求时，执行相应的回调函数：
+When receiving tool call requests, execute corresponding callback functions:
 
 ```typescript
 private async handleToolsCallRequest(request: JsonRpcRequest, clientId: string) {
@@ -154,7 +154,7 @@ private async handleToolsCallRequest(request: JsonRpcRequest, clientId: string) 
   try {
     switch (name) {
       case 'control_camera':
-        // 触发摄像头控制回调
+        // Trigger camera control callback
         if (this.callbacks.onCameraControl) {
           this.callbacks.onCameraControl(args?.enabled)
         }
@@ -167,7 +167,7 @@ private async handleToolsCallRequest(request: JsonRpcRequest, clientId: string) 
         break
         
       case 'change_emotion':
-        // 触发表情切换回调
+        // Trigger emotion change callback
         if (this.callbacks.onEmotionChange) {
           this.callbacks.onEmotionChange(args?.emotion)
         }
@@ -183,7 +183,7 @@ private async handleToolsCallRequest(request: JsonRpcRequest, clientId: string) 
         throw new Error(`Unknown tool: ${name}`)
     }
     
-    // 发送成功响应
+    // Send success response
     const response = {
       jsonrpc: '2.0',
       id: request.id,
@@ -194,7 +194,7 @@ private async handleToolsCallRequest(request: JsonRpcRequest, clientId: string) 
     await this.publish(responseTopic, JSON.stringify(response))
     
   } catch (error) {
-    // 发送错误响应
+    // Send error response
     const errorResponse = {
       jsonrpc: '2.0',
       id: request.id,
@@ -210,9 +210,9 @@ private async handleToolsCallRequest(request: JsonRpcRequest, clientId: string) 
 }
 ```
 
-### 6. React Hook 封装 (`hooks/useMcpMqttServer.ts`)
+### 6. React Hook Wrapper (`hooks/useMcpMqttServer.ts`)
 
-提供易用的 React Hook 接口：
+Provides an easy-to-use React Hook interface:
 
 ```typescript
 export function useMcpMqttServer(options: UseMqttOptions): UseMqttServerReturn {
@@ -230,7 +230,7 @@ export function useMcpMqttServer(options: UseMqttOptions): UseMqttServerReturn {
     
     mqttClient.onConnect(() => {
       setIsConnected(true)
-      setIsMcpInitialized(true) // Server 连接即初始化
+      setIsMcpInitialized(true) // Server is initialized upon connection
     })
     
     if (autoConnect) {
@@ -246,14 +246,14 @@ export function useMcpMqttServer(options: UseMqttOptions): UseMqttServerReturn {
     client,
     isConnected,
     isMcpInitialized,
-    // ... 其他状态和方法
+    // ... other states and methods
   }
 }
 ```
 
-### 7. 应用层使用 (`App.tsx`)
+### 7. Application Layer Usage (`App.tsx`)
 
-在应用中集成 MCP Server：
+Integrate MCP Server in the application:
 
 ```typescript
 function App() {
@@ -292,18 +292,18 @@ function App() {
 }
 ```
 
-## MQTT 主题规范
+## MQTT Topic Specification
 
-根据 MCP over MQTT 规范，使用以下主题结构：
+According to the MCP over MQTT specification, use the following topic structure:
 
-| 主题类型 | 格式 | 方向 | 说明 |
-|---------|------|------|------|
-| 控制主题 | `$mcp-server/{server-id}/{server-name}` | Client→Server | 接收初始化请求 |
-| 在线主题 | `$mcp-server/presence/{server-id}/{server-name}` | Server→Broker | 发布服务在线状态 |
-| RPC主题 | `$mcp-rpc/{client-id}/{server-id}/{server-name}` | 双向 | RPC 请求和响应 |
-| 能力变更 | `$mcp-server/capability/{server-id}/{server-name}` | Server→Client | 通知能力变化 |
+| Topic Type | Format | Direction | Description |
+|------------|--------|-----------|-------------|
+| Control Topic | `$mcp-server/{server-id}/{server-name}` | Client→Server | Receive initialization requests |
+| Presence Topic | `$mcp-server/presence/{server-id}/{server-name}` | Server→Broker | Publish service online status |
+| RPC Topic | `$mcp-rpc/{client-id}/{server-id}/{server-name}` | Bidirectional | RPC requests and responses |
+| Capability Change | `$mcp-server/capability/{server-id}/{server-name}` | Server→Client | Notify capability changes |
 
-## 完整交互流程
+## Complete Interaction Flow
 
 ```mermaid
 sequenceDiagram
@@ -312,60 +312,60 @@ sequenceDiagram
     participant Agent as App Agent (MCP Client)
     participant LLM as LLM
 
-    UI->>MQTT: 1. 连接并订阅 $mcp-server/web-ui/controller
-    UI->>MQTT: 2. 发布在线通知到 $mcp-server/presence/web-ui/controller
-    
-    Agent->>MQTT: 3. 订阅 $mcp-server/presence/+/+
-    MQTT->>Agent: 4. 收到 Web UI 在线通知
-    
-    Agent->>MQTT: 5. 发送 initialize 到 $mcp-server/web-ui/controller
-    MQTT->>UI: 6. 转发 initialize 请求
-    UI->>MQTT: 7. 响应服务器信息到 $mcp-rpc/agent-id/web-ui/controller
-    MQTT->>Agent: 8. 转发响应
-    
-    Agent->>MQTT: 9. 发送 tools/list 请求
-    MQTT->>UI: 10. 转发请求
-    UI->>MQTT: 11. 返回工具列表
-    MQTT->>Agent: 12. 转发工具列表
-    
-    Note over Agent,LLM: 用户说话触发
-    Agent->>LLM: 13. 发送用户输入 + 可用工具
-    LLM->>Agent: 14. 决定调用 change_emotion("happy")
-    
-    Agent->>MQTT: 15. 发送 tools/call 请求
-    MQTT->>UI: 16. 转发工具调用
-    UI->>UI: 17. 执行 onEmotionChange("happy")
-    UI->>MQTT: 18. 返回执行结果
-    MQTT->>Agent: 19. 转发结果
-    Agent->>LLM: 20. 继续对话
+    UI->>MQTT: 1. Connect and subscribe to $mcp-server/web-ui/controller
+    UI->>MQTT: 2. Publish online notification to $mcp-server/presence/web-ui/controller
+
+    Agent->>MQTT: 3. Subscribe to $mcp-server/presence/+/+
+    MQTT->>Agent: 4. Receive Web UI online notification
+
+    Agent->>MQTT: 5. Send initialize to $mcp-server/web-ui/controller
+    MQTT->>UI: 6. Forward initialize request
+    UI->>MQTT: 7. Respond with server info to $mcp-rpc/agent-id/web-ui/controller
+    MQTT->>Agent: 8. Forward response
+
+    Agent->>MQTT: 9. Send tools/list request
+    MQTT->>UI: 10. Forward request
+    UI->>MQTT: 11. Return tool list
+    MQTT->>Agent: 12. Forward tool list
+
+    Note over Agent,LLM: User speech triggers
+    Agent->>LLM: 13. Send user input + available tools
+    LLM->>Agent: 14. Decide to call change_emotion("happy")
+
+    Agent->>MQTT: 15. Send tools/call request
+    MQTT->>UI: 16. Forward tool call
+    UI->>UI: 17. Execute onEmotionChange("happy")
+    UI->>MQTT: 18. Return execution result
+    MQTT->>Agent: 19. Forward result
+    Agent->>LLM: 20. Continue conversation
 ```
 
-## 关键设计决策
+## Key Design Decisions
 
-1. **Server 而非 Client**: Web UI 作为 Server 提供工具，而不是作为 Client 调用工具
-2. **回调模式**: 通过 callbacks 解耦协议层和业务逻辑
-3. **命名清晰**: 使用 `mqttClient` 避免与 MCP Client/Server 概念混淆
-4. **无状态工具**: 每个工具调用独立，不依赖会话状态
-5. **标准协议**: 严格遵循 MCP over MQTT 规范，确保互操作性
+1. **Server rather than Client**: Web UI acts as Server providing tools, rather than as Client calling tools
+2. **Callback pattern**: Decouple protocol layer and business logic through callbacks
+3. **Clear naming**: Use `mqttClient` to avoid confusion with MCP Client/Server concepts
+4. **Stateless tools**: Each tool call is independent, not dependent on session state
+5. **Standard protocol**: Strictly follow MCP over MQTT specification to ensure interoperability
 
-## 错误处理
+## Error Handling
 
-- MQTT 连接失败：自动重连，通过 `reconnectPeriod` 配置
-- 工具执行失败：返回 JSON-RPC 错误响应
-- 消息解析失败：记录日志，忽略无效消息
-- 超时处理：Client 端实现，Server 无需关心
+- MQTT connection failure: Automatic reconnection, configured via `reconnectPeriod`
+- Tool execution failure: Return JSON-RPC error response
+- Message parsing failure: Log and ignore invalid messages
+- Timeout handling: Implemented on Client side, Server doesn't need to care
 
-## 安全考虑
+## Security Considerations
 
-- 使用 MQTT 5.0 的 User Properties 标识组件类型
-- 工具执行前可添加权限验证
-- 支持 TLS 加密连接（配置 `wss://`）
-- Client ID 用于追踪和审计
+- Use MQTT 5.0 User Properties to identify component types
+- Add permission verification before tool execution
+- Support TLS encrypted connections (configure `wss://`)
+- Client ID is used for tracking and auditing
 
-## 后续扩展
+## Future Extensions
 
-1. 添加更多硬件控制工具
-2. 实现资源订阅功能
-3. 添加工具执行权限控制
-4. 支持批量工具调用
-5. 实现工具执行进度反馈
+1. Add more hardware control tools
+2. Implement resource subscription functionality
+3. Add tool execution permission control
+4. Support batch tool calls
+5. Implement tool execution progress feedback

@@ -31,7 +31,7 @@ pnpm lint
 ### shadcn/ui Components
 
 ```bash
-# Add new shadcn/ui components (需要使用 Node.js v22)
+# Add new shadcn/ui components (need to use Node.js v22)
 cd /Users/ysfscream/Workspace/EMQ/mcp-ai-companion-demo/web && nvm use v22 && pnpm dlx shadcn@latest add <component-name>
 
 # Example: Add a card component
