@@ -14,10 +14,10 @@ cp .env.example .env
 # Fill in:
 # VOLC_ACCESS_KEY_ID / VOLC_SECRET_KEY
 # VOLC_RTC_APP_ID / VOLC_RTC_APP_KEY
-# Optional: VOLC_SCENE_DEFAULT (defaults to Custom)
+# Optional: VOLC_SCENE_DEFAULT (defaults to emq-mcp-ai-companion)
 ```
 
-Add more scenes under `src/scenes/` if needed (see `Custom.json` for structure).
+Add more scenes under `src/scenes/` if needed (see `emq-mcp-ai-companion.json` for structure).
 
 ## 2. Install Dependencies
 
@@ -47,10 +47,10 @@ Verify with curl:
 curl -X POST http://localhost:3001/getScenes
 curl -X POST 'http://localhost:3001/proxy?Action=StartVoiceChat' \
   -H 'Content-Type: application/json' \
-  -d '{"SceneID":"Custom"}'
+  -d '{"SceneID":"emq-mcp-ai-companion"}'
 ```
 
-## 4. Structure
+## 5. Structure
 
 ```shell
 volc-server/
@@ -61,7 +61,7 @@ volc-server/
 │   ├── lib/token.ts       # RTC token generator
 │   └── scenes/
 │       ├── loader.ts      # scene loader & helpers
-│       └── Custom.json    # sample scene
+│       └── emq-mcp-ai-companion.json  # sample scene (EMQ MCP AI Companion)
 ├── .env.example
 ├── package.json
 ├── bunfig.toml
