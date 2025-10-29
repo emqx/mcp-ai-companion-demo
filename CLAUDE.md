@@ -1,87 +1,87 @@
 # CLAUDE.md
 
-这是一个基于 EMQX MCP、Agent、LLM、VLM、ASR 和 TTS 技术的硬件智能代理演示项目。
+This is a hardware intelligent agent demonstration project based on EMQX MCP, Agent, LLM, VLM, ASR, and TTS technologies.
 
-代码中不要使用中文的注释
+Do not use Chinese comments in the code.
 
-## 项目结构
+## Project Structure
 
-- `app/` - 智能代理核心代码，包含与多媒体服务的交互以及调用和与 LLM、VLM 交互的实现
-- `web/` - 前端界面，提供用户交互和设备控制功能
-- `volc-server/` - VolcEngine AIGC 实时语音 API 代理服务器 (Bun + TypeScript)
+- `app/` - Core intelligent agent code, containing multimedia service interactions and implementation of LLM and VLM interactions
+- `web/` - Frontend interface, providing user interaction and device control functionality
+- `volc-server/` - VolcEngine AIGC real-time voice API proxy server (Bun + TypeScript)
 
-## 技术栈
+## Tech Stack
 
 ### Backend (app/)
 
 - **Python** >= 3.11
-- **uv** - 包管理器
-- **FastAPI** - Web 框架
-- **LlamaIndex** - LLM 集成框架
-- **OpenAI/SiliconFlow** - LLM 服务
-- **MCP (Model Context Protocol)** - 通过 MQTT 协议实现设备控制
-- **MQTT** - 消息传输协议
+- **uv** - Package manager
+- **FastAPI** - Web framework
+- **LlamaIndex** - LLM integration framework
+- **OpenAI/SiliconFlow** - LLM services
+- **MCP (Model Context Protocol)** - Device control through MQTT protocol
+- **MQTT** - Message transport protocol
 
 ### Frontend (web/)
 
 - **Node.js** >= 22.0.0
 - **React + TypeScript**
-- **Vite** - 构建工具
-- **Tailwind CSS** + **shadcn/ui** - UI 框架
-- **MQTT.js** - MQTT 客户端
+- **Vite** - Build tool
+- **Tailwind CSS** + **shadcn/ui** - UI framework
+- **MQTT.js** - MQTT client
 
-## 主要功能
+## Key Features
 
-1. **语音识别与合成** - 集成语音流，实现实时语音识别和自然语音合成
-2. **视觉理解** - 利用多模态大模型(VLM)实现基于图像的视觉内容理解
-3. **智能推理** - 结合 LLM 和 Agent 技术，生成符合角色设定的智能回应
-4. **设备控制** - 通过 MCP over MQTT 协议控制摄像头、音响等外设
+1. **Speech Recognition and Synthesis** - Integrate voice streaming for real-time speech recognition and natural voice synthesis
+2. **Visual Understanding** - Utilize multimodal large models (VLM) for image-based visual content understanding
+3. **Intelligent Reasoning** - Combine LLM and Agent technologies to generate intelligent responses that match character settings
+4. **Device Control** - Control cameras, speakers, and other peripherals through MCP over MQTT protocol
 
-## 开发命令
+## Development Commands
 
 ### Backend
 
 ```bash
 cd app
-uv sync          # 安装依赖
-uv run main.py   # 运行主程序
+uv sync          # Install dependencies
+uv run main.py   # Run main program
 ```
 
 ### Frontend
 
 ```bash
 cd web
-pnpm install     # 安装依赖
-pnpm dev         # 开发服务器
+pnpm install     # Install dependencies
+pnpm dev         # Development server
 ```
 
 ### Volc Server
 
 ```bash
 cd volc-server
-cp .env.example .env  # 配置环境变量
-TMPDIR=$PWD/.tmp bun install  # 安装依赖
-bun run dev      # 开发服务器 (默认端口 3001)
+cp .env.example .env  # Configure environment variables
+TMPDIR=$PWD/.tmp bun install  # Install dependencies
+bun run dev      # Development server (default port 3001)
 ```
 
-## 环境变量
+## Environment Variables
 
-- `MQTT_CLIENT_ID` - MQTT 客户端 ID
-- `MQTT_BROKER_HOST` - MQTT 服务器地址 (默认: localhost)
-- `MQTT_BROKER_PORT` - MQTT 服务器端口 (默认: 1883)
+- `MQTT_CLIENT_ID` - MQTT client ID
+- `MQTT_BROKER_HOST` - MQTT broker address (default: localhost)
+- `MQTT_BROKER_PORT` - MQTT broker port (default: 1883)
 
-## 架构说明
+## Architecture Description
 
-系统采用事件驱动架构：
+The system adopts an event-driven architecture:
 
-- 主程序通过 JSON-RPC 协议与外部服务通信
-- ASR 服务识别语音输入，放入 asr_queue
-- Agent 处理用户输入，生成回应
-- TTS 服务合成语音输出，通过 tts_queue 处理
-- MCP 客户端通过 MQTT 协议控制硬件设备
+- Main program communicates with external services through JSON-RPC protocol
+- ASR service recognizes voice input and puts it into asr_queue
+- Agent processes user input and generates responses
+- TTS service synthesizes voice output, handled through tts_queue
+- MCP client controls hardware devices through MQTT protocol
 
-## 关键文件
+## Key Files
 
-- `app/main.py` - 主程序入口，处理消息队列和事件循环
-- `app/agents.py` - MCP 客户端初始化和 Agent 集成
-- `app/mcp_client_init.py` - MCP MQTT 客户端初始化
+- `app/main.py` - Main program entry point, handling message queues and event loops
+- `app/agents.py` - MCP client initialization and Agent integration
+- `app/mcp_client_init.py` - MCP MQTT client initialization

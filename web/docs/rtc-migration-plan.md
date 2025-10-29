@@ -17,8 +17,8 @@
    - On `App` mount, call `volc-server/getScenes`; populate stores with scene data.
    - Store mapping should mirror `rtc-aigc-demo` (`sceneConfigMap`, `rtcConfigMap`). Default `sceneId` = `emq-mcp-ai-companion`.
 3. **Config wiring**
-   - ✅ `src/api/` 已建立基础请求封装，并通过 `VITE_AIGC_PROXY_HOST` 指向 Bun 代理。
-   - 下一步：结合 Zustand store 暴露派生状态（如 interrupt/vision/avatar 标记）。
+   - ✅ `src/api/` has established basic request encapsulation and points to Bun proxy via `VITE_AIGC_PROXY_HOST`.
+   - Next step: Combine with Zustand store to expose derived state (such as interrupt/vision/avatar flags).
 
 ## Phase 2 — RTC Client Integration
 
