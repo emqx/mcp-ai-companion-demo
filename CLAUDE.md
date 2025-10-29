@@ -8,6 +8,7 @@
 
 - `app/` - 智能代理核心代码，包含与多媒体服务的交互以及调用和与 LLM、VLM 交互的实现
 - `web/` - 前端界面，提供用户交互和设备控制功能
+- `volc-server/` - VolcEngine AIGC 实时语音 API 代理服务器 (Bun + TypeScript)
 
 ## 技术栈
 
@@ -52,6 +53,15 @@ uv run main.py   # 运行主程序
 cd web
 pnpm install     # 安装依赖
 pnpm dev         # 开发服务器
+```
+
+### Volc Server
+
+```bash
+cd volc-server
+cp .env.example .env  # 配置环境变量
+TMPDIR=$PWD/.tmp bun install  # 安装依赖
+bun run dev      # 开发服务器 (默认端口 3001)
 ```
 
 ## 环境变量
