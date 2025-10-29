@@ -1,0 +1,21 @@
+{
+  "name": "volc-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/server.ts",
+    "start": "bun run src/server.ts",
+    "check": "tsc --noEmit",
+    "format": "bunx --bun prettier --write ."
+  },
+  "dependencies": {
+    "@volcengine/openapi": "^1.0.9",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "typescript": "^5.4.5",
+    "prettier": "^3.3.3"
+  }
+}

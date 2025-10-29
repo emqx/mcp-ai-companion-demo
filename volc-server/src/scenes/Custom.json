@@ -1,0 +1,71 @@
+{
+  "SceneConfig": {
+    "icon": "https://lf3-rtc-demo.volccdn.com/obj/rtc-aigc-assets/DoubaoAvatar.png",
+    "name": "默认实时语音助手"
+  },
+  "AccountConfig": {
+    "accessKeyId": "",
+    "secretKey": ""
+  },
+  "RTCConfig": {
+    "AppId": "",
+    "AppKey": "",
+    "RoomId": "",
+    "UserId": "",
+    "Token": ""
+  },
+  "VoiceChat": {
+    "AppId": "",
+    "RoomId": "",
+    "TaskId": "voice-agent-task",
+    "AgentConfig": {
+      "TargetUserId": [""],
+      "WelcomeMessage": "你好，我是实时语音助手，很高兴见到你。",
+      "UserId": "voice-agent",
+      "EnableConversationStateCallback": true
+    },
+    "Config": {
+      "ASRConfig": {
+        "Provider": "volcano",
+        "ProviderParams": {
+          "Mode": "smallmodel",
+          "AppId": "",
+          "Cluster": "volcengine_streaming_common"
+        }
+      },
+      "TTSConfig": {
+        "Provider": "volcano",
+        "ProviderParams": {
+          "app": {
+            "appid": "",
+            "cluster": "volcano_tts"
+          },
+          "audio": {
+            "voice_type": "BV001_streaming",
+            "speed_ratio": 1,
+            "pitch_ratio": 1,
+            "volume_ratio": 1
+          }
+        }
+      },
+      "LLMConfig": {
+        "Mode": "ArkV3",
+        "EndPointId": "",
+        "SystemMessages": ["你是一个友好又专业的实时语音助手，请用简洁自然的语气回应用户。"],
+        "VisionConfig": {
+          "Enable": false
+        }
+      },
+      "AvatarConfig": {
+        "Enabled": false,
+        "AvatarType": "",
+        "AvatarRole": "",
+        "BackgroundUrl": "",
+        "VideoBitrate": 2000,
+        "AvatarAppID": "",
+        "AvatarToken": ""
+      },
+      "InterruptMode": 0
+    }
+  }
+}

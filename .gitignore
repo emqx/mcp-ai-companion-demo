@@ -16,6 +16,7 @@ eggs/
 .eggs/
 lib/
 !web/src/lib
+!volc-server/src/lib
 lib64/
 parts/
 sdist/
@@ -209,3 +210,35 @@ __marimo__/
 
 # macOS
 .DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Package files
+mcp-ai-companion-demo-web-*.tar.gz
+*.tar.gz
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.tmp/
+.cache
+.env
