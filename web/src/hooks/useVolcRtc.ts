@@ -14,7 +14,7 @@ export interface UseVolcRtcOptions extends Pick<UseWebRTCMqttOptions, 'onASRResp
 const stageToLoadingStatus = (code?: number) => {
   switch (code) {
     case AGENT_BRIEF_CODE.LISTENING:
-      return 'waiting'
+      return 'listening'
     case AGENT_BRIEF_CODE.THINKING:
       return 'processing'
     case AGENT_BRIEF_CODE.SPEAKING:
@@ -74,8 +74,6 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
       const parsed = parseAigcBinaryMessage(buffer)
       if (!parsed) return
 
-      console.debug('[useVolcRtc] TLV message', parsed.type, parsed)
-
       switch (parsed.type) {
         case MESSAGE_TYPE.SUBTITLE: {
           const entries = parsed.payload.data || []
@@ -97,7 +95,6 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
         case MESSAGE_TYPE.BRIEF: {
           const stage = parsed.payload.Stage
           const errorInfo = parsed.payload.ErrorInfo
-          console.debug('[useVolcRtc] Stage update', stage, errorInfo)
           const status = stageToLoadingStatus(stage?.Code)
           if (status) {
             onMessage?.({
@@ -145,7 +142,6 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
         if (!event || !event.userId || event.userId === localUserId) {
           return
         }
-        console.debug('[useVolcRtc] onUserPublishStream', event)
         remoteUserIdRef.current = event.userId
         try {
           if (event.mediaType === MediaType.AUDIO_AND_VIDEO) {
@@ -164,7 +160,6 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
         if (!event || !event.userId || event.userId === localUserId) {
           return
         }
-        console.debug('[useVolcRtc] onUserPublishScreen', event)
         remoteUserIdRef.current = event.userId
         try {
           await rtcClient.subscribeScreen(event.userId, event.mediaType)
@@ -240,10 +235,8 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
 
       if (sceneConfig?.id && !voiceChatStartedRef.current) {
         try {
-          const startResult = await startVoiceChat(sceneConfig.id)
-          console.debug('[useVolcRtc] StartVoiceChat result', startResult)
+          await startVoiceChat(sceneConfig.id)
           voiceChatStartedRef.current = true
-          onMessage?.({ type: 'loading', status: 'waiting' } as any)
         } catch (e) {
           console.warn('[useVolcRtc] Failed to start voice chat', e)
         }
@@ -272,22 +265,22 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
     try {
       await rtcClient.unpublishStream(MediaType.VIDEO)
     } catch (err) {
-      console.debug('[useVolcRtc] unpublish video failed', err)
+      console.warn('[useVolcRtc] unpublish video failed', err)
     }
     try {
       await rtcClient.unpublishStream(MediaType.AUDIO)
     } catch (err) {
-      console.debug('[useVolcRtc] unpublish audio failed', err)
+      console.warn('[useVolcRtc] unpublish audio failed', err)
     }
     try {
       await rtcClient.stopVideoCapture()
     } catch (err) {
-      console.debug('[useVolcRtc] stop video capture failed', err)
+      console.warn('[useVolcRtc] stop video capture failed', err)
     }
     try {
       await rtcClient.stopAudioCapture()
     } catch (err) {
-      console.debug('[useVolcRtc] stop audio capture failed', err)
+      console.warn('[useVolcRtc] stop audio capture failed', err)
     }
 
     await rtcClient.leaveRoom()
@@ -353,18 +346,10 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
       }
     }
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && shouldDisconnect()) {
-        void disconnect()
-      }
-    }
-
     window.addEventListener('beforeunload', handleBeforeUnload)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [connectionState, disconnect])
 

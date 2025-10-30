@@ -4,7 +4,7 @@ import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChatInterface } from '@/components/ChatInterface'
-import { appLogger } from '@/utils/logger'
+import { appLogger, conversationLogger } from '@/utils/logger'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import { defaultMqttConfig } from '@/config/mqtt'
@@ -14,7 +14,7 @@ import type { PhotoCaptureResult } from '@/tools/types'
 function App() {
   const { t } = useTranslation()
   const [aiReplyText, setAiReplyText] = useState<string>('')
-  const [llmLoading] = useState<'processing' | 'waiting' | null>(null)
+  const [llmLoading, setLlmLoading] = useState<'processing' | 'waiting' | 'listening' | null>(null)
   const [showVideo, setShowVideo] = useState<boolean>(false)
   const [selectedEmotion, setSelectedEmotion] = useState<string>('happy')
   const [volume, setVolume] = useState<number>(1.0) // 0.0 to 1.0
@@ -34,7 +34,6 @@ function App() {
   })
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
-
   const onCameraControl = useCallback((enabled: boolean) => {
     appLogger.info(`📷 Camera control: ${enabled ? 'ON' : 'OFF'}`)
     setShowVideo(enabled)
@@ -120,24 +119,31 @@ function App() {
     isVideoEnabled,
     cleanup: cleanupWebRTC,
   } = useVolcRtc({
-    onASRResponse: () => {
+    onASRResponse: (text?: string) => {
+      conversationLogger.user(text)
+      setLlmLoading('processing')
       setAiReplyText('')
     },
     onTTSText: (text: string) => {
+      conversationLogger.assistant(text)
       setAiReplyText(text)
+      setLlmLoading(null)
     },
     onMessage: (message: any) => {
-      appLogger.info('🔊 Message:', message)
-      // Loading status updates disabled while using Volc RTC integration
+      appLogger.debug('🔄 Conversation status update', message)
       if (message && typeof message === 'object') {
         if (message.type === 'loading') {
-          if (message.status === 'processing' || message.status === 'waiting') {
+          if (message.status === 'processing' || message.status === 'waiting' || message.status === 'listening') {
+            setLlmLoading(message.status)
             setAiReplyText('')
+          } else if (message.status === 'complete') {
+            setLlmLoading(null)
           }
         } else if (message.type === 'error') {
           const reason = message.reason || t('common.errorOccurred')
           toast.error(reason)
           setAiReplyText('')
+          setLlmLoading(null)
         }
       }
     },
@@ -152,6 +158,12 @@ function App() {
   useEffect(() => {
     if (isWebRTCConnected) {
       appLogger.info('🎥 WebRTC connected successfully')
+    }
+  }, [isWebRTCConnected])
+
+  useEffect(() => {
+    if (!isWebRTCConnected) {
+      setLlmLoading(null)
     }
   }, [isWebRTCConnected])
 

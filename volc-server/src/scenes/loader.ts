@@ -100,8 +100,6 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
   return scene
 }
 
-
-
 const buildToken = (rtc: SceneFile['RTCConfig'], appKey: string) => {
   const { AppId, RoomId, UserId } = rtc
   if (!AppId) {
