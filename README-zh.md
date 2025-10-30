@@ -64,7 +64,7 @@ pnpm install
 pnpm dev
 ```
 
-可选：复制 `.env.example` 为 `.env` 并通过 `VITE_MQTT_*` 变量覆盖 Volc 代理地址或 MQTT WebSocket 凭证。默认值会根据当前页面地址推导，本地开发通常无需修改。
+可选：复制 `.env.example` 为 `.env` 并通过 `VITE_AIGC_PROXY_HOST` 变量覆盖 Volc 代理地址。默认值会根据当前页面地址推导，本地开发通常无需修改。
 
 ### app
 

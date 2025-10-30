@@ -66,7 +66,7 @@ pnpm install
 pnpm dev
 ```
 
-Optional: copy `.env.example` to `.env` to override the Volc proxy host or MQTT WebSocket credentials (`VITE_MQTT_*` keys). Defaults derive from the current page origin, so most local setups work without changes.
+Optional: copy `.env.example` to `.env` to override the Volc proxy host. Defaults derive from the current page origin, so most local setups work without changes.
 
 ### app
 
