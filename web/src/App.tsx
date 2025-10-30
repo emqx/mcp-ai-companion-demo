@@ -125,7 +125,7 @@ function App() {
       setAiReplyText('')
     },
     onTTSText: (text: string) => {
-      conversationLogger.assistant(text)
+      // conversationLogger.assistant(text)
       setAiReplyText(text)
       setLlmLoading(null)
     },
