@@ -43,16 +43,13 @@ This Web UI acts as an **MCP Server** that exposes hardware control functionalit
 ## Setup
 
 ```bash
-# Copy environment variables
-cp .env.example .env
-
 # Install dependencies
 pnpm install
 
 # Start development server
 pnpm dev
 
-# Build for production  
+# Build for production
 pnpm build
 ```
 
@@ -70,10 +67,8 @@ pnpm build
   - `fetchScenes` -> `POST /getScenes`
   - `startVoiceChat` / `stopVoiceChat` -> `POST /proxy?Action=...`
 - Type definitions live in `src/types/aigc.ts`; from there you can connect Zustand state and the UI.
-- `src/store/sceneStore.ts` 使用 Zustand 缓存场景与 RTC 信息。
-- `src/store/rtcStore.ts` 存储每个场景的 RTC 凭证、加入状态、设备首选项，供后续 RTC hooks 复用。
-- `src/store/deviceStore.ts` 与 Settings 面板配合，维护可选麦克风/摄像头列表及选项。
-- `src/lib/rtcClient.ts` 封装火山 RTC SDK；`src/hooks/useRtcClient.ts` 提供 join/leave/权限预检等能力，后续可在 UI 中逐步替换 MQTT WebRTC 流程。
+- `src/lib/rtcClient.ts` wraps VolcEngine RTC SDK for WebRTC functionality.
+- `src/hooks/useVolcRtc.ts` provides React hook for RTC operations.
 
 After you start `volc-server`, you can verify with the following commands:
 
