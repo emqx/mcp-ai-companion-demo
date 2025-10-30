@@ -2,22 +2,25 @@
 
 Bun + TypeScript server that proxies VolcEngine AIGC real-time voice APIs.
 
-- Exposes `/getScenes` and `/proxy` endpoints matching the Web client contract.
-- Loads `src/scenes/*.json`, merges credentials from `.env`, autogenerates Room/User IDs and 24h RTC tokens.
-- Signs VolcEngine TOP gateway requests and forwards `StartVoiceChat` / `StopVoiceChat`.
+- Exposes `/getScenes` and `/proxy` endpoints matching the Web client contract
+- Loads configuration entirely from environment variables, no JSON config files needed
+- Autogenerates Room/User IDs and 24h RTC tokens
+- Signs VolcEngine TOP gateway requests and forwards `StartVoiceChat` / `StopVoiceChat`
 
 ## 1. Prepare Environment
 
 ```bash
 cd volc-server
 cp .env.example .env
-# Fill in:
-# VOLC_ACCESS_KEY_ID / VOLC_SECRET_KEY
-# VOLC_RTC_APP_ID / VOLC_RTC_APP_KEY
-# Optional: VOLC_SCENE_DEFAULT (defaults to emq-mcp-ai-companion)
+# Fill in all required configuration values:
+# VOLC_ACCESS_KEY_ID / VOLC_SECRET_KEY (required)
+# VOLC_RTC_APP_ID / VOLC_RTC_APP_KEY (required)
+# VOLC_ASR_APP_ID / VOLC_TTS_APP_ID (for speech services)
+# VOLC_LLM_ENDPOINT_ID (for LLM services)
+# Other optional configurations for voice, LLM, agent, and avatar settings
 ```
 
-Add more scenes under `src/scenes/` if needed (see `emq-mcp-ai-companion.json` for structure).
+The server now loads all configuration from environment variables only. No JSON config files are needed, making it more secure and easier to manage across different environments.
 
 ## 2. Install Dependencies
 
@@ -56,17 +59,33 @@ curl -X POST 'http://localhost:3001/proxy?Action=StartVoiceChat' \
 volc-server/
 ├── src/
 │   ├── server.ts          # Bun HTTP server entry
-│   ├── env.ts             # runtime env validation
-│   ├── types.ts           # scene / API typings
-│   ├── lib/token.ts       # RTC token generator
+│   ├── env.ts             # Runtime environment validation with type conversion
+│   ├── types.ts           # Scene / API typings
+│   ├── handlers.ts        # HTTP request handlers
+│   ├── lib/
+│   │   └── token.ts       # RTC token generator
 │   └── scenes/
-│       ├── loader.ts      # scene loader & helpers
-│       └── emq-mcp-ai-companion.json  # sample scene (EMQ MCP AI Companion)
-├── .env.example
+│       └── loader.ts      # Scene builder from environment variables
+├── .env.example           # Complete environment variable template
+├── .env                   # Your actual configuration (not in version control)
 ├── package.json
 ├── bunfig.toml
 └── tsconfig.json
 ```
+
+## 6. Configuration
+
+The server uses environment variables exclusively for configuration. Key categories:
+
+- **Credentials**: `VOLC_ACCESS_KEY_ID`, `VOLC_SECRET_KEY`
+- **RTC**: `VOLC_RTC_APP_ID`, `VOLC_RTC_APP_KEY`
+- **Speech**: `VOLC_ASR_APP_ID`, `VOLC_TTS_APP_ID`, `VOLC_TTS_VOICE_TYPE`
+- **LLM**: `VOLC_LLM_ENDPOINT_ID`, `VOLC_LLM_SYSTEM_MESSAGE`
+- **Agent**: `VOLC_AGENT_USER_ID`, `VOLC_AGENT_WELCOME_MESSAGE`
+- **Scene**: `VOLC_SCENE_NAME`, `VOLC_SCENE_ICON`
+- **Avatar**: `VOLC_AVATAR_ENABLED`, `VOLC_AVATAR_TYPE`
+
+See `.env.example` for all available options and their defaults.
 
 VolcEngine docs for reference:
 

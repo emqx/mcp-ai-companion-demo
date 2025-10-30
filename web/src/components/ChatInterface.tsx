@@ -3,11 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { EmotionAnimation } from './EmotionAnimation'
 // import { EmotionSelector } from './EmotionSelector'
 import { ChatMessages } from './ChatMessages'
-import { Settings } from './Settings'
 import { useAudioPlaying } from '@/hooks/useAudioPlaying'
 import { useEffect, useRef, type RefObject } from 'react'
-import type { MqttConfig } from '@/utils/storage'
-import { appLogger, mqttLogger } from '@/utils/logger'
+import { appLogger } from '@/utils/logger'
 
 interface WebRTCState {
   remoteStream: MediaStream | null
@@ -27,7 +25,6 @@ interface WebRTCActions {
 
 interface ChatInterfaceProps {
   webrtc: WebRTCState & WebRTCActions
-  isMqttConnected: boolean
   aiReplyText?: string
   llmLoading?: 'processing' | 'waiting' | null
   showVideo: boolean
@@ -39,15 +36,11 @@ interface ChatInterfaceProps {
   audioRef: RefObject<HTMLAudioElement | null>
   volume: number
   isMuted: boolean
-  mqttConfig: MqttConfig
-  onMqttConfigChange: (config: MqttConfig) => void
-  onSendMessage?: (message: string) => Promise<void>
   onVolumeControl?: (volume?: number, muted?: boolean) => void
 }
 
 export function ChatInterface({
   webrtc,
-  isMqttConnected,
   aiReplyText,
   llmLoading,
   showVideo,
@@ -59,35 +52,10 @@ export function ChatInterface({
   audioRef,
   volume,
   isMuted,
-  mqttConfig,
-  onMqttConfigChange,
-  onSendMessage,
 }: ChatInterfaceProps) {
   const { t } = useTranslation()
   const isSpeaking = useAudioPlaying(audioRef, 1000)
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-  const sendAvatarInteraction = async (interactionType: 'encourage' | 'tap') => {
-    if (!onSendMessage) {
-      appLogger.error('onSendMessage callback not provided')
-      return
-    }
-    const interactionMap = {
-      encourage: t('chat.encourage'),
-      tap: t('chat.tap'),
-    }
-
-    const message = JSON.stringify({
-      type: 'message',
-      payload: interactionMap[interactionType],
-    })
-
-    try {
-      await onSendMessage(message)
-    } catch (error) {
-      mqttLogger.error('Failed to send avatar interaction message:', error)
-    }
-  }
 
   useEffect(() => {
     // Use remote stream for both audio and video display
@@ -136,7 +104,6 @@ export function ChatInterface({
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">
       <div className="fixed top-4 right-4 flex items-center gap-2">
-        <Settings config={mqttConfig} onConfigChange={onMqttConfigChange} isConnected={isMqttConnected} />
         {/*<EmotionSelector
           selectedEmotion={selectedEmotion}
           onEmotionSelect={setSelectedEmotion}
@@ -150,11 +117,9 @@ export function ChatInterface({
             clearTimeout(clickTimeoutRef.current)
             clickTimeoutRef.current = null
             appLogger.log('双击头像 - 鼓励')
-            sendAvatarInteraction('encourage')
           } else {
             clickTimeoutRef.current = setTimeout(() => {
               appLogger.log('单击头像 - 敲打')
-              sendAvatarInteraction('tap')
               clickTimeoutRef.current = null
             }, 300)
           }
@@ -202,7 +167,7 @@ export function ChatInterface({
         >
           <button
             onClick={async () => {
-              if (!webrtc.isConnected && !webrtc.isConnecting && isMqttConnected) {
+              if (!webrtc.isConnected && !webrtc.isConnecting) {
                 webrtc.connect()
                 return
               }
@@ -263,7 +228,7 @@ export function ChatInterface({
               if (!showVideo) {
                 setShowVideo(true)
                 // Connect WebRTC if needed
-                if (isMqttConnected && !webrtc.isConnected && !webrtc.isConnecting) {
+                if (!webrtc.isConnected && !webrtc.isConnecting) {
                   webrtc.connect()
                 }
               } else {

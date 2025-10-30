@@ -1,25 +1,25 @@
 import { useMcpMqttServer } from '@/hooks/useMcpMqttServer'
-import { useWebRTCMqtt } from '@/hooks/useWebRTCMqtt'
+import { useVolcRtc } from '@/hooks/useVolcRtc'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChatInterface } from '@/components/ChatInterface'
-import { appLogger, mqttLogger } from '@/utils/logger'
-import type { PhotoCaptureResult } from '@/tools/types'
+import { appLogger } from '@/utils/logger'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import { defaultMqttConfig } from '@/config/mqtt'
-import { loadMqttConfig, saveMqttConfig, type MqttConfig } from '@/utils/storage'
+import { loadMqttConfig, type MqttConfig } from '@/utils/storage'
+import type { PhotoCaptureResult } from '@/tools/types'
 
 function App() {
   const { t } = useTranslation()
   const [aiReplyText, setAiReplyText] = useState<string>('')
-  const [llmLoading, setLlmLoading] = useState<'processing' | 'waiting' | null>()
+  const [llmLoading] = useState<'processing' | 'waiting' | null>(null)
   const [showVideo, setShowVideo] = useState<boolean>(false)
   const [selectedEmotion, setSelectedEmotion] = useState<string>('happy')
   const [volume, setVolume] = useState<number>(1.0) // 0.0 to 1.0
   const [isMuted, setIsMuted] = useState<boolean>(true)
-  const [mqttConfig, setMqttConfig] = useState<MqttConfig>(() => {
+  const [mqttConfig] = useState<MqttConfig>(() => {
     const savedConfig = loadMqttConfig()
     if (savedConfig) {
       return savedConfig
@@ -57,46 +57,38 @@ function App() {
     [captureFromLocalCamera],
   )
 
-  const onVolumeControl = useCallback((newVolume?: number, muted?: boolean) => {
-    // Update volume if provided (0.0 to 1.0)
-    if (newVolume !== undefined) {
-      setVolume(newVolume)
-      const volumePercent = Math.round(newVolume * 100)
-      appLogger.info(`🔊 Volume set to ${volumePercent}%`)
-      toast(`${t('audio.volumeSet')} ${volumePercent}%`, {
-        duration: 3000,
-      })
-    }
-
-    // Update muted state if provided
-    if (muted !== undefined) {
-      setIsMuted(muted)
-      const message = muted ? t('audio.muted') : t('audio.unmuted')
-      appLogger.info(`🔊 Audio ${muted ? 'muted' : 'unmuted'}`)
-      toast(message, {
-        duration: 3000,
-      })
-    }
-
-    // Apply changes to audio element if it exists
-    if (audioRef.current) {
+  const onVolumeControl = useCallback(
+    (newVolume?: number, muted?: boolean) => {
       if (newVolume !== undefined) {
-        audioRef.current.volume = newVolume
+        setVolume(newVolume)
+        const volumePercent = Math.round(newVolume * 100)
+        appLogger.info(`🔊 Volume set to ${volumePercent}%`)
+        toast(`${t('audio.volumeSet')} ${volumePercent}%`, {
+          duration: 3000,
+        })
       }
+
       if (muted !== undefined) {
-        audioRef.current.muted = muted
+        setIsMuted(muted)
+        const message = muted ? t('audio.muted') : t('audio.unmuted')
+        appLogger.info(`🔊 Audio ${muted ? 'muted' : 'unmuted'}`)
+        toast(message, {
+          duration: 3000,
+        })
       }
-    }
-  }, [t])
 
-  const onMqttConfigChange = useCallback((newConfig: MqttConfig) => {
-    setMqttConfig(newConfig)
-    saveMqttConfig(newConfig)
-    appLogger.info('💾 MQTT config saved to localStorage')
-    // TODO: Reconnect MQTT with new config
-  }, [])
+      if (audioRef.current) {
+        if (newVolume !== undefined) {
+          audioRef.current.volume = newVolume
+        }
+        if (muted !== undefined) {
+          audioRef.current.muted = muted
+        }
+      }
+    },
+    [t],
+  )
 
-  // Temporarily use original callback - will be updated after enhancedOnTakePhoto is defined
   const callbacks = useMemo(
     () => ({
       onCameraControl,
@@ -107,34 +99,13 @@ function App() {
     [onCameraControl, onEmotionChange, onTakePhoto, onVolumeControl],
   )
 
-  const {
-    client: mcpMqttClient,
-    isConnected: isMqttConnected,
-    isMcpInitialized,
-  } = useMcpMqttServer({
+  const { isConnected: isMqttConnected, isMcpInitialized } = useMcpMqttServer({
     brokerUrl: mqttConfig.brokerUrl,
     username: mqttConfig.username,
     password: mqttConfig.password,
     autoConnect: true,
     callbacks,
   })
-
-  const onSendMessage = useCallback(
-    async (message: string) => {
-      if (!mcpMqttClient) {
-        throw new Error('MQTT client is not available')
-      }
-      try {
-        const topic = `$message/${mcpMqttClient.getClientId()}/multimedia_proxy`
-        await mcpMqttClient.publish(topic, message)
-        mqttLogger.info(`Message sent to ${topic}: ${message}`)
-      } catch (error) {
-        mqttLogger.error('Failed to send MQTT message:', error)
-        throw error
-      }
-    },
-    [mcpMqttClient],
-  )
 
   const {
     remoteStream,
@@ -148,8 +119,7 @@ function App() {
     isAudioEnabled,
     isVideoEnabled,
     cleanup: cleanupWebRTC,
-  } = useWebRTCMqtt({
-    mqttClient: mcpMqttClient?.getMqttClient() || null,
+  } = useVolcRtc({
     onASRResponse: () => {
       setAiReplyText('')
     },
@@ -158,15 +128,16 @@ function App() {
     },
     onMessage: (message: any) => {
       appLogger.info('🔊 Message:', message)
-
-      // Handle loading messages
-      if (message && typeof message === 'object' && message.type === 'loading') {
-        const status = message.status
-        if (status === 'processing' || status === 'waiting') {
-          setLlmLoading(status)
+      // Loading status updates disabled while using Volc RTC integration
+      if (message && typeof message === 'object') {
+        if (message.type === 'loading') {
+          if (message.status === 'processing' || message.status === 'waiting') {
+            setAiReplyText('')
+          }
+        } else if (message.type === 'error') {
+          const reason = message.reason || t('common.errorOccurred')
+          toast.error(reason)
           setAiReplyText('')
-        } else if (status === 'complete') {
-          setLlmLoading(null)
         }
       }
     },
@@ -189,7 +160,7 @@ function App() {
   useEffect(() => {
     return () => {
       if (cleanupWebRTC) {
-        cleanupWebRTC()
+        void cleanupWebRTC()
       }
     }
   }, [cleanupWebRTC])
@@ -209,7 +180,6 @@ function App() {
           toggleAudio,
           toggleVideo,
         }}
-        isMqttConnected={isMqttConnected}
         aiReplyText={aiReplyText}
         llmLoading={llmLoading}
         showVideo={showVideo}
@@ -221,9 +191,6 @@ function App() {
         audioRef={audioRef}
         volume={volume}
         isMuted={isMuted}
-        mqttConfig={mqttConfig}
-        onMqttConfigChange={onMqttConfigChange}
-        onSendMessage={onSendMessage}
       />
       <Toaster />
     </>
