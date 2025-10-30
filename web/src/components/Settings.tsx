@@ -21,7 +21,6 @@ import type { MqttConfig, IceServersConfig } from '@/utils/storage'
 import { clearMqttConfig, saveIceServersConfig, loadIceServersConfig, clearIceServersConfig } from '@/utils/storage'
 import { defaultMqttConfig } from '@/config/mqtt'
 import { getDefaultIceServersConfig } from '@/utils/ice-servers'
-import { appLogger } from '@/utils/logger'
 
 interface SettingsProps {
   config: MqttConfig
@@ -49,7 +48,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
     },
   )
   const [tempLanguage, setTempLanguage] = useState<string>(i18n.language)
-  const [currentVoice, setCurrentVoice] = useState<string>('longhua_v2')
+  const [currentVoice] = useState<string>('longhua_v2')
   const [tempVoice, setTempVoice] = useState<string>('longhua_v2')
   const [iceServersConfig, setIceServersConfig] = useState<IceServersConfig>(() => {
     const saved = loadIceServersConfig()
@@ -69,21 +68,21 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
     setTempLanguage(i18n.language)
   }, [i18n.language])
 
-  useEffect(() => {
-    const fetchCurrentVoice = async () => {
-      try {
-        const response = await fetch('/api/get_tts_voice')
-        const data = await response.json()
-        if (data.voice_type) {
-          setCurrentVoice(data.voice_type)
-          setTempVoice(data.voice_type)
-        }
-      } catch (error) {
-        console.error('Failed to fetch current voice:', error)
-      }
-    }
-    fetchCurrentVoice()
-  }, [])
+  // useEffect(() => {
+  //   const fetchCurrentVoice = async () => {
+  //     try {
+  //       const response = await fetch('/api/get_tts_voice')
+  //       const data = await response.json()
+  //       if (data.voice_type) {
+  //         setCurrentVoice(data.voice_type)
+  //         setTempVoice(data.voice_type)
+  //       }
+  //     } catch (error) {
+  //       console.error('Failed to fetch current voice:', error)
+  //     }
+  //   }
+  //   fetchCurrentVoice()
+  // }, [])
 
   const handleLanguageChange = (newLanguage: string) => {
     setTempLanguage(newLanguage)
@@ -100,24 +99,24 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
     }
 
     // Change voice if it's different
-    if (tempVoice !== currentVoice) {
-      try {
-        const response = await fetch('/api/set_tts_voice', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ voice_type: tempVoice }),
-        })
-        const data = await response.json()
-        if (data.success) {
-          setCurrentVoice(tempVoice)
-          appLogger.info(`TTS Voice changed to ${tempVoice}`)
-        }
-      } catch (error) {
-        console.error('Failed to change voice:', error)
-      }
-    }
+    // if (tempVoice !== currentVoice) {
+    //   try {
+    //     const response = await fetch('/api/set_tts_voice', {
+    //       method: 'POST',
+    //       headers: {
+    //         'Content-Type': 'application/json',
+    //       },
+    //       body: JSON.stringify({ voice_type: tempVoice }),
+    //     })
+    //     const data = await response.json()
+    //     if (data.success) {
+    //       setCurrentVoice(tempVoice)
+    //       appLogger.info(`TTS Voice changed to ${tempVoice}`)
+    //     }
+    //   } catch (error) {
+    //     console.error('Failed to change voice:', error)
+    //   }
+    // }
 
     onConfigChange(tempConfig)
     saveIceServersConfig(iceServersConfig)

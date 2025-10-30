@@ -35,6 +35,9 @@ importers:
       '@types/mqtt':
         specifier: ^2.5.0
         version: 2.5.0
+      '@volcengine/rtc':
+        specifier: ^4.67.8
+        version: 4.67.8
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -80,6 +83,9 @@ importers:
       zod:
         specifier: ^4.1.5
         version: 4.1.5
+      zustand:
+        specifier: ^5.0.8
+        version: 5.0.8(@types/react@19.1.11)(react@19.1.1)
     devDependencies:
       '@eslint/js':
         specifier: ^9.33.0
@@ -1114,6 +1120,9 @@ packages:
     peerDependencies:
       vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
 
+  '@volcengine/rtc@4.67.8':
+    resolution: {integrity: sha512-IWdwqbD0Z/WACn7DPQfr63LcFjlK2rPn7nKe/aiQV0HEfJE0KxhIGn5dhxjHMaAwjWiYMjeQ16FjNyOxzsA1VQ==}
+
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
     engines: {node: '>=6.5'}
@@ -1326,6 +1335,9 @@ packages:
   event-target-shim@5.0.1:
     resolution: {integrity: sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ==}
     engines: {node: '>=6'}
+
+  eventemitter3@4.0.7:
+    resolution: {integrity: sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw==}
 
   events@3.3.0:
     resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
@@ -2067,6 +2079,24 @@ packages:
 
   zod@4.1.5:
     resolution: {integrity: sha512-rcUUZqlLJgBC33IT3PNMgsCq6TzLQEG/Ei/KTCU0PedSWRMAXoOUN+4t/0H+Q8bdnLPdqUYnvboJT0bn/229qg==}
+
+  zustand@5.0.8:
+    resolution: {integrity: sha512-gyPKpIaxY9XcO2vSMrLbiER7QMAMGOQZVRdJ6Zi782jkbzZygq5GI9nG8g+sMgitRtndwaBSl7uiqC49o1SSiw==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@types/react': '>=18.0.0'
+      immer: '>=9.0.6'
+      react: '>=18.0.0'
+      use-sync-external-store: '>=1.2.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
+        optional: true
 
 snapshots:
 
@@ -2966,6 +2996,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@volcengine/rtc@4.67.8':
+    dependencies:
+      eventemitter3: 4.0.7
+
   abort-controller@3.0.0:
     dependencies:
       event-target-shim: 5.0.1
@@ -3220,6 +3254,8 @@ snapshots:
   esutils@2.0.3: {}
 
   event-target-shim@5.0.1: {}
+
+  eventemitter3@4.0.7: {}
 
   events@3.3.0: {}
 
@@ -3845,3 +3881,8 @@ snapshots:
   zod@3.25.76: {}
 
   zod@4.1.5: {}
+
+  zustand@5.0.8(@types/react@19.1.11)(react@19.1.1):
+    optionalDependencies:
+      '@types/react': 19.1.11
+      react: 19.1.1
