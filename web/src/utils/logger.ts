@@ -32,9 +32,15 @@ const loggerConfigs: Record<string, LoggerConfig> = {
 export class Logger {
   private config: LoggerConfig
   private enabled: boolean = true
+  private includeTimestamp: boolean
 
   constructor(type: keyof typeof loggerConfigs) {
     this.config = loggerConfigs[type] || loggerConfigs.app
+    this.includeTimestamp = false
+  }
+
+  setTimestamp(enabled: boolean): void {
+    this.includeTimestamp = enabled
   }
 
   private formatMessage(level: LogLevel, ...args: any[]): void {
@@ -49,19 +55,25 @@ export class Logger {
     ].join(';')
 
     const prefix = `%c${this.config.prefix}`
+    const parts: any[] = [prefix, styles]
+    if (this.includeTimestamp) {
+      const now = new Date()
+      const ts = now.toLocaleTimeString('en-US', { hour12: false }) + `.${now.getMilliseconds().toString().padStart(3, '0')}`
+      parts.push(`[${ts}]`)
+    }
 
     switch (level) {
       case 'debug':
-        console.debug(prefix, styles, ...args)
+        console.debug(...parts, ...args)
         break
       case 'info':
-        console.log(prefix, styles, ...args)
+        console.log(...parts, ...args)
         break
       case 'warn':
-        console.warn(prefix, styles, ...args)
+        console.warn(...parts, ...args)
         break
       case 'error':
-        console.error(prefix, styles, ...args)
+        console.error(...parts, ...args)
         break
     }
   }
@@ -95,3 +107,35 @@ export const mcpLogger = new Logger('mcp')
 export const webrtcLogger = new Logger('webrtc')
 export const mqttLogger = new Logger('mqtt')
 export const appLogger = new Logger('app')
+
+type ConversationSpeaker = 'user' | 'assistant'
+
+const speakerStyles: Record<ConversationSpeaker, { label: string; style: string }> = {
+  user: {
+    label: '[User]',
+    style: 'color: #1D3557; font-weight: 600;',
+  },
+  assistant: {
+    label: '[Assistant]',
+    style: 'color: #E63946; font-weight: 600;',
+  },
+}
+
+const secondaryStyle = 'color: #4C566A;'
+
+export const conversationLogger = {
+  log(speaker: ConversationSpeaker, message?: string | null) {
+    if (!message) return
+    const trimmed = message.trim()
+    if (!trimmed) return
+
+    const { label, style } = speakerStyles[speaker]
+    console.log(`%c${label}%c ${trimmed}`, style, secondaryStyle)
+  },
+  user(message?: string | null) {
+    conversationLogger.log('user', message)
+  },
+  assistant(message?: string | null) {
+    conversationLogger.log('assistant', message)
+  },
+}

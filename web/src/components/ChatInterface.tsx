@@ -26,7 +26,7 @@ interface WebRTCActions {
 interface ChatInterfaceProps {
   webrtc: WebRTCState & WebRTCActions
   aiReplyText?: string
-  llmLoading?: 'processing' | 'waiting' | null
+  llmLoading?: 'processing' | 'waiting' | 'listening' | null
   showVideo: boolean
   setShowVideo: (show: boolean) => void
   selectedEmotion: string

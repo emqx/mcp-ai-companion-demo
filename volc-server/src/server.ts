@@ -1,5 +1,6 @@
 import { getEnv } from './env'
 import { createRequestHandler } from './handlers'
+import { serverLogger } from './logger'
 
 const env = getEnv()
 const handleRequest = createRequestHandler(env)
@@ -11,4 +12,4 @@ const server = Bun.serve({
   },
 })
 
-console.log(`Volc server is running at http://localhost:${server.port}`)
+serverLogger.info(`Volc server is running`, { url: `http://localhost:${server.port}` })

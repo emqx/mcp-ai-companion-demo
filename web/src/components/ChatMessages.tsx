@@ -7,7 +7,7 @@ interface ChatMessagesProps {
   isLoading?: boolean
   isSpeaking?: boolean
   aiReplyText?: string
-  llmLoading?: 'processing' | 'waiting' | null
+  llmLoading?: 'processing' | 'waiting' | 'listening' | null
 }
 
 export function ChatMessages({
@@ -29,7 +29,8 @@ export function ChatMessages({
   const getLoadingText = () => {
     if (llmLoading === 'processing') return t('chat.processing')
     if (llmLoading === 'waiting') return t('chat.waiting')
-    return t('chat.listening')
+    if (llmLoading === 'listening') return t('chat.listening')
+    return t('chat.ready')
   }
 
   // If not connected/loading, show welcome message

@@ -2,6 +2,7 @@ import { Signer } from '@volcengine/openapi'
 import { loadScenes, summarizeScenes, getScene, prepareSceneForRequest } from './scenes/loader'
 import type { RuntimeEnv } from './env'
 import type { SceneFile, SceneSummary } from './types'
+import { serverLogger } from './logger'
 
 type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null
 
@@ -42,7 +43,7 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 const buildStartVoiceChatPayload = (scene: SceneFile) => {
   const prepared = prepareSceneForRequest(scene)
   const voiceChat = clone(prepared.VoiceChat)
-  console.debug('[volc-server] VoiceChat config before start:', JSON.stringify(voiceChat, null, 2))
+  serverLogger.info('Starting voice chat', { AppId: voiceChat.AppId, RoomId: voiceChat.RoomId, TaskId: voiceChat.TaskId })
   return voiceChat
 }
 
@@ -52,6 +53,7 @@ const buildStopVoiceChatPayload = (scene: SceneFile) => {
   if (!AppId || !RoomId || !TaskId) {
     throw new Error('VoiceChat.AppId, VoiceChat.RoomId, and VoiceChat.TaskId are required to stop voice chat')
   }
+  serverLogger.info('Stopping voice chat', { AppId, RoomId, TaskId })
   return {
     AppId,
     RoomId,
@@ -64,23 +66,29 @@ const buildAccessInfoPayload = (scene: SceneFile, payload: ProxyPayload) => {
   delete extras.SceneID
 
   if (Object.keys(extras).length > 0) {
+    serverLogger.debug('Access info requested with payload overrides', extras)
     return extras
   }
 
   const prepared = prepareSceneForRequest(scene)
   const config = prepared.VoiceChat.Config as Record<string, unknown> | undefined
   if (config && config.AccessInfo) {
+    serverLogger.debug('Access info resolved from config', config.AccessInfo)
     return clone(config.AccessInfo)
   }
 
-  return {
+  const defaultAccessInfo = {
     AppId: prepared.VoiceChat.AppId,
     RoomId: prepared.VoiceChat.RoomId,
     TaskId: prepared.VoiceChat.TaskId,
   }
+  serverLogger.debug('Access info fallback to defaults', defaultAccessInfo)
+  return defaultAccessInfo
 }
 
 const callVolcApi = async (scene: SceneFile, env: RuntimeEnv, action: string, version: string, body: unknown) => {
+  serverLogger.info(`Calling VolcEngine API: ${action}`, { version })
+
   const accessKeyId = scene.AccountConfig.accessKeyId || env.VOLC_ACCESS_KEY_ID
   const secretKey = scene.AccountConfig.secretKey || env.VOLC_SECRET_KEY
   if (!accessKeyId || !secretKey) {
@@ -111,6 +119,7 @@ const callVolcApi = async (scene: SceneFile, env: RuntimeEnv, action: string, ve
   })
 
   const data = (await response.json()) as JsonValue
+  serverLogger.debug(`VolcEngine API response: ${action}`, { status: response.status })
   return {
     status: response.status,
     data,
@@ -121,8 +130,11 @@ const makeSceneSummaries = (scenes: Map<string, SceneFile>): SceneSummary[] => s
 
 export const createRequestHandler = (env: RuntimeEnv) => {
   const scenes = loadScenes(env)
+  serverLogger.info('Request handler initialized', { sceneCount: scenes.size, defaultScene: env.VOLC_SCENE_DEFAULT })
+
   const resolveScene = (sceneId?: string): SceneFile => {
     const id = sceneId && sceneId.trim().length ? sceneId : env.VOLC_SCENE_DEFAULT
+    serverLogger.debug('Resolving scene', { requestedSceneId: sceneId, resolvedId: id })
     const scene = getScene(scenes, id)
     if (!scene) {
       throw new Error(`Scene ${id} not found`)
@@ -131,10 +143,12 @@ export const createRequestHandler = (env: RuntimeEnv) => {
   }
 
   const handleGetScenes = () => {
+    serverLogger.info('Handling getScenes request')
     for (const scene of scenes.values()) {
       prepareSceneForRequest(scene)
     }
     const summaries = makeSceneSummaries(scenes)
+    serverLogger.debug('Scenes ready to return', { sceneCount: summaries.length })
     return toJsonResponse({
       ResponseMetadata: {
         Action: 'getScenes',
@@ -150,19 +164,26 @@ export const createRequestHandler = (env: RuntimeEnv) => {
     const action = url.searchParams.get('Action')
     const version = url.searchParams.get('Version') ?? env.VOLC_API_VERSION
 
+    serverLogger.info('Handling proxy request', { action, version })
+
     if (!action) {
+      serverLogger.warn('Proxy request missing Action parameter')
       return toErrorResponse('proxy', 'Action query parameter is required')
     }
 
     const rawBody = (await req.json().catch(() => null)) as ProxyPayload | null
     if (!rawBody || typeof rawBody !== 'object') {
+      serverLogger.warn('Proxy request has invalid body', { action })
       return toErrorResponse(action, 'Invalid request body', 400)
     }
+
+    serverLogger.debug('Proxy request body received', { action, sceneId: rawBody.SceneID })
 
     let scene: SceneFile
     try {
       scene = resolveScene(rawBody.SceneID)
     } catch (error) {
+      serverLogger.error('Failed to resolve scene', { action, sceneId: rawBody.SceneID, error })
       return toErrorResponse(action, (error as Error).message, 404)
     }
 
@@ -179,35 +200,44 @@ export const createRequestHandler = (env: RuntimeEnv) => {
           requestBody = buildAccessInfoPayload(scene, rawBody)
           break
         default:
+          serverLogger.warn('Unsupported action requested', { action })
           return toErrorResponse(action, `Unsupported Action: ${action}`, 400)
       }
     } catch (error) {
+      serverLogger.error('Failed to build request payload', { action, error })
       return toErrorResponse(action, (error as Error).message, 500)
     }
 
     try {
       const result = await callVolcApi(scene, env, action, version, requestBody)
+      serverLogger.info(`VolcEngine call completed: ${action}`, { status: result.status })
       return toJsonResponse(result.data, { status: result.status })
     } catch (error) {
+      serverLogger.error('VolcEngine API call failed', { action, error })
       return toErrorResponse(action, `Failed to call VolcEngine API: ${(error as Error).message}`, 502)
     }
   }
 
   const handleRequest = async (req: Request): Promise<Response> => {
-    if (req.method === 'OPTIONS') {
+    const { pathname } = new URL(req.url)
+    const method = req.method
+
+    serverLogger.info('Incoming request', { method, pathname })
+
+    if (method === 'OPTIONS') {
+      serverLogger.debug('Handling OPTIONS request', { pathname })
       return new Response(null, { status: 204, headers: RESPONSE_HEADERS })
     }
 
-    const { pathname } = new URL(req.url)
-
-    if (req.method === 'POST' && pathname === '/getScenes') {
+    if (method === 'POST' && pathname === '/getScenes') {
       return handleGetScenes()
     }
 
-    if (req.method === 'POST' && pathname === '/proxy') {
+    if (method === 'POST' && pathname === '/proxy') {
       return handleProxy(req)
     }
 
+    serverLogger.warn('Request not handled', { method, pathname })
     return new Response('Not Found', { status: 404, headers: RESPONSE_HEADERS })
   }
 
