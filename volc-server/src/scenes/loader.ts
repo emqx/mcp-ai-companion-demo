@@ -18,6 +18,20 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
   const roomId = randomUUID()
   const userId = randomUUID()
 
+  const agentConfig: VoiceChatConfig['AgentConfig'] = {
+    TargetUserId: [userId],
+    WelcomeMessage: env.VOLC_AGENT_WELCOME_MESSAGE,
+    UserId: env.VOLC_AGENT_USER_ID,
+    EnableConversationStateCallback: env.VOLC_AGENT_ENABLE_CONVERSATION_CALLBACK,
+    AnsMode: env.VOLC_AGENT_ANS_MODE,
+  }
+
+  if (env.VOLC_AGENT_VOICEPRINT_MODE > 0) {
+    agentConfig.VoicePrint = {
+      Mode: env.VOLC_AGENT_VOICEPRINT_MODE,
+    }
+  }
+
   const scene: SceneFile = {
     SceneConfig: {
       icon: env.VOLC_SCENE_ICON,
@@ -45,12 +59,7 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
       AppId: env.VOLC_RTC_APP_ID,
       RoomId: roomId,
       TaskId: env.VOLC_TASK_ID,
-      AgentConfig: {
-        TargetUserId: [userId],
-        WelcomeMessage: env.VOLC_AGENT_WELCOME_MESSAGE,
-        UserId: env.VOLC_AGENT_USER_ID,
-        EnableConversationStateCallback: env.VOLC_AGENT_ENABLE_CONVERSATION_CALLBACK,
-      },
+      AgentConfig: agentConfig,
       Config: {
         ASRConfig: {
           Provider: 'volcano',

@@ -31,6 +31,8 @@ const envSchema = z.object({
   VOLC_AGENT_USER_ID: z.string().default('emq-ai-bot'),
   VOLC_AGENT_WELCOME_MESSAGE: z.string().default('你好，我是 EMQ，有什么需要帮忙的吗？'),
   VOLC_AGENT_ENABLE_CONVERSATION_CALLBACK: z.boolean().default(true),
+  VOLC_AGENT_ANS_MODE: z.number().default(2),
+  VOLC_AGENT_VOICEPRINT_MODE: z.number().default(1),
 
   // Task configuration
   VOLC_TASK_ID: z.string().default('emq-aigc-task-001'),
@@ -64,6 +66,8 @@ export const getEnv = (): RuntimeEnv => {
     VOLC_TTS_VOLUME_RATIO: Bun.env.VOLC_TTS_VOLUME_RATIO ? Number(Bun.env.VOLC_TTS_VOLUME_RATIO) : 1,
     VOLC_LLM_VISION_ENABLE: Bun.env.VOLC_LLM_VISION_ENABLE === 'true',
     VOLC_AGENT_ENABLE_CONVERSATION_CALLBACK: Bun.env.VOLC_AGENT_ENABLE_CONVERSATION_CALLBACK !== 'false',
+    VOLC_AGENT_ANS_MODE: Bun.env.VOLC_AGENT_ANS_MODE ? Number(Bun.env.VOLC_AGENT_ANS_MODE) : 2,
+    VOLC_AGENT_VOICEPRINT_MODE: Bun.env.VOLC_AGENT_VOICEPRINT_MODE ? Number(Bun.env.VOLC_AGENT_VOICEPRINT_MODE) : 1,
     VOLC_AVATAR_ENABLED: Bun.env.VOLC_AVATAR_ENABLED === 'true',
     VOLC_AVATAR_VIDEO_BITRATE: Bun.env.VOLC_AVATAR_VIDEO_BITRATE ? Number(Bun.env.VOLC_AVATAR_VIDEO_BITRATE) : 2000,
     VOLC_INTERRUPT_MODE: Bun.env.VOLC_INTERRUPT_MODE ? Number(Bun.env.VOLC_INTERRUPT_MODE) : 0,
