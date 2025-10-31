@@ -32,6 +32,104 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
     }
   }
 
+  const interruptConfig: Record<string, unknown> = {}
+  if (env.VOLC_INTERRUPT_SPEECH_DURATION > 0) {
+    interruptConfig.InterruptSpeechDuration = env.VOLC_INTERRUPT_SPEECH_DURATION
+  }
+  if (env.VOLC_INTERRUPT_KEYWORDS.length > 0) {
+    interruptConfig.InterruptKeywords = env.VOLC_INTERRUPT_KEYWORDS
+  }
+
+  const asrConfig: Record<string, unknown> = {
+    Provider: 'volcano',
+    ProviderParams: {
+      Mode: 'smallmodel',
+      AppId: env.VOLC_ASR_APP_ID || '',
+      Cluster: env.VOLC_ASR_CLUSTER,
+    },
+    VADConfig: {
+      SilenceTime: env.VOLC_INTERRUPT_SILENCE_TIME,
+    },
+    VolumeGain: env.VOLC_INTERRUPT_VOLUME_GAIN,
+  }
+
+  if (Object.keys(interruptConfig).length > 0) {
+    asrConfig.InterruptConfig = interruptConfig
+  }
+
+  const ttsAudioConfig: Record<string, unknown> = {
+    voice_type: env.VOLC_TTS_VOICE_TYPE,
+  }
+
+  switch (env.VOLC_TTS_MODE) {
+    case 'bigtts':
+      ttsAudioConfig.speech_ratio = env.VOLC_TTS_SPEECH_RATIO
+      ttsAudioConfig.pitch_rate = env.VOLC_TTS_PITCH_RATE
+      ttsAudioConfig.volume_ratio = env.VOLC_TTS_VOLUME_RATIO
+      break
+    case 'bidirection':
+      ttsAudioConfig.speech_rate = env.VOLC_TTS_SPEECH_RATE
+      ttsAudioConfig.volume_ratio = env.VOLC_TTS_VOLUME_RATIO
+      ttsAudioConfig.pitch_ratio = env.VOLC_TTS_PITCH_RATIO
+      break
+    default:
+      ttsAudioConfig.speed_ratio = env.VOLC_TTS_SPEED_RATIO
+      ttsAudioConfig.pitch_ratio = env.VOLC_TTS_PITCH_RATIO
+      ttsAudioConfig.volume_ratio = env.VOLC_TTS_VOLUME_RATIO
+      break
+  }
+
+  if (env.VOLC_TTS_EMOTION) {
+    ttsAudioConfig.emotion = env.VOLC_TTS_EMOTION
+    if (env.VOLC_TTS_EMOTION_INTENSITY) {
+      ttsAudioConfig.emotion_strength = env.VOLC_TTS_EMOTION_INTENSITY
+    }
+  }
+
+  const ttsProviderParams: Record<string, unknown> = {
+    app: {
+      appid: env.VOLC_TTS_APP_ID || '',
+    },
+    audio: ttsAudioConfig,
+  }
+
+  if (env.VOLC_TTS_PROVIDER === 'volcano') {
+    ttsProviderParams.app = {
+      ...(ttsProviderParams.app as Record<string, unknown>),
+      cluster: env.VOLC_TTS_CLUSTER,
+    }
+  }
+
+  if (env.VOLC_TTS_APP_TOKEN) {
+    ;(ttsProviderParams.app as Record<string, unknown>).token = env.VOLC_TTS_APP_TOKEN
+  }
+
+  if (env.VOLC_TTS_RESOURCE_ID) {
+    ttsProviderParams.ResourceId = env.VOLC_TTS_RESOURCE_ID
+  }
+
+  if (env.VOLC_TTS_MODE === 'bidirection') {
+    const additions: Record<string, unknown> = {}
+    if (env.VOLC_TTS_DISABLE_MARKDOWN_FILTER) {
+      additions.disable_markdown_filter = true
+    }
+    if (env.VOLC_TTS_ENABLE_LATEX_TN) {
+      additions.enable_latex_tn = true
+    }
+    if (Object.keys(additions).length > 0) {
+      ttsProviderParams.Additions = additions
+    }
+  }
+
+  const ttsConfig: Record<string, unknown> = {
+    Provider: env.VOLC_TTS_PROVIDER,
+    ProviderParams: ttsProviderParams,
+  }
+
+  if (env.VOLC_TTS_IGNORE_BRACKET_TEXT.length > 0) {
+    ttsConfig.IgnoreBracketText = env.VOLC_TTS_IGNORE_BRACKET_TEXT
+  }
+
   const scene: SceneFile = {
     SceneConfig: {
       icon: env.VOLC_SCENE_ICON,
@@ -61,29 +159,8 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
       TaskId: env.VOLC_TASK_ID,
       AgentConfig: agentConfig,
       Config: {
-        ASRConfig: {
-          Provider: 'volcano',
-          ProviderParams: {
-            Mode: 'smallmodel',
-            AppId: env.VOLC_ASR_APP_ID || '',
-            Cluster: env.VOLC_ASR_CLUSTER,
-          },
-        },
-        TTSConfig: {
-          Provider: 'volcano',
-          ProviderParams: {
-            app: {
-              appid: env.VOLC_TTS_APP_ID || '',
-              cluster: env.VOLC_TTS_CLUSTER,
-            },
-            audio: {
-              voice_type: env.VOLC_TTS_VOICE_TYPE,
-              speed_ratio: env.VOLC_TTS_SPEED_RATIO,
-              pitch_ratio: env.VOLC_TTS_PITCH_RATIO,
-              volume_ratio: env.VOLC_TTS_VOLUME_RATIO,
-            },
-          },
-        },
+        ASRConfig: asrConfig,
+        TTSConfig: ttsConfig,
         LLMConfig: {
           Mode: env.VOLC_LLM_MODE,
           EndPointId: env.VOLC_LLM_ENDPOINT_ID || '',
