@@ -200,6 +200,26 @@ class RtcClient {
     await this.engine.subscribeScreen(userId, mediaType)
   }
 
+  getLocalMediaStream(): MediaStream | null {
+    if (!this.engine) return null
+
+    const stream = new MediaStream()
+    const audioTrack = this.engine.getLocalStreamTrack(StreamIndex.STREAM_INDEX_MAIN, 'audio')
+    const videoTrack = this.engine.getLocalStreamTrack(StreamIndex.STREAM_INDEX_MAIN, 'video')
+
+    if (audioTrack) {
+      stream.addTrack(audioTrack)
+    }
+    if (videoTrack) {
+      stream.addTrack(videoTrack)
+    }
+
+    if (stream.getTracks().length === 0) {
+      return null
+    }
+    return stream
+  }
+
   async unsubscribeScreen(userId: string, mediaType: MediaType) {
     if (!this.engine) return
     await this.engine.unsubscribeScreen(userId, mediaType)

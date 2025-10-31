@@ -27,6 +27,7 @@ const stageToLoadingStatus = (code?: number) => {
 }
 
 export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: UseVolcRtcOptions): UseWebRTCReturn {
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
   const [error, setError] = useState<Error | null>(null)
@@ -69,6 +70,30 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
     sceneRef.current = selected
     return selected
   }, [sceneId])
+
+  const tryUpdateLocalStream = useCallback(() => {
+    const stream = rtcClient.getLocalMediaStream()
+    if (stream) {
+      setLocalStream(stream)
+      return true
+    }
+    return false
+  }, [])
+
+  const refreshLocalStream = useCallback(
+    (attempt = 0) => {
+      if (tryUpdateLocalStream()) {
+        return
+      }
+      if (attempt >= 3) {
+        return
+      }
+      window.setTimeout(() => {
+        refreshLocalStream(attempt + 1)
+      }, 200)
+    },
+    [tryUpdateLocalStream],
+  )
 
   const handleBinaryMessage = useCallback((buffer: ArrayBuffer) => {
       const parsed = parseAigcBinaryMessage(buffer)
@@ -231,6 +256,7 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
       if (isVideoEnabled) {
         await rtcClient.startVideoCapture()
         await rtcClient.publishStream(MediaType.VIDEO)
+        refreshLocalStream()
       }
 
       if (sceneConfig?.id && !voiceChatStartedRef.current) {
@@ -247,7 +273,7 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
     } finally {
       pendingConnectRef.current = false
     }
-  }, [connectionState, ensureSceneConfig, isAudioEnabled, isVideoEnabled, onMessage])
+  }, [connectionState, ensureSceneConfig, isAudioEnabled, isVideoEnabled, refreshLocalStream])
 
   const disconnect = useCallback(async () => {
     pendingConnectRef.current = false
@@ -267,6 +293,7 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
     } catch (err) {
       console.warn('[useVolcRtc] unpublish video failed', err)
     }
+    setLocalStream(null)
     try {
       await rtcClient.unpublishStream(MediaType.AUDIO)
     } catch (err) {
@@ -323,17 +350,18 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
         setIsVideoEnabled(true)
         if (connectionState !== 'connected') {
           await connect()
-          return
         }
         await rtcClient.startVideoCapture()
         await rtcClient.publishStream(MediaType.VIDEO)
+        refreshLocalStream()
       } else {
         await rtcClient.unpublishStream(MediaType.VIDEO)
         await rtcClient.stopVideoCapture()
         setIsVideoEnabled(false)
+        setLocalStream(null)
       }
     },
-    [connect, connectionState, isVideoEnabled],
+    [connect, connectionState, isVideoEnabled, refreshLocalStream],
   )
 
   useEffect(() => {
@@ -354,7 +382,7 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
   }, [connectionState, disconnect])
 
   return {
-    localStream: null,
+    localStream,
     remoteStream,
     connectionState,
     isConnecting: connectionState === 'connecting',
