@@ -34,7 +34,7 @@ const languages = [
   { code: 'zh', name: '中文' },
 ]
 
-const voiceOptions = [{ value: 'longhua_v2', name: 'Longhua V2 (Chinese)' }]
+// const voiceOptions = [{ value: 'longhua_v2', name: 'Longhua V2 (Chinese)' }]
 
 export function Settings({ config, onConfigChange, className }: SettingsProps) {
   const { t, i18n } = useTranslation()
@@ -48,8 +48,8 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
     },
   )
   const [tempLanguage, setTempLanguage] = useState<string>(i18n.language)
-  const [currentVoice] = useState<string>('longhua_v2')
-  const [tempVoice, setTempVoice] = useState<string>('longhua_v2')
+  // const [currentVoice] = useState<string>('longhua_v2')
+  // const [tempVoice, setTempVoice] = useState<string>('longhua_v2')
   const [iceServersConfig, setIceServersConfig] = useState<IceServersConfig>(() => {
     const saved = loadIceServersConfig()
     return saved || getDefaultIceServersConfig()
@@ -164,7 +164,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
     if (!open) {
       // Reset temp values when closing without saving
       setTempLanguage(i18n.language)
-      setTempVoice(currentVoice)
+      // setTempVoice(currentVoice)
     }
     setIsOpen(open)
   }
@@ -207,6 +207,8 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
                 </Select>
               </div>
 
+              {/* TTS Voice selection disabled temporarily */}
+              {/*
               <div className="space-y-4">
                 <h3 className="text-base font-semibold">{t('settings.ttsVoice', 'TTS Voice')}</h3>
                 <Select value={tempVoice} onValueChange={setTempVoice}>
@@ -222,6 +224,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
                   </SelectContent>
                 </Select>
               </div>
+              */}
 
               <div className="space-y-4">
                 <h3 className="text-base font-semibold">{t('settings.mqtt')}</h3>
@@ -248,6 +251,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
                     value={tempConfig.username}
                     onChange={(e) => setTempConfig({ ...tempConfig, username: e.target.value })}
                     placeholder="emqx-mcp-webrtc-web-ui"
+                    autoComplete="username"
                     className="mt-2"
                   />
                 </div>
@@ -268,6 +272,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
                 </div>
               </div>
 
+              {/*
               <div className="border-t pt-6 space-y-4">
                 <h3 className="text-base font-semibold">{t('settings.webrtcIceServers')}</h3>
 
@@ -279,7 +284,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
                     id="turnUrl"
                     value={iceServersConfig.turnUrl || ''}
                     onChange={(e) => setIceServersConfig({ ...iceServersConfig, turnUrl: e.target.value })}
-                    placeholder={`turn:${window.location.hostname}:13478`}
+                    placeholder="turn:localhost:13478"
                     className="mt-2"
                   />
                 </div>
@@ -292,7 +297,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
                     id="turnUsername"
                     value={iceServersConfig.turnUsername || ''}
                     onChange={(e) => setIceServersConfig({ ...iceServersConfig, turnUsername: e.target.value })}
-                    placeholder=""
+                    placeholder="emqx-demo-x"
                     className="mt-2"
                   />
                 </div>
@@ -306,7 +311,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
                     type="password"
                     value={iceServersConfig.turnPassword || ''}
                     onChange={(e) => setIceServersConfig({ ...iceServersConfig, turnPassword: e.target.value })}
-                    placeholder=""
+                    placeholder="••••••••••••••"
                     autoComplete="new-password"
                     className="mt-2"
                   />
@@ -325,6 +330,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
                   />
                 </div>
               </div>
+              */}
             </div>
           </form>
 

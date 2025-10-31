@@ -4,11 +4,12 @@ import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChatInterface } from '@/components/ChatInterface'
+import { Settings } from '@/components/Settings'
 import { appLogger, conversationLogger } from '@/utils/logger'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import { defaultMqttConfig } from '@/config/mqtt'
-import { loadMqttConfig, type MqttConfig } from '@/utils/storage'
+import { loadMqttConfig, saveMqttConfig, type MqttConfig } from '@/utils/storage'
 import type { PhotoCaptureResult } from '@/tools/types'
 
 function App() {
@@ -19,7 +20,7 @@ function App() {
   const [selectedEmotion, setSelectedEmotion] = useState<string>('happy')
   const [volume, setVolume] = useState<number>(1.0) // 0.0 to 1.0
   const [isMuted, setIsMuted] = useState<boolean>(true)
-  const [mqttConfig] = useState<MqttConfig>(() => {
+  const [mqttConfig, setMqttConfig] = useState<MqttConfig>(() => {
     const savedConfig = loadMqttConfig()
     if (savedConfig) {
       return savedConfig
@@ -97,6 +98,11 @@ function App() {
     }),
     [onCameraControl, onEmotionChange, onTakePhoto, onVolumeControl],
   )
+
+  const handleMqttConfigChange = useCallback((config: MqttConfig) => {
+    setMqttConfig(config)
+    saveMqttConfig(config)
+  }, [])
 
   const { isConnected: isMqttConnected, isMcpInitialized } = useMcpMqttServer({
     brokerUrl: mqttConfig.brokerUrl,
@@ -205,6 +211,13 @@ function App() {
         audioRef={audioRef}
         volume={volume}
         isMuted={isMuted}
+        settingsSlot={
+          <Settings
+            config={mqttConfig}
+            onConfigChange={handleMqttConfigChange}
+            isConnected={isMqttConnected}
+          />
+        }
       />
       <Toaster />
     </>

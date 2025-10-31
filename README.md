@@ -52,6 +52,24 @@ docker compose -f docker/docker-compose.yml up -d
 
 Open your browser and visit `http://localhost:4000/demo` to see the demo app's frontend interface.
 
+### Local Preview (Volc proxy + Web UI)
+
+Bring up the Volc real-time voice proxy together with the web interface via Docker:
+
+1. Ensure `volc-server/.env` exists (copy from `.env.example` and fill in the required Volc credentials).
+2. (Optional) export `VITE_AIGC_PROXY_HOST` to override the web build-time API endpoint. It defaults to `http://localhost:3002`, which matches the compose port mapping.
+3. Build and start both services:
+
+```bash
+docker compose up --build
+```
+
+4. Open `http://localhost:8080` for the web UI. The Volc proxy is available at `http://localhost:3002`.
+
+The compose stack exposes containers named `mcp-volc-server` and `mcp-web`, making it easy to identify the Volc proxy in `docker ps`.
+
+Need more detail (including per-image builds or running without local Bun/Node.js)? See [docs/docker-build.md](docs/docker-build.md).
+
 ## Project Structure
 
 ### web

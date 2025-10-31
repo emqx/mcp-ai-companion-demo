@@ -4,7 +4,7 @@ import { EmotionAnimation } from './EmotionAnimation'
 // import { EmotionSelector } from './EmotionSelector'
 import { ChatMessages } from './ChatMessages'
 import { useAudioPlaying } from '@/hooks/useAudioPlaying'
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject, type ReactNode } from 'react'
 import { appLogger } from '@/utils/logger'
 
 interface WebRTCState {
@@ -38,6 +38,7 @@ interface ChatInterfaceProps {
   volume: number
   isMuted: boolean
   onVolumeControl?: (volume?: number, muted?: boolean) => void
+  settingsSlot?: ReactNode
 }
 
 export function ChatInterface({
@@ -53,6 +54,7 @@ export function ChatInterface({
   audioRef,
   volume,
   isMuted,
+  settingsSlot,
 }: ChatInterfaceProps) {
   const { t } = useTranslation()
   const isSpeaking = useAudioPlaying(audioRef, 1000)
@@ -124,12 +126,7 @@ export function ChatInterface({
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">
-      <div className="fixed top-4 right-4 flex items-center gap-2">
-        {/*<EmotionSelector
-          selectedEmotion={selectedEmotion}
-          onEmotionSelect={setSelectedEmotion}
-        />*/}
-      </div>
+      <div className="fixed top-4 right-4 flex items-center gap-2 z-40">{settingsSlot}</div>
 
       <div
         className="mb-2 select-none cursor-pointer relative"

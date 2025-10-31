@@ -50,6 +50,22 @@ docker compose -f docker/docker-compose.yml up -d
 
 打开浏览器，访问 `http://localhost:4000/demo`，即可看到 demo 应用的前端界面。
 
+### 本地预览（Volc 代理 + Web UI）
+
+使用 Docker 同时启动 Volc 实时语音代理和 Web 界面：
+
+1. 确保 `volc-server/.env` 已存在（可从 `.env.example` 复制并补齐所需的 Volc 凭据）。
+2. （可选）通过设置环境变量 `VITE_AIGC_PROXY_HOST` 覆盖构建时的 Web 接口地址，默认值为 `http://localhost:3002`，与 compose 的端口映射一致。
+3. 构建并启动服务：
+
+```bash
+docker compose up --build
+```
+
+4. 打开 `http://localhost:8080` 访问 Web 界面。Volc 代理服务监听 `http://localhost:3002`。
+
+Compose 启动后会生成 `mcp-volc-server` 与 `mcp-web` 两个容器名称，方便通过 `docker ps` 区分 Volc 代理。
+
 ## 项目结构
 
 ### web
