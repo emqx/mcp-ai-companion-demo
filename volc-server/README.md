@@ -81,7 +81,7 @@ The server uses environment variables exclusively for configuration. Key categor
 - **RTC**: `VOLC_RTC_APP_ID`, `VOLC_RTC_APP_KEY`
 - **Speech**: `VOLC_ASR_APP_ID`, `VOLC_TTS_APP_ID`, `VOLC_TTS_VOICE_TYPE`
 - **LLM**: `VOLC_LLM_ENDPOINT_ID`, `VOLC_LLM_SYSTEM_MESSAGE`
-- **Agent**: `VOLC_AGENT_USER_ID`, `VOLC_AGENT_WELCOME_MESSAGE`
+- **Agent**: `VOLC_AGENT_USER_ID`, `VOLC_AGENT_WELCOME_MESSAGE`, `VOLC_AGENT_ANS_MODE` (default 2 = medium), `VOLC_AGENT_VOICEPRINT_MODE` (default 1 = realtime)
 - **Scene**: `VOLC_SCENE_NAME`, `VOLC_SCENE_ICON`
 - **Avatar**: `VOLC_AVATAR_ENABLED`, `VOLC_AVATAR_TYPE`
 

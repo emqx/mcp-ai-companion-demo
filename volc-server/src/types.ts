@@ -23,17 +23,26 @@ export interface RTCConfig {
   Token?: string
 }
 
+export interface VoicePrintConfig {
+  Mode: number
+  IdList?: string[]
+}
+
+export interface VoiceChatAgentConfig {
+  TargetUserId: string[]
+  WelcomeMessage?: string
+  UserId: string
+  EnableConversationStateCallback?: boolean
+  AnsMode?: number
+  VoicePrint?: VoicePrintConfig
+  [key: string]: unknown
+}
+
 export interface VoiceChatConfig {
   AppId: string
   RoomId?: string
   TaskId: string
-  AgentConfig: {
-    TargetUserId: string[]
-    WelcomeMessage?: string
-    UserId: string
-    EnableConversationStateCallback?: boolean
-    [key: string]: unknown
-  }
+  AgentConfig: VoiceChatAgentConfig
   Config: Record<string, unknown>
 }
 

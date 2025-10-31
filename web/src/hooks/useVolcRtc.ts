@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { rtcClient, type BasicInfo } from '@/lib/rtcClient'
+import { rtcClient, type BasicInfo, AnsMode } from '@/lib/rtcClient'
 import type { UseWebRTCReturn, ConnectionState } from '@/types/webrtc'
 import type { UseWebRTCMqttOptions } from '@/hooks/useWebRTCMqtt'
 import { fetchScenes, startVoiceChat, stopVoiceChat } from '@/api/aigc'
@@ -39,6 +39,11 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
   const remoteUserIdRef = useRef<string | null>(null)
   const voiceChatStartedRef = useRef(false)
   const pendingConnectRef = useRef(false)
+
+  useEffect(() => {
+    rtcClient.setAiAnsMode(AnsMode.MEDIUM)
+    rtcClient.setAiAnsEnabled(true)
+  }, [])
 
   const updateRemoteStream = useCallback(
     (userId?: string) => {

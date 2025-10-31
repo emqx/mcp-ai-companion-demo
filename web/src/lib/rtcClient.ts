@@ -11,7 +11,7 @@ import VERTC, {
   RoomProfileType,
   StreamIndex,
 } from '@volcengine/rtc'
-import RTCAIAnsExtension from '@volcengine/rtc/extension-ainr'
+import RTCAIAnsExtension, { AnsMode, EventTypes } from '@volcengine/rtc/extension-ainr'
 
 export interface BasicInfo {
   appId: string
@@ -59,6 +59,20 @@ class RtcClient {
 
   private registered = false
 
+  private aiAnsExtension: RTCAIAnsExtension | null = null
+
+  private aiAnsSupported: boolean | null = null
+
+  private aiAnsEnabled = false
+
+  private aiAnsMode: AnsMode = AnsMode.MEDIUM
+
+  private aiAnsEventsBound = false
+
+  private aiAnsManuallyDisabled = false
+
+  private readonly aiAnsConstraint: Record<string, string | number> = {}
+
   setListeners(listeners: RtcEventListeners) {
     this.listeners = { ...listeners }
     if (this.engine && !this.registered) {
@@ -85,21 +99,143 @@ class RtcClient {
     this.registered = true
   }
 
+  private bindAiAnsEvents(extension: RTCAIAnsExtension) {
+    if (this.aiAnsEventsBound) {
+      return
+    }
+    extension.on(EventTypes.onUnsupported, this.handleAiAnsUnsupported)
+    extension.on(EventTypes.onOverload, this.handleAiAnsOverload)
+    extension.on(EventTypes.onError, this.handleAiAnsError)
+    this.aiAnsEventsBound = true
+  }
+
+  private async setupAiAnsExtension(extension: RTCAIAnsExtension) {
+    this.aiAnsExtension = extension
+    this.bindAiAnsEvents(extension)
+    try {
+      const supported = await extension.isSupported().catch(() => false)
+      this.aiAnsSupported = supported
+      if (!supported) {
+        console.warn('[rtcClient] AI noise reduction unsupported in current environment')
+        return
+      }
+      await this.applyAiAnsMode()
+      this.enableAiAns()
+    } catch (error) {
+      this.aiAnsSupported = false
+      console.warn('[rtcClient] Failed to initialize AI noise reduction:', (error as Error).message)
+    }
+  }
+
+  private async applyAiAnsMode() {
+    if (!this.aiAnsExtension) return
+    try {
+      await this.aiAnsExtension.setAnsMode(this.aiAnsMode)
+    } catch (error) {
+      console.warn('[rtcClient] Failed to set AI noise reduction mode:', (error as Error).message)
+    }
+  }
+
+  private enableAiAns() {
+    if (
+      !this.aiAnsExtension ||
+      this.aiAnsEnabled ||
+      this.aiAnsSupported === false ||
+      this.aiAnsManuallyDisabled
+    ) {
+      return
+    }
+    try {
+      this.aiAnsExtension.enable(this.aiAnsConstraint as never)
+      this.aiAnsEnabled = true
+      console.info('[rtcClient] AI noise reduction enabled', { mode: this.aiAnsMode })
+    } catch (error) {
+      console.warn('[rtcClient] Failed to enable AI noise reduction:', (error as Error).message)
+    }
+  }
+
+  private disableAiAns(reason?: string) {
+    if (!this.aiAnsExtension || !this.aiAnsEnabled) {
+      return
+    }
+    try {
+      this.aiAnsExtension.disable(this.aiAnsConstraint as never)
+      console.info('[rtcClient] AI noise reduction disabled', { reason })
+    } catch (error) {
+      console.warn('[rtcClient] Failed to disable AI noise reduction:', (error as Error).message)
+    } finally {
+      this.aiAnsEnabled = false
+    }
+  }
+
+  setAiAnsMode(mode: AnsMode) {
+    this.aiAnsMode = mode
+    void (async () => {
+      await this.applyAiAnsMode()
+      this.enableAiAns()
+    })()
+  }
+
+  private handleAiAnsUnsupported = () => {
+    this.aiAnsSupported = false
+    this.disableAiAns('unsupported')
+  }
+
+  private handleAiAnsOverload = () => {
+    this.disableAiAns('overload')
+  }
+
+  private handleAiAnsError = (event?: { message?: string }) => {
+    const message = event?.message || 'unknown error'
+    console.warn('[rtcClient] AI noise reduction error:', message)
+    this.disableAiAns('error')
+  }
+
+  setAiAnsEnabled(enabled: boolean) {
+    this.aiAnsManuallyDisabled = !enabled
+    if (!enabled) {
+      this.disableAiAns('manual-toggle')
+      return
+    }
+    if (this.aiAnsSupported === false) {
+      return
+    }
+    this.enableAiAns()
+  }
+
+  isAiAnsEnabled() {
+    return this.aiAnsEnabled && !this.aiAnsManuallyDisabled
+  }
+
+  isAiAnsSupported() {
+    return this.aiAnsSupported === true
+  }
+
   private ensureEngine(appId: string) {
     if (this.engine) {
       return this.engine
     }
 
     const engine = VERTC.createEngine(appId)
+    this.aiAnsExtension = null
+    this.aiAnsEventsBound = false
+    this.aiAnsSupported = null
+    this.aiAnsEnabled = false
+
     const extension = new RTCAIAnsExtension()
     try {
+      const finalizeRegistration = () => {
+        this.aiAnsExtension = extension
+        void this.setupAiAnsExtension(extension)
+      }
+
       const result = engine.registerExtension(extension)
       if (result && typeof (result as Promise<void>).then === 'function') {
-        void (result as Promise<void>).then(() => {
-          extension.enable()
+        void (result as Promise<void>).then(finalizeRegistration).catch((error) => {
+          console.warn('[rtcClient] Failed to register AI noise reduction extension:', (error as Error).message)
         })
       } else {
-        extension.enable()
+        finalizeRegistration()
       }
     } catch (error) {
       console.warn('[rtcClient] AI noise reduction not available:', (error as Error).message)
@@ -147,6 +283,7 @@ class RtcClient {
     if (!this.engine) return
 
     try {
+      this.disableAiAns()
       await this.engine.leaveRoom()
     } finally {
       VERTC.destroyEngine(this.engine)
@@ -354,3 +491,5 @@ class RtcClient {
 }
 
 export const rtcClient = new RtcClient()
+
+export { AnsMode } from '@volcengine/rtc/extension-ainr'
