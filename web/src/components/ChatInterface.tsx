@@ -8,6 +8,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { appLogger } from '@/utils/logger'
 
 interface WebRTCState {
+  localStream: MediaStream | null
   remoteStream: MediaStream | null
   isConnecting: boolean
   isConnected: boolean
@@ -58,35 +59,60 @@ export function ChatInterface({
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    // Use remote stream for both audio and video display
-    const currentStream = webrtc.remoteStream
+    const remoteStream = webrtc.remoteStream
 
-    if (currentStream) {
-      appLogger.info('🎥 Using remote WebRTC stream for media display')
-
-      // Auto unmute when stream is available
-      if (isMuted && webrtc.remoteStream) {
+    if (remoteStream && audioRef.current) {
+      if (isMuted) {
         setIsMuted(false)
         appLogger.info('🔊 Auto unmuted due to remote stream availability')
       }
-
-      if (audioRef.current && webrtc.remoteStream) {
-        // Use remote stream for audio
-        audioRef.current.srcObject = webrtc.remoteStream
-        audioRef.current.volume = volume
-        audioRef.current.muted = false
+      if (audioRef.current.srcObject !== remoteStream) {
+        audioRef.current.srcObject = remoteStream
         appLogger.info('🔊 Remote stream connected to audio element')
       }
-
-      if (showVideo && videoRef?.current) {
-        videoRef.current.srcObject = currentStream
-        videoRef.current.volume = volume
-        videoRef.current.muted = false
-        appLogger.info('📺 Remote stream connected to video element')
-      }
+      audioRef.current.volume = volume
+      audioRef.current.muted = false
+    } else if (audioRef.current && audioRef.current.srcObject) {
+      audioRef.current.srcObject = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webrtc.remoteStream, showVideo, volume])
+  }, [audioRef, volume, webrtc.remoteStream, isMuted, setIsMuted])
+
+  useEffect(() => {
+    const videoElement = videoRef?.current
+    if (!videoElement) return
+
+    if (!showVideo) {
+      videoElement.pause()
+      videoElement.srcObject = null
+      return
+    }
+
+    const stream = webrtc.localStream ?? webrtc.remoteStream
+    if (!stream) {
+      videoElement.pause()
+      videoElement.srcObject = null
+      return
+    }
+
+    if (videoElement.srcObject !== stream) {
+      videoElement.srcObject = stream
+      appLogger.info(
+        webrtc.localStream
+          ? '📷 Local camera stream connected to video element'
+          : '📺 Remote stream connected to video element',
+      )
+    }
+
+    videoElement.muted = true
+    videoElement.playsInline = true
+
+    const playPromise = videoElement.play()
+    if (playPromise && typeof playPromise.then === 'function') {
+      playPromise.catch((error) => {
+        appLogger.warn('📺 Video playback failed', error)
+      })
+    }
+  }, [showVideo, videoRef, webrtc.localStream, webrtc.remoteStream])
 
   // Update volume and mute state when they change
   useEffect(() => {
@@ -94,12 +120,7 @@ export function ChatInterface({
       audioRef.current.volume = volume
       audioRef.current.muted = isMuted
     }
-    // Also update video element if it exists
-    if (videoRef?.current) {
-      videoRef.current.volume = volume
-      videoRef.current.muted = isMuted
-    }
-  }, [volume, isMuted, audioRef, videoRef])
+  }, [volume, isMuted, audioRef])
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-4 pt-8 relative">
@@ -145,7 +166,7 @@ export function ChatInterface({
               autoPlay
               playsInline
               controls={false}
-              muted={isMuted}
+              muted
               className="w-full h-80 object-cover"
             />
             {!webrtc.isConnected && (
@@ -225,22 +246,20 @@ export function ChatInterface({
 
           <button
             onClick={async () => {
-              if (!showVideo) {
-                setShowVideo(true)
-                // Connect WebRTC if needed
-                if (!webrtc.isConnected && !webrtc.isConnecting) {
-                  webrtc.connect()
-                }
-              } else {
-                setShowVideo(false)
+              const targetState = !webrtc.isVideoEnabled
+              try {
+                await webrtc.toggleVideo(targetState)
+                setShowVideo(targetState)
+              } catch (error) {
+                appLogger.error('🎥 Failed to toggle video', error)
               }
             }}
             className={`w-12 h-12 rounded-[48px] flex items-center justify-center cursor-pointer transition-all duration-200 ${
-              showVideo ? 'bg-button-active' : 'bg-[#F3F4F9] hover:bg-gray-200'
+              webrtc.isVideoEnabled ? 'bg-button-active' : 'bg-[#F3F4F9] hover:bg-gray-200'
             }`}
-            title={showVideo ? t('video.turnOff') : t('video.turnOn')}
+            title={webrtc.isVideoEnabled ? t('video.turnOff') : t('video.turnOn')}
           >
-            <Camera className={`w-6 h-6 ${showVideo ? 'text-button-active' : 'text-[#343741]'}`} />
+            <Camera className={`w-6 h-6 ${webrtc.isVideoEnabled ? 'text-button-active' : 'text-[#343741]'}`} />
           </button>
         </div>
 

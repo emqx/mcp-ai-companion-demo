@@ -107,6 +107,7 @@ function App() {
   })
 
   const {
+    localStream,
     remoteStream,
     isConnecting: isWebRTCConnecting,
     isConnected: isWebRTCConnected,
@@ -181,6 +182,7 @@ function App() {
     <>
       <ChatInterface
         webrtc={{
+          localStream,
           remoteStream,
           isConnecting: isWebRTCConnecting,
           isConnected: isWebRTCConnected,
