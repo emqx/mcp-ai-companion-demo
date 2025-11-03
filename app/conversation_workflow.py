@@ -3,14 +3,16 @@ import time
 import json
 import anyio
 from typing import Optional, AsyncGenerator, Dict, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 from mcp_client_init import McpMqttClient
 from mcp.shared.mqtt import MqttOptions
 from agents.emotion_agent import EmotionAgent
 from agents.voice_agent import VoiceAgent
+from llm import BaseLLMClient, create_llm_client
 from utils.colored_logger import get_agent_logger
+from utils.config import LLMSettings, get_llm_settings
 
 logger = get_agent_logger("chat")
 
@@ -36,35 +38,71 @@ class ConversationWorkflow:
 
     def __init__(
         self,
-        api_key: str = None,
-        api_base: str = "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        model: str = "qwen-flash",
+        api_key: str | None = None,
+        api_base: str | None = None,
+        model: str | None = None,
         voice_prompt_file: str = "prompts/voice_reply_system_prompt.txt",
         tool_prompt_file: str = "prompts/emotion_system_prompt.txt",
-        temperature: float = 0.5,
-        max_tokens: int = 5000,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         device_id: Optional[str] = None,
+        llm_settings: Optional[LLMSettings] = None,
+        llm_client: Optional[BaseLLMClient] = None,
     ):
-        self.api_key = api_key or os.environ.get("DASHSCOPE_API_KEY")
-        if not self.api_key:
-            raise ValueError("API key is required")
+        base_settings = llm_settings or get_llm_settings()
+        self.llm_settings = replace(base_settings)
+        if self.llm_settings.custom_options:
+            self.llm_settings.custom_options = replace(self.llm_settings.custom_options)
+
+        if api_key:
+            self.llm_settings.api_key = api_key
+        if api_base:
+            self.llm_settings.api_base = api_base
+        if model:
+            self.llm_settings.model = model
+        if temperature is not None:
+            self.llm_settings.temperature = temperature
+        if max_tokens is not None:
+            self.llm_settings.max_tokens = max_tokens
 
         self.device_id = device_id
 
+        try:
+            self.llm_client = llm_client or create_llm_client(self.llm_settings)
+        except Exception as exc:
+            raise ValueError(f"Failed to initialize LLM client: {exc}") from exc
+
+        custom_options = self.llm_settings.custom_options
+        history_length = custom_options.history_length if custom_options else self.llm_settings.history_length
+        enable_round_id = custom_options.enable_round_id if custom_options else self.llm_settings.enable_round_id
+        custom_payload = custom_options.custom_payload if custom_options else {}
+
         self.voice_agent = VoiceAgent(
-            api_key=self.api_key,
-            api_base=api_base,
-            model=model,
+            llm_client=self.llm_client,
+            temperature=self.llm_settings.temperature,
+            top_p=self.llm_settings.top_p,
+            max_tokens=self.llm_settings.max_tokens,
+            history_length=history_length,
             system_prompt_file=voice_prompt_file,
-            temperature=temperature,
-            max_tokens=max_tokens,
+            system_messages=self.llm_settings.system_messages,
+            user_prompts=self.llm_settings.user_prompts,
+            enable_round_id=enable_round_id,
+            custom_payload=custom_payload,
             device_id=device_id,
+            model=self.llm_settings.model,
         )
 
+        emotion_api_key = os.getenv("EMOTION_LLM_API_KEY") or os.getenv("DASHSCOPE_API_KEY")
+        if not emotion_api_key:
+            raise ValueError("EmotionAgent requires EMOTION_LLM_API_KEY or DASHSCOPE_API_KEY")
+
+        emotion_api_base = os.getenv("EMOTION_LLM_API_BASE") or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        emotion_model = os.getenv("EMOTION_LLM_MODEL") or os.getenv("LLM_MODEL") or "qwen-flash"
+
         self.emotion_agent = EmotionAgent(
-            api_key=self.api_key,
-            api_base=api_base,
-            model=model,
+            api_key=emotion_api_key,
+            api_base=emotion_api_base,
+            model=emotion_model,
             system_prompt_file=tool_prompt_file,
             temperature=0.0,
             max_tokens=1000,
@@ -72,8 +110,9 @@ class ConversationWorkflow:
 
         self.mcp_client: Optional[McpMqttClient] = None
 
-        logger.info("initialized")
-        self.tg = anyio.create_task_group()
+        logger.info("initialized with provider=%s", self.llm_settings.provider)
+        self.tg: anyio.abc.TaskGroup | None = None
+        self._tg_entered = False
 
     def _reinit_agents(self):
         """Simple reinit function when MCP tools are updated"""
@@ -114,7 +153,12 @@ class ConversationWorkflow:
         )
 
         # Start MCP
-        await self.tg.__aenter__()
+        if self.tg is None:
+            self.tg = anyio.create_task_group()
+            self._tg_entered = False
+        if not self._tg_entered:
+            await self.tg.__aenter__()
+            self._tg_entered = True
         self.tg.start_soon(self.mcp_client.start)
 
         # Wait for connection
@@ -224,3 +268,7 @@ class ConversationWorkflow:
         logger.info("shutting down")
         if self.mcp_client:
             await self.mcp_client.stop()
+        if self.tg and self._tg_entered:
+            await self.tg.__aexit__(None, None, None)
+            self._tg_entered = False
+            self.tg = None

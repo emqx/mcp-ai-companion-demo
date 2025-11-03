@@ -1,164 +1,131 @@
-import time
-from typing import List, AsyncGenerator, Optional
+from __future__ import annotations
 
-from llama_index.llms.openai_like import OpenAILike
-from llama_index.core.agent import FunctionAgent
-from llama_index.core.tools import BaseTool, FunctionTool
-from llama_index.core.memory import Memory
+import logging
+from typing import AsyncGenerator, List, Optional
 
-from tools import explain_photo, explain_photo_async
-
+from llm import BaseLLMClient, ChatMessage, ChatRequest, StreamChunk, create_round_id
 from utils.prompt_loader import load_system_prompt
-from utils.colored_logger import get_agent_logger
 
 from mcp_client_init import McpMqttClient
 
-logger = get_agent_logger("voice")
+logger = logging.getLogger(__name__)
 
 
 class VoiceAgent:
-    """Voice agent with FunctionAgent - supports tool calling and streaming text generation"""
+    """Voice response agent powered by a generic LLM client"""
 
     def __init__(
         self,
-        api_key: str,
-        api_base: str,
-        model: str,
+        *,
+        llm_client: BaseLLMClient,
         temperature: float = 0.6,
+        top_p: float = 1.0,
         max_tokens: int = 5000,
+        history_length: int = 5,
         system_prompt_file: str = "prompts/voice_reply_system_prompt.txt",
+        system_messages: Optional[List[str]] = None,
+        user_prompts: Optional[List[dict]] = None,
+        enable_round_id: bool = False,
+        custom_payload: Optional[dict] = None,
         device_id: Optional[str] = None,
+        model: Optional[str] = None,
     ):
-        self.api_key = api_key
-
-        # LLM initialization for conversation
-        self.llm = OpenAILike(
-            model=model,
-            api_key=self.api_key,
-            api_base=api_base,
-            is_chat_model=True,
-            is_function_calling_model=True,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=60,
-        )
+        self.llm_client = llm_client
+        self.temperature = temperature
+        self.top_p = top_p
+        self.max_tokens = max_tokens
+        self.history_length = history_length
+        self.enable_round_id = enable_round_id
+        self.custom_payload = custom_payload or {}
+        self.device_id = device_id
+        self.model = model
 
         self.system_prompt = load_system_prompt(system_prompt_file)
+        self.base_messages: List[ChatMessage] = [ChatMessage(role="system", content=self.system_prompt)]
 
-        # Tools and agent
-        self.tools: List[BaseTool] = []
-        self.mcp_tools: List[BaseTool] = []
+        if system_messages:
+            for message in system_messages:
+                self.base_messages.append(ChatMessage(role="system", content=message))
+
+        if user_prompts:
+            for prompt in user_prompts:
+                role = prompt.get("Role") or prompt.get("role")
+                content = prompt.get("Content") or prompt.get("content")
+                if role and content:
+                    self.base_messages.append(ChatMessage(role=role, content=content))
+
+        self.history: List[ChatMessage] = []
+
         self.mcp_client: Optional[McpMqttClient] = None
-        self._init_base_tools()
+        self.mcp_tools = []
 
-        self.memory = Memory.from_defaults(
-            token_limit=1000,
-            session_id=f"session_{device_id or 'voice'}"
+        logger.info(
+            "VoiceAgent initialized: history_length=%s, base_messages=%s",
+            self.history_length,
+            len(self.base_messages),
         )
-
-        # Agent instance
-        self.agent: Optional[FunctionAgent] = None
-        self._initialize_agent()
-
-    def _init_base_tools(self):
-        """Initialize base tools"""
-        photo_tool = FunctionTool.from_defaults(
-            fn=explain_photo,
-            name="explain_photo",
-            description=(
-                "Analyze and explain a photo based on a specific question. "
-                "Required parameters: image_url (string) - the URL of the image to analyze, "
-                "question (string) - the specific question about the image. "
-                "Returns: A text description answering the question about the image."
-            ),
-            async_fn=explain_photo_async,
-        )
-        self.tools.append(photo_tool)
-
-    def _initialize_agent(self):
-        """Initialize agent"""
-        # Filter out change_emotion tool, other tools can be used
-        filtered_mcp_tools = []
-
-        for tool in self.mcp_tools:
-            tool_name = tool.metadata.name if hasattr(tool, 'metadata') and hasattr(tool.metadata, 'name') else str(tool)
-            logger.debug(f"checking tool: {tool_name}")
-            if tool_name != "change_emotion":
-                filtered_mcp_tools.append(tool)
-                logger.debug(f"included tool: {tool_name}")
-            else:
-                logger.debug(f"filtered out tool: {tool_name}")
-
-        all_tools = self.tools + filtered_mcp_tools
-
-        self.agent = FunctionAgent(
-            tools=all_tools,
-            llm=self.llm,
-            system_prompt=self.system_prompt,
-            verbose=True,
-            streaming=True,
-            timeout=20.0,
-            max_function_calls=5,
-        )
-
-        logger.info(f"initialized with {len(all_tools)} tools: {[tool.metadata.name if hasattr(tool, 'metadata') else str(tool) for tool in all_tools]}")
-
-    def set_mcp_tools(self, mcp_tools: List[BaseTool]):
-        """Set MCP tools"""
-        self.mcp_tools = mcp_tools
-        self._initialize_agent()
 
     def set_mcp_client(self, mcp_client: McpMqttClient):
-        """Set MCP client"""
         self.mcp_client = mcp_client
-        if mcp_client and mcp_client.mcp_tools:
-            self.mcp_tools = mcp_client.mcp_tools
-            self._initialize_agent()
-
-    async def generate_response_stream(self, user_input: str) -> AsyncGenerator[str, None]:
-        """Generate streaming response - using FunctionAgent"""
-        try:
-            start_time = time.time()
-
-            if not self.agent:
-                logger.error("Voice agent not initialized")
-                yield "Sorry, voice agent not initialized."
-                return
-
-            accumulated_content = ""
-            first_token_time = None
-
-            handler = self.agent.run(user_msg=user_input, memory=self.memory)
-
-            async for event in handler.stream_events():
-                # Extract content
-                token = None
-                if hasattr(event, 'delta') and event.delta:
-                    token = event.delta
-                elif hasattr(event, 'chunk') and event.chunk:
-                    token = event.chunk
-
-                if token:
-                    # Record first token time
-                    if first_token_time is None:
-                        first_token_time = time.time()
-                        time_to_first_token = first_token_time - start_time
-                        logger.info(f"first token: {time_to_first_token:.3f}s")
-
-                    accumulated_content += token
-                    yield token
-
-            stream_end = time.time()
-            total_time = stream_end - start_time
-
-            logger.info(f"response complete: {total_time:.3f}s, {len(accumulated_content)} chars")
-
-        except Exception as e:
-            logger.error(f"error in response generation: {e}")
-            yield f"Sorry, I encountered some issues: {str(e)}"
-
+        if mcp_client:
+            self.mcp_tools = getattr(mcp_client, "mcp_tools", [])
 
     def clear_history(self):
-        """Clear conversation history"""
-        logger.info("history cleared")
-        self.memory.reset()
+        logger.info("Conversation history cleared")
+        self.history.clear()
+
+    def _build_messages(self) -> List[ChatMessage]:
+        if self.history_length <= 0:
+            conversation = self.history
+        else:
+            retain = self.history_length * 2
+            conversation = self.history[-retain:]
+
+        return self.base_messages + conversation
+
+    async def generate_response_stream(self, user_input: str) -> AsyncGenerator[str, None]:
+        user_message = ChatMessage(role="user", content=user_input)
+        self.history.append(user_message)
+
+        accumulated = []
+        round_id = create_round_id() if self.enable_round_id else None
+
+        request = ChatRequest(
+            messages=self._build_messages(),
+            model=self.model,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            max_tokens=self.max_tokens,
+            stream=True,
+            custom_payload=self.custom_payload,
+            round_id=round_id,
+        )
+
+        logger.info("Start generating response, round_id=%s", round_id)
+
+        try:
+            async for chunk in self.llm_client.stream_chat(request):
+                if isinstance(chunk, StreamChunk):
+                    if chunk.content:
+                        accumulated.append(chunk.content)
+                        yield chunk.content
+                    if chunk.is_final:
+                        break
+                else:
+                    token = str(chunk)
+                    accumulated.append(token)
+                    yield token
+
+            assistant_text = "".join(accumulated)
+            self.history.append(ChatMessage(role="assistant", content=assistant_text))
+            if self.history_length > 0:
+                retain = self.history_length * 2
+                if len(self.history) > retain:
+                    self.history = self.history[-retain:]
+            logger.info("Response generation finished, length=%s", len(assistant_text))
+        except Exception as exc:
+            # Rollback user input when streaming fails
+            if self.history and self.history[-1] is user_message:
+                self.history.pop()
+            logger.error("Failed to generate response: %s", exc)
+            raise
