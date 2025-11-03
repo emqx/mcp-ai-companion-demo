@@ -4,7 +4,7 @@ import json
 import threading
 import queue
 
-import asyncio, anyio
+import asyncio
 from conversation_workflow import ConversationWorkflow, ResponseType
 
 # Message queue for sending to TTS

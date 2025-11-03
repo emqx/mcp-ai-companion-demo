@@ -89,20 +89,13 @@ class ConversationWorkflow:
             api_base=voice_api_base,
         )
 
-        emotion_api_key = os.getenv("EMOTION_LLM_API_KEY") or os.getenv("DASHSCOPE_API_KEY")
-        if not emotion_api_key:
-            raise ValueError("EmotionAgent requires EMOTION_LLM_API_KEY or DASHSCOPE_API_KEY")
-
-        emotion_api_base = os.getenv("EMOTION_LLM_API_BASE") or "https://dashscope.aliyuncs.com/compatible-mode/v1"
-        emotion_model = os.getenv("EMOTION_LLM_MODEL") or os.getenv("LLM_MODEL") or "qwen-flash"
-
         self.emotion_agent = EmotionAgent(
-            api_key=emotion_api_key,
-            api_base=emotion_api_base,
-            model=emotion_model,
             system_prompt_file=tool_prompt_file,
             temperature=0.0,
             max_tokens=1000,
+            api_key=os.getenv("EMOTION_LLM_API_KEY") or os.getenv("DASHSCOPE_API_KEY"),
+            api_base=os.getenv("EMOTION_LLM_API_BASE") or os.getenv("LLM_API_BASE"),
+            model=os.getenv("EMOTION_LLM_MODEL") or os.getenv("LLM_MODEL"),
         )
 
         self.mcp_client: Optional[McpMqttClient] = None
