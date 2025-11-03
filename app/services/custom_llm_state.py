@@ -12,6 +12,12 @@ from utils.config import LLMSettings
 logger = logging.getLogger(__name__)
 
 
+def sanitize_for_log(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    return value.replace("\n", "").replace("\r", "")
+
+
 class ServiceState:
     """Encapsulates ConversationWorkflow lifecycle and MCP bindings."""
 
@@ -48,8 +54,8 @@ class ServiceState:
             if target_device and current_device and current_device != target_device:
                 logger.warning(
                     "Workflow already bound to device '%s'; ignoring new device_id '%s'",
-                    current_device,
-                    target_device,
+                    sanitize_for_log(current_device),
+                    sanitize_for_log(target_device),
                 )
             return
 
@@ -61,9 +67,16 @@ class ServiceState:
                     self.default_device_id = target_device
                     if not self.workflow.device_id:
                         self.workflow.device_id = target_device
-                    logger.info("MCP tools loaded for existing connection '%s'", target_device)
+                    logger.info(
+                        "MCP tools loaded for existing connection '%s'",
+                        sanitize_for_log(target_device),
+                    )
                     return
-            logger.info("Initializing MCP with device_id=%s filter=%s", target_device, server_name_filter)
+            logger.info(
+                "Initializing MCP with device_id=%s filter=%s",
+                sanitize_for_log(target_device),
+                sanitize_for_log(server_name_filter),
+            )
             await self.workflow.init_mcp(server_name_filter=server_name_filter, device_id=target_device)
             self.default_device_id = target_device
             return
@@ -109,13 +122,19 @@ class ServiceState:
             logger.warning("Auto discovery timed out after %.1fs", max_wait)
             return
 
-        logger.info("Discovered MCP server '%s'; attempting to load tools", discovered_server.server_name)
+        logger.info(
+            "Discovered MCP server '%s'; attempting to load tools",
+            sanitize_for_log(discovered_server.server_name),
+        )
         await mcp_client.load_mcp_tools(discovered_server.server_name)
 
         if mcp_client.mcp_tools:
             self.default_device_id = discovered_server.server_name
             self.workflow.device_id = discovered_server.server_name
-            logger.info("MCP tools loaded from '%s'", discovered_server.server_name)
+            logger.info(
+                "MCP tools loaded from '%s'",
+                sanitize_for_log(discovered_server.server_name),
+            )
 
     def snapshot_voice_agent_state(self) -> Dict[str, Any]:
         voice_agent = self.workflow.voice_agent
