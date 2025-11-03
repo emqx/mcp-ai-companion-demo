@@ -125,7 +125,8 @@ class McpMqttClient:
         try:
             ## note that we only support 1 MCP server now
             self.mcp_tools = await self._get_mcp_tools(server_name)
-            logger.info(f"loaded tools: {[tool.metadata.name for tool in self.mcp_tools]}")
+            tool_names = [tool.metadata.name for tool in self.mcp_tools]
+            logger.info(f"loaded tools: {tool_names}")
 
             # Notify tools updated callback
             if self.on_tools_updated:
