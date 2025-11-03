@@ -95,7 +95,7 @@ This directory contains the Agent code, including interaction with multimedia se
 ```bash
 cd app
 uv sync
-uv run main.py
+uv run --env-file ../.env python main.py
 ```
 
 ## Contact Us

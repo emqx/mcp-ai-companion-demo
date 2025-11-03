@@ -16,10 +16,10 @@ mcp_server_name_prefix = "web-ui-hardware-controller/"
 class DeviceManager:
     def __init__(self, websocket):
         self.websocket = websocket
-        self.devices: Dict[str, asyncio.Queue] = {}  # device_id -> 消息队列
-        self.device_tasks: Dict[str, asyncio.Task] = {}  # device_id -> 协程任务
-        self.workflows: Dict[str, ConversationWorkflow] = {}  # device_id -> ConversationWorkflow实例
-        self.current_task_ids: Dict[str, Optional[str]] = {}  # device_id -> 当前任务ID
+        self.devices: Dict[str, asyncio.Queue] = {}  # device_id -> message queue
+        self.device_tasks: Dict[str, asyncio.Task] = {}  # device_id -> coroutine task
+        self.workflows: Dict[str, ConversationWorkflow] = {}  # device_id -> workflow instance
+        self.current_task_ids: Dict[str, Optional[str]] = {}  # device_id -> current task id
 
     async def start_device(self, device_id: str) -> None:
         if device_id in self.device_tasks:
@@ -34,7 +34,7 @@ class DeviceManager:
 
     async def stop_device(self, device_id: str) -> None:
         if device_id in self.device_tasks:
-            # 取消任务
+            # cancel existing task
             task = self.device_tasks[device_id]
             task.cancel()
             try:
@@ -139,7 +139,7 @@ class DeviceManager:
             if not msg_q:
                 logger.error(f"Failed to create message queue for device {device_id}")
                 return
-        # 将消息放入对应设备的队列
+        # push message into device queue
         await msg_q.put(message)
 
     async def cleanup(self):
