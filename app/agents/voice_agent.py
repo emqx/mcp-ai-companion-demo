@@ -1,9 +1,20 @@
 from __future__ import annotations
 
 import logging
+import asyncio
 from typing import AsyncGenerator, List, Optional
 
-from llm import BaseLLMClient, ChatMessage, ChatRequest, StreamChunk, create_round_id
+from llama_index.llms.openai_like import OpenAILike
+from llama_index.core.agent import (
+    FunctionAgent,
+    AgentStream,
+    AgentOutput,
+    ToolCall,
+    ToolCallResult,
+)
+from llama_index.core.llms import ChatMessage
+
+from workflows.events import StopEvent
 from utils.prompt_loader import load_system_prompt
 
 from mcp_client_init import McpMqttClient
@@ -17,7 +28,6 @@ class VoiceAgent:
     def __init__(
         self,
         *,
-        llm_client: BaseLLMClient,
         temperature: float = 0.6,
         top_p: float = 1.0,
         max_tokens: int = 5000,
@@ -29,8 +39,9 @@ class VoiceAgent:
         custom_payload: Optional[dict] = None,
         device_id: Optional[str] = None,
         model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        api_base: Optional[str] = None,
     ):
-        self.llm_client = llm_client
         self.temperature = temperature
         self.top_p = top_p
         self.max_tokens = max_tokens
@@ -39,16 +50,20 @@ class VoiceAgent:
         self.custom_payload = custom_payload or {}
         self.device_id = device_id
         self.model = model
+        self.api_key = api_key
+        self.api_base = api_base
 
         self.system_prompt = load_system_prompt(system_prompt_file)
+        self.extra_system_messages = system_messages or []
+        self.user_prompts = user_prompts or []
         self.base_messages: List[ChatMessage] = [ChatMessage(role="system", content=self.system_prompt)]
 
-        if system_messages:
-            for message in system_messages:
+        if self.extra_system_messages:
+            for message in self.extra_system_messages:
                 self.base_messages.append(ChatMessage(role="system", content=message))
 
-        if user_prompts:
-            for prompt in user_prompts:
+        if self.user_prompts:
+            for prompt in self.user_prompts:
                 role = prompt.get("Role") or prompt.get("role")
                 content = prompt.get("Content") or prompt.get("content")
                 if role and content:
@@ -58,6 +73,7 @@ class VoiceAgent:
 
         self.mcp_client: Optional[McpMqttClient] = None
         self.mcp_tools = []
+        self.function_agent: Optional[FunctionAgent] = None
 
         logger.info(
             "VoiceAgent initialized: history_length=%s, base_messages=%s",
@@ -69,63 +85,186 @@ class VoiceAgent:
         self.mcp_client = mcp_client
         if mcp_client:
             self.mcp_tools = getattr(mcp_client, "mcp_tools", [])
+            tool_names = [
+                tool.metadata.name
+                if hasattr(tool, "metadata") and hasattr(tool.metadata, "name")
+                else str(tool)
+                for tool in self.mcp_tools
+            ]
+            logger.info(
+                "VoiceAgent received MCP tools (%s): %s",
+                len(tool_names),
+                ", ".join(tool_names) if tool_names else "[unknown]",
+            )
+            self._initialize_function_agent()
+
+    def _initialize_function_agent(self):
+        if not self.mcp_tools:
+            logger.warning("No MCP tools available for VoiceAgent; skipping function agent initialization")
+            self.function_agent = None
+            return
+
+        llm = self._build_llama_index_llm()
+        if llm is None:
+            self.function_agent = None
+            return
+
+        system_prompt = self._compose_system_prompt()
+
+        try:
+            self.function_agent = FunctionAgent(
+                tools=self.mcp_tools,
+                llm=llm,
+                verbose=False,
+                system_prompt=system_prompt,
+                max_function_calls=4,
+                timeout=15.0,
+            )
+            tool_names = [
+                tool.metadata.name
+                for tool in self.mcp_tools
+                if hasattr(tool, "metadata") and hasattr(tool.metadata, "name")
+            ]
+            logger.info(
+                "Voice FunctionAgent initialized with %s tools: %s",
+                len(tool_names),
+                tool_names or "[unknown]",
+            )
+        except Exception as exc:
+            logger.error("Failed to initialize Voice FunctionAgent: %s", exc)
+            self.function_agent = None
+
+    def _build_llama_index_llm(self) -> Optional[OpenAILike]:
+        api_key = self.api_key or self._fallback_env("LLM_API_KEY") or self._fallback_env("DASHSCOPE_API_KEY")
+        api_base = self.api_base or self._fallback_env("LLM_API_BASE") or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        model_name = self.model or self._fallback_env("LLM_MODEL") or "qwen-flash"
+
+        if not api_key or not model_name:
+            logger.error("Missing API credentials for Voice FunctionAgent")
+            return None
+
+        try:
+            return OpenAILike(
+                model=model_name,
+                api_key=api_key,
+                api_base=api_base,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                is_chat_model=True,
+                is_function_calling_model=True,
+                timeout=60,
+            )
+        except Exception as exc:
+            logger.error("Failed to create OpenAILike LLM for VoiceAgent: %s", exc)
+            return None
+
+    @staticmethod
+    def _fallback_env(name: str) -> Optional[str]:
+        import os
+        value = os.getenv(name)
+        return value.strip() if value else None
+
+    def _compose_system_prompt(self) -> str:
+        sections = [self.system_prompt]
+        if self.extra_system_messages:
+            sections.extend(self.extra_system_messages)
+        if self.user_prompts:
+            formatted = []
+            for prompt in self.user_prompts:
+                role = prompt.get("Role") or prompt.get("role") or "user"
+                content = prompt.get("Content") or prompt.get("content")
+                if content:
+                    formatted.append(f"{role}: {content}")
+            if formatted:
+                sections.append("\n".join(formatted))
+        return "\n\n".join(section for section in sections if section)
 
     def clear_history(self):
         logger.info("Conversation history cleared")
         self.history.clear()
 
-    def _build_messages(self) -> List[ChatMessage]:
-        if self.history_length <= 0:
-            conversation = self.history
-        else:
-            retain = self.history_length * 2
-            conversation = self.history[-retain:]
-
-        return self.base_messages + conversation
-
     async def generate_response_stream(self, user_input: str) -> AsyncGenerator[str, None]:
+        if not self.function_agent:
+            logger.error("FunctionAgent not initialized for VoiceAgent")
+            raise RuntimeError("Voice FunctionAgent unavailable")
+
         user_message = ChatMessage(role="user", content=user_input)
         self.history.append(user_message)
 
-        accumulated = []
-        round_id = create_round_id() if self.enable_round_id else None
+        logger.info("Start generating response with FunctionAgent")
+        context_prompt = self._build_context_prompt()
+        query = user_input if not context_prompt else f"{context_prompt}\nUser: {user_input}"
 
-        request = ChatRequest(
-            messages=self._build_messages(),
-            model=self.model,
-            temperature=self.temperature,
-            top_p=self.top_p,
-            max_tokens=self.max_tokens,
-            stream=True,
-            custom_payload=self.custom_payload,
-            round_id=round_id,
-        )
-
-        logger.info("Start generating response, round_id=%s", round_id)
+        assistant_chunks: List[str] = []
 
         try:
-            async for chunk in self.llm_client.stream_chat(request):
-                if isinstance(chunk, StreamChunk):
-                    if chunk.content:
-                        accumulated.append(chunk.content)
-                        yield chunk.content
-                    if chunk.is_final:
-                        break
-                else:
-                    token = str(chunk)
-                    accumulated.append(token)
-                    yield token
+            handler = self.function_agent.run(
+                user_msg=user_message,
+                chat_history=self.history[:-1],
+            )
 
-            assistant_text = "".join(accumulated)
-            self.history.append(ChatMessage(role="assistant", content=assistant_text))
-            if self.history_length > 0:
-                retain = self.history_length * 2
-                if len(self.history) > retain:
-                    self.history = self.history[-retain:]
-            logger.info("Response generation finished, length=%s", len(assistant_text))
+            async for event in handler.stream_events():
+                if isinstance(event, AgentStream):
+                    accumulated = "".join(assistant_chunks)
+                    delta = event.delta or ""
+                    if not delta and event.response:
+                        if len(event.response) > len(accumulated):
+                            delta = event.response[len(accumulated):]
+                    if delta:
+                        assistant_chunks.append(delta)
+                        yield delta
+                elif isinstance(event, ToolCall):
+                    logger.info("VoiceAgent tool call: %s(%s)", event.tool_name, event.tool_kwargs)
+                elif isinstance(event, ToolCallResult):
+                    logger.info("VoiceAgent tool result: %s -> %s", event.tool_name, event.tool_output.content)
+                elif isinstance(event, AgentOutput):
+                    content = event.response.content or ""
+                    if content:
+                        accumulated = "".join(assistant_chunks)
+                        if len(content) > len(accumulated):
+                            delta = content[len(accumulated):]
+                            if delta:
+                                assistant_chunks.append(delta)
+                                yield delta
+
+            stop_event = await handler
+            if isinstance(stop_event, StopEvent):
+                result = stop_event.result
+                if isinstance(result, AgentOutput):
+                    content = result.response.content or ""
+                    accumulated = "".join(assistant_chunks)
+                    if content and len(content) > len(accumulated):
+                        assistant_chunks.append(content[len(accumulated):])
+            else:
+                logger.debug("VoiceAgent handler returned: %s", stop_event)
+
         except Exception as exc:
-            # Rollback user input when streaming fails
             if self.history and self.history[-1] is user_message:
                 self.history.pop()
-            logger.error("Failed to generate response: %s", exc)
+            logger.error("Voice FunctionAgent streaming failed: %s", exc)
             raise
+
+        assistant_text = "".join(assistant_chunks).strip()
+        self.history.append(ChatMessage(role="assistant", content=assistant_text))
+        logger.info("assistant reply: %s", assistant_text)
+
+        if self.history_length > 0:
+            retain = self.history_length * 2
+            if len(self.history) > retain:
+                self.history = self.history[-retain:]
+
+        logger.info("Response generation finished, length=%s", len(assistant_text))
+
+    async def _chunk_text(self, text: str) -> AsyncGenerator[str, None]:
+        for char in text:
+            yield char
+
+    def _build_context_prompt(self) -> str:
+        if not self.history:
+            return ""
+        relevant_history = self.history[-self.history_length * 2 :] if self.history_length > 0 else self.history
+        lines = []
+        for message in relevant_history:
+            prefix = "Assistant" if message.role == "assistant" else "User"
+            lines.append(f"{prefix}: {message.content}")
+        return "\n".join(lines)

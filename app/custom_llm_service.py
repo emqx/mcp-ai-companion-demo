@@ -6,7 +6,7 @@ import os
 import time
 import uuid
 from dataclasses import replace
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
 import anyio
 import uvicorn
@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 
 from conversation_workflow import ConversationWorkflow, ResponseType
-from llm import BaseLLMClient, ChatMessage, create_llm_client
+from llama_index.core.llms import ChatMessage
 from utils.colored_logger import get_agent_logger
 from utils.config import LLMSettings, get_llm_settings
 
@@ -50,13 +50,18 @@ class ServiceState:
     def __init__(
         self,
         settings: LLMSettings,
-        llm_client: BaseLLMClient,
         *,
         default_device_id: Optional[str] = None,
+        workflow_factory: Optional[Callable[[LLMSettings], ConversationWorkflow]] = None,
     ):
         self.settings = settings
-        self.llm_client = llm_client
-        self.workflow = ConversationWorkflow(llm_settings=settings, llm_client=llm_client)
+        if workflow_factory:
+            try:
+                self.workflow = workflow_factory(settings)
+            except TypeError:
+                self.workflow = workflow_factory()
+        else:
+            self.workflow = ConversationWorkflow(llm_settings=settings)
         self.lock = anyio.Lock()
         self.default_device_id = default_device_id or os.getenv("CUSTOM_LLM_DEVICE_ID")
         self.mcp_server_name_prefix = os.getenv("MCP_SERVER_NAME_PREFIX", "web-ui-hardware-controller/")
@@ -70,31 +75,80 @@ class ServiceState:
     async def ensure_mcp(self, device_id: Optional[str]) -> None:
         target_device = device_id or self.default_device_id
 
-        if not target_device:
-            return
-
-        if self.workflow.mcp_client:
-            if self.workflow.device_id and self.workflow.device_id != target_device:
+        # If we already have tools loaded for the current binding, nothing to do
+        if self.workflow.mcp_client and self.workflow.mcp_client.mcp_tools:
+            current_device = self.workflow.device_id or self.default_device_id
+            if target_device and current_device and current_device != target_device:
                 logger.warning(
                     "Workflow already bound to device '%s'; ignoring new device_id '%s'",
-                    self.workflow.device_id,
+                    current_device,
                     target_device,
                 )
             return
 
-        if target_device.startswith(self.mcp_server_name_prefix):
-            server_name_filter = target_device
+        if target_device:
+            server_name_filter = self._derive_server_filter(target_device)
+            if self.workflow.mcp_client:
+                await self.workflow.mcp_client.load_mcp_tools(server_name_filter)
+                if self.workflow.mcp_client.mcp_tools:
+                    self.default_device_id = target_device
+                    if not self.workflow.device_id:
+                        self.workflow.device_id = target_device
+                    logger.info("MCP tools loaded for existing connection '%s'", target_device)
+                    return
+            logger.info("Initializing MCP with device_id=%s filter=%s", target_device, server_name_filter)
+            await self.workflow.init_mcp(server_name_filter=server_name_filter, device_id=target_device)
+            self.default_device_id = target_device
+            return
+
+        await self._auto_discover_tools()
+
+    def _derive_server_filter(self, device_id: str) -> str:
+        if device_id.startswith(self.mcp_server_name_prefix):
+            return device_id
+        if "/" in device_id:
+            suffix = device_id.rsplit("/", 1)[-1]
+        elif "-" in device_id:
+            suffix = device_id.split("-")[-1]
         else:
-            if "/" in target_device:
-                suffix = target_device.rsplit("/", 1)[-1]
-            elif "-" in target_device:
-                suffix = target_device.split("-")[-1]
-            else:
-                suffix = target_device
-            server_name_filter = f"{self.mcp_server_name_prefix}{suffix}"
-        logger.info("Initializing MCP with device_id=%s filter=%s", target_device, server_name_filter)
-        await self.workflow.init_mcp(server_name_filter=server_name_filter, device_id=target_device)
-        self.default_device_id = target_device
+            suffix = device_id
+        return f"{self.mcp_server_name_prefix}{suffix}"
+
+    async def _auto_discover_tools(self) -> None:
+        logger.info("Attempting MCP auto-discovery via presence topics")
+
+        if not self.workflow.mcp_client:
+            await self.workflow.init_mcp(server_name_filter="#", device_id=None)
+
+        mcp_client = self.workflow.mcp_client
+        if not mcp_client:
+            logger.warning("Unable to create MCP client for discovery")
+            return
+
+        max_wait = 12.0
+        interval = 0.5
+        elapsed = 0.0
+        discovered_server = None
+
+        while elapsed < max_wait:
+            alive_servers = mcp_client.get_alive_mcp_servers()
+            if alive_servers:
+                discovered_server = alive_servers[0]
+                break
+            await anyio.sleep(interval)
+            elapsed += interval
+
+        if not discovered_server:
+            logger.warning("Auto discovery timed out after %.1fs", max_wait)
+            return
+
+        logger.info("Discovered MCP server '%s'; attempting to load tools", discovered_server.server_name)
+        await mcp_client.load_mcp_tools(discovered_server.server_name)
+
+        if mcp_client.mcp_tools:
+            self.default_device_id = discovered_server.server_name
+            self.workflow.device_id = discovered_server.server_name
+            logger.info("MCP tools loaded from '%s'", discovered_server.server_name)
 
     def snapshot_voice_agent_state(self) -> Dict[str, Any]:
         voice_agent = self.workflow.voice_agent
@@ -203,19 +257,18 @@ def format_sse(payload: dict) -> str:
 def build_app(
     *,
     settings: Optional[LLMSettings] = None,
-    llm_client: Optional[BaseLLMClient] = None,
     expected_api_key: Optional[str] = None,
     default_device_id: Optional[str] = None,
+    workflow_factory: Optional[Callable[[LLMSettings], ConversationWorkflow]] = None,
 ) -> FastAPI:
     llm_settings = replace(settings or get_llm_settings())
     if llm_settings.custom_options:
         llm_settings.custom_options = replace(llm_settings.custom_options)
 
-    client = llm_client or create_llm_client(llm_settings)
     state = ServiceState(
         settings=llm_settings,
-        llm_client=client,
         default_device_id=default_device_id,
+        workflow_factory=workflow_factory,
     )
 
     async def lifespan(_: FastAPI):
@@ -344,6 +397,10 @@ def build_app(
                                 )
                             )
 
+                    trimmed_reply = aggregated_text.strip()
+                    if trimmed_reply:
+                        logger.info("assistant reply: %s", trimmed_reply)
+
                     final_payload = make_final_chunk(
                         response_id,
                         model_name,
@@ -380,7 +437,7 @@ def main():
     try:
         app = build_app(expected_api_key=expected_api_key, default_device_id=args.device_id)
     except Exception as exc:
-        logger.error(f"Failed to initialize LLM client: {exc}")
+        logger.error(f"Failed to initialize service: {exc}")
         raise
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

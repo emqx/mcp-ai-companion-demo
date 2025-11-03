@@ -66,6 +66,12 @@ class EmotionAgent:
                 else:
                     logger.debug(f"skipped tool: {tool_name}")
 
+            tool_names = [
+                tool.metadata.name
+                for tool in filtered_tools
+                if hasattr(tool, "metadata") and hasattr(tool.metadata, "name")
+            ]
+
             self.agent = FunctionAgent(
                 tools=filtered_tools,
                 llm=self.llm,
@@ -75,7 +81,11 @@ class EmotionAgent:
                 timeout=8.0,
             )
 
-            logger.info(f"initialized with {len(filtered_tools)} tools")
+            logger.info(
+                "initialized with %s tools: %s",
+                len(filtered_tools),
+                tool_names or "[unknown]",
+            )
 
     async def determine_and_call_tools(self, user_input: str, context: str = "") -> Optional[Dict[str, Any]]:
         try:

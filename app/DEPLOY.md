@@ -28,7 +28,7 @@ Notes:
 - `--api-key` is optional. By default the service reads `CUSTOM_LLM_API_KEY` from `.env` (currently `4ecf5336172f1a715196f8bbd35df00d`); replace it with a strong random string (e.g., `openssl rand -hex 16`) before deploying and ensure clients send `Authorization: Bearer <your-token>`. Supplying `--api-key` on the CLI overrides the value from `.env`.
 - Adjust `--host` / `--port` to match your deployment environment. For production, ensure the port is reachable over HTTPS.
 - Each request now runs through the full `ConversationWorkflow` (`VoiceAgent` + `EmotionAgent`), so MCP tool calls behave exactly as in the main agent runtime. Provide `device_id` in the payload (or set `CUSTOM_LLM_DEVICE_ID`) when you need to bind the workflow to a specific MCP device.
-- To preload MCP tools on startup, pass `--device-id <web-ui-hardware-controller/...>` (or set `CUSTOM_LLM_DEVICE_ID`). When provided, the service connects to MQTT immediately instead of waiting for the first request.
+- To preload MCP tools on startup, pass `--device-id <web-ui-hardware-controller/...>` (or set `CUSTOM_LLM_DEVICE_ID`). 当未提供 `device_id` 时，服务会自动订阅 `$mcp-server/presence/#` 发现首个在线 MCP Server，并尝试加载其工具集，方便快速验证前端是否已接入。
 
 ## Endpoint
 

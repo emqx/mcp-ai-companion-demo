@@ -10,7 +10,6 @@ from mcp_client_init import McpMqttClient
 from mcp.shared.mqtt import MqttOptions
 from agents.emotion_agent import EmotionAgent
 from agents.voice_agent import VoiceAgent
-from llm import BaseLLMClient, create_llm_client
 from utils.colored_logger import get_agent_logger
 from utils.config import LLMSettings, get_llm_settings
 
@@ -47,7 +46,6 @@ class ConversationWorkflow:
         max_tokens: int | None = None,
         device_id: Optional[str] = None,
         llm_settings: Optional[LLMSettings] = None,
-        llm_client: Optional[BaseLLMClient] = None,
     ):
         base_settings = llm_settings or get_llm_settings()
         self.llm_settings = replace(base_settings)
@@ -67,18 +65,15 @@ class ConversationWorkflow:
 
         self.device_id = device_id
 
-        try:
-            self.llm_client = llm_client or create_llm_client(self.llm_settings)
-        except Exception as exc:
-            raise ValueError(f"Failed to initialize LLM client: {exc}") from exc
-
         custom_options = self.llm_settings.custom_options
         history_length = custom_options.history_length if custom_options else self.llm_settings.history_length
         enable_round_id = custom_options.enable_round_id if custom_options else self.llm_settings.enable_round_id
         custom_payload = custom_options.custom_payload if custom_options else {}
 
+        voice_api_key = self.llm_settings.api_key or os.getenv("LLM_API_KEY") or os.getenv("DASHSCOPE_API_KEY")
+        voice_api_base = self.llm_settings.api_base or os.getenv("LLM_API_BASE")
+
         self.voice_agent = VoiceAgent(
-            llm_client=self.llm_client,
             temperature=self.llm_settings.temperature,
             top_p=self.llm_settings.top_p,
             max_tokens=self.llm_settings.max_tokens,
@@ -90,6 +85,8 @@ class ConversationWorkflow:
             custom_payload=custom_payload,
             device_id=device_id,
             model=self.llm_settings.model,
+            api_key=voice_api_key,
+            api_base=voice_api_base,
         )
 
         emotion_api_key = os.getenv("EMOTION_LLM_API_KEY") or os.getenv("DASHSCOPE_API_KEY")
@@ -174,7 +171,17 @@ class ConversationWorkflow:
 
             while waited_time < max_wait_time:
                 if self.mcp_client.mcp_tools:
-                    logger.info(f"MCP tools loaded: {len(self.mcp_client.mcp_tools)} tools")
+                    tool_names = [
+                        tool.metadata.name
+                        if hasattr(tool, "metadata") and hasattr(tool.metadata, "name")
+                        else str(tool)
+                        for tool in self.mcp_client.mcp_tools
+                    ]
+                    logger.info(
+                        "MCP tools loaded (%s): %s",
+                        len(tool_names),
+                        ", ".join(tool_names) if tool_names else "[unknown]",
+                    )
 
                     # Set MCP client for emotion control agent
                     self.emotion_agent.set_mcp_client(self.mcp_client)

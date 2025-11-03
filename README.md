@@ -88,15 +88,33 @@ Optional: copy `.env.example` to `.env` to override the Volc proxy host. Default
 
 ### app
 
-This directory contains the Agent code, including interaction with multimedia services and the implementation for calling and interacting with LLM and VLM.
+Backend agent service implemented in Python. It now exposes an HTTP SSE endpoint as the primary integration surface.
 
-**Requirements**: Python >= 3.11, uv
+**Requirements**: Python >= 3.11, `uv`
+
+#### Run HTTP SSE server
 
 ```bash
 cd app
 uv sync
-uv run --env-file ../.env python main.py
+uv run --env-file .env python custom_llm_service.py \
+  --host 0.0.0.0 \
+  --port 8081 \
 ```
+
+- API: `POST /chat-stream`. Send a JSON body with OpenAI-compatible `messages`. The server responds with an SSE stream (`data: ...` chunks ending with `data: [DONE]`).
+
+#### Legacy CLI mode
+
+The original JSON-RPC / STDIN workflow remains available via `main.py` for legacy integrations:
+
+```bash
+cd app
+uv sync
+uv run --env-file .env python main.py
+```
+
+The CLI expects JSON-RPC commands from stdin, typically provided by the media proxy pipeline. Use this mode only if you integrate with the legacy streaming infrastructure; otherwise, prefer the HTTP SSE server above.
 
 ## Contact Us
 

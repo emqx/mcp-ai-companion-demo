@@ -84,14 +84,32 @@ pnpm dev
 
 ### app
 
-该目录下为 Agent 的代码，包含了跟多媒体服务交互，与 LLM、VLM 调用和交互的实现
+Python 实现的后台 Agent 服务，现以 HTTP SSE 接口为主要接入方式。
 
-**要求**: Python >= 3.11, uv
+**要求**：Python >= 3.11，`uv`
+
+#### 启动 HTTP SSE 服务
 
 ```bash
 cd app
 uv sync
-uv run main.py
+uv run --env-file .env python custom_llm_service.py \
+  --host 0.0.0.0 \
+  --port 8081 \
+  --device-id web-ui-hardware-controller/<id>
+```
+
+- `--device-id` 可选， 未指定时服务会通过 `$mcp-server/presence/#` 自动发现在线的 MCP Server。
+- API：`POST /chat-stream`，请求体为 OpenAI Chat 兼容格式 `messages`，响应为 SSE (`data: ...` + `data: [DONE]`)。
+
+#### CLI 模式（兼容旧流程）
+
+保留 `main.py` 供原有 JSON-RPC/STDIN 控制链路使用：
+
+```bash
+cd app
+uv sync
+uv run --env-file .env python main.py
 ```
 
 ## 联系我们
