@@ -9,6 +9,7 @@ import { MediaType } from '@volcengine/rtc'
 
 export interface UseVolcRtcOptions extends Pick<UseWebRTCMqttOptions, 'onASRResponse' | 'onTTSText' | 'onMessage'> {
   sceneId?: string
+  deviceId?: string
 }
 
 const stageToLoadingStatus = (code?: number) => {
@@ -26,7 +27,7 @@ const stageToLoadingStatus = (code?: number) => {
   }
 }
 
-export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: UseVolcRtcOptions): UseWebRTCReturn {
+export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMessage }: UseVolcRtcOptions): UseWebRTCReturn {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
@@ -236,6 +237,10 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
     setConnectionState('connecting')
 
     try {
+      if (!deviceId) {
+        throw new Error('Device ID unavailable. Please ensure MCP MQTT is connected.')
+      }
+
       const scene = await ensureSceneConfig()
       const { rtc, scene: sceneConfig } = scene
       if (!rtc?.AppId || !rtc.RoomId || !rtc.UserId || !rtc.Token) {
@@ -266,7 +271,9 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
 
       if (sceneConfig?.id && !voiceChatStartedRef.current) {
         try {
-          await startVoiceChat(sceneConfig.id)
+          await startVoiceChat(sceneConfig.id, {
+            device_id: deviceId,
+          })
           voiceChatStartedRef.current = true
         } catch (e) {
           console.warn('[useVolcRtc] Failed to start voice chat', e)
@@ -278,7 +285,7 @@ export function useVolcRtc({ sceneId, onASRResponse, onTTSText, onMessage }: Use
     } finally {
       pendingConnectRef.current = false
     }
-  }, [connectionState, ensureSceneConfig, isAudioEnabled, isVideoEnabled, refreshLocalStream])
+  }, [connectionState, deviceId, ensureSceneConfig, isAudioEnabled, isVideoEnabled, refreshLocalStream])
 
   const disconnect = useCallback(async () => {
     pendingConnectRef.current = false

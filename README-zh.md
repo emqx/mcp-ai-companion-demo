@@ -95,11 +95,12 @@ cd app
 uv sync
 uv run --env-file .env python custom_llm_service.py \
   --host 0.0.0.0 \
-  --port 8081 \
-  --device-id web-ui-hardware-controller/<id>
+  --port 8081
 ```
 
-- `--device-id` 可选， 未指定时服务会通过 `$mcp-server/presence/#` 自动发现在线的 MCP Server。
+- 每个 HTTP 请求都必须携带 `device_id`（可放在顶层字段或 `custom` JSON 中）。服务在首次收到某个设备 ID 时会初始化 MCP、加载工具，后续同一设备会直接复用既有连接，会话间互不干扰。
+- 当暂未检测到 MCP 工具时，会自动退回纯文本回复（不执行设备控制），避免直接报错。
+- 可通过环境变量 `MCP_TOOLS_WAIT_SECONDS`（默认 2 秒）控制等待 MCP 工具加载的时长；超时后立即进入纯文本模式。
 - API：`POST /chat-stream`，请求体为 OpenAI Chat 兼容格式 `messages`，响应为 SSE (`data: ...` + `data: [DONE]`)。
 
 #### CLI 模式（兼容旧流程）

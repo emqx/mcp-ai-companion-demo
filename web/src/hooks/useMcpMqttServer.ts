@@ -3,6 +3,7 @@ import { McpMqttServer } from '@emqx-ai/mcp-mqtt-sdk'
 
 type McpMqttServerWithCompat = McpMqttServer & {
   getClientId(): string
+  getServerName(): string
   getMqttClient(): MqttClient
   publish(topic: string, message: string): Promise<void>
 }
@@ -124,6 +125,7 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
 
     const serverWithCompat = Object.assign(server, {
       getClientId: () => serverId,
+      getServerName: () => fullServerName,
       publish: async (topic: string, message: string) => {
         const mqttClient = server.getMqttClient()
         if (mqttClient) {

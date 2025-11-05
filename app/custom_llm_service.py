@@ -9,6 +9,7 @@ from typing import Callable, Optional, TYPE_CHECKING
 
 import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from services.chat_models import ChatStreamPayload
@@ -28,7 +29,6 @@ def build_app(
     *,
     settings: Optional[LLMSettings] = None,
     expected_api_key: Optional[str] = None,
-    default_device_id: Optional[str] = None,
     workflow_factory: Optional[Callable[[LLMSettings], "ConversationWorkflow"]] = None,
 ) -> FastAPI:
     llm_settings = replace(settings or get_llm_settings())
@@ -37,21 +37,24 @@ def build_app(
 
     state = ServiceState(
         settings=llm_settings,
-        default_device_id=default_device_id,
         workflow_factory=workflow_factory,
     )
 
     async def lifespan(_: FastAPI):
-        try:
-            await state.ensure_mcp(state.default_device_id)
-        except Exception as exc:  # pragma: no cover - defensive logging
-            logger.warning("Failed to pre-initialize MCP: %s", exc)
+        await state.start()
         try:
             yield
         finally:
             await state.shutdown()
 
     app = FastAPI(title="Custom LLM SSE Service", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.state.service_state = state
     app.state.expected_api_key = expected_api_key
 
@@ -104,13 +107,12 @@ def main():
     parser.add_argument("--host", default="0.0.0.0", help="Service host (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=8081, help="Service port (default: 8081)")
     parser.add_argument("--api-key", default=None, help="Bearer token to require from requests (overrides CUSTOM_LLM_API_KEY)")
-    parser.add_argument("--device-id", default=None, help="Default MCP device id to bind on startup (overrides CUSTOM_LLM_DEVICE_ID)")
     args = parser.parse_args()
 
     expected_api_key = args.api_key or os.getenv("CUSTOM_LLM_API_KEY")
 
     try:
-        app = build_app(expected_api_key=expected_api_key, default_device_id=args.device_id)
+        app = build_app(expected_api_key=expected_api_key)
     except Exception as exc:
         logger.error(f"Failed to initialize service: {exc}")
         raise

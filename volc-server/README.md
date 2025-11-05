@@ -50,7 +50,9 @@ Verify with curl:
 curl -X POST http://localhost:3001/getScenes
 curl -X POST 'http://localhost:3001/proxy?Action=StartVoiceChat' \
   -H 'Content-Type: application/json' \
-  -d '{"SceneID":"emq-mcp-ai-companion"}'
+  -d '{"SceneID":"emq-mcp-ai-companion","LLMCustom":{"device_id":"web-ui-hardware-controller/demo-device"}}'
+
+👉 `LLMCustom.device_id` is forwarded as-is to the custom LLM interface. The backend uses it to initialize and then reuse the corresponding MCP session. In production, replace this with the actual ID used by the Web/MQTT client.
 ```
 
 ## 5. Structure
@@ -88,16 +90,16 @@ The server uses environment variables exclusively for configuration. Key categor
 
 See `.env.example` for all available options and their defaults.
 
-`VOLC_INTERRUPT_KEYWORDS` accepts either a comma-separated list or a JSON array string. The defaults覆盖常用的中英文打断词，例如“谢谢”“停”“Stop”。
+`VOLC_INTERRUPT_KEYWORDS` accepts either a comma-separated list or a JSON array string. The defaults cover common Chinese and English interrupt keywords, e.g. "谢谢", "停", "Stop".
 
 ### Selecting a natural TTS profile
 
 - `VOLC_TTS_MODE`:
-  - `standard` (默认) 使用传统火山流式 TTS，对应 `speed_ratio/pitch_ratio/volume_ratio`。
-  - `bigtts` 使用语音合成大模型（更自然、更具情感），自动映射为 `speech_ratio/pitch_rate`。
-  - `bidirection` 对接流式大模型，需要提供 `VOLC_TTS_APP_TOKEN` 与 `VOLC_TTS_RESOURCE_ID`，并可通过 `VOLC_TTS_DISABLE_MARKDOWN_FILTER`、`VOLC_TTS_ENABLE_LATEX_TN` 控制额外特性。
-- `VOLC_TTS_IGNORE_BRACKET_TEXT` 支持 JSON 数组或逗号分隔，示例 `[1,2]` 可过滤括号内内容。
-- 可选的情感参数：设置 `VOLC_TTS_EMOTION` 及 `VOLC_TTS_EMOTION_INTENSITY`（0-1 范围）为大模型音色增加情感色彩。
+  - `standard` (default) uses the traditional Volc streaming TTS, which maps to `speed_ratio/pitch_ratio/volume_ratio`.
+  - `bigtts` uses a large TTS synthesis model (more natural and expressive), automatically mapped to `speech_ratio/pitch_rate`.
+  - `bidirection` connects to a streaming large model and requires `VOLC_TTS_APP_TOKEN` and `VOLC_TTS_RESOURCE_ID`. Additional features can be toggled via `VOLC_TTS_DISABLE_MARKDOWN_FILTER` and `VOLC_TTS_ENABLE_LATEX_TN`.
+- `VOLC_TTS_IGNORE_BRACKET_TEXT` accepts a JSON array or a comma-separated list; e.g., `[1,2]` filters text inside brackets.
+- Optional emotion parameters: set `VOLC_TTS_EMOTION` and `VOLC_TTS_EMOTION_INTENSITY` (range 0–1) to add emotional coloring to the large-model voice.
 
 VolcEngine docs for reference:
 

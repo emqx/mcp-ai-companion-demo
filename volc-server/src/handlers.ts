@@ -6,7 +6,7 @@ import { serverLogger } from './logger'
 
 type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null
 
-type ProxyPayload = Record<string, unknown> & { SceneID?: string }
+type ProxyPayload = Record<string, unknown> & { SceneID?: string; LLMCustom?: unknown }
 
 const RESPONSE_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -40,9 +40,59 @@ const toErrorResponse = (action: string, message: string, status = 400) =>
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
-const buildStartVoiceChatPayload = (scene: SceneFile) => {
+const stringifyCustomPayload = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) {
+    return undefined
+  }
+
+  if (typeof value === 'string') {
+    return value
+  }
+
+  try {
+    return JSON.stringify(value)
+  } catch (error) {
+    const cause = error instanceof Error ? error.message : String(error)
+    serverLogger.warn('Failed to serialize LLM custom payload', { error: cause })
+    return undefined
+  }
+}
+
+const buildStartVoiceChatPayload = (scene: SceneFile, payload?: ProxyPayload) => {
   const prepared = prepareSceneForRequest(scene)
   const voiceChat = clone(prepared.VoiceChat)
+
+  const llmCustomRaw = payload?.LLMCustom
+  const customPayload = stringifyCustomPayload(llmCustomRaw)
+  if (customPayload) {
+    const config = (voiceChat.Config ??= {}) as Record<string, unknown>
+    const currentLlmConfig = (config['LLMConfig'] as Record<string, unknown> | undefined) ?? {}
+    currentLlmConfig['Custom'] = customPayload
+    config['LLMConfig'] = currentLlmConfig
+
+    const customDeviceId = (() => {
+      if (llmCustomRaw && typeof llmCustomRaw === 'object') {
+        const deviceField = (llmCustomRaw as Record<string, unknown>).device_id
+        return typeof deviceField === 'string' ? deviceField : undefined
+      }
+      if (typeof llmCustomRaw === 'string') {
+        try {
+          const parsed = JSON.parse(llmCustomRaw)
+          if (parsed && typeof parsed === 'object' && typeof parsed.device_id === 'string') {
+            return parsed.device_id as string
+          }
+        } catch (error) {
+          // Ignore malformed JSON
+        }
+      }
+      return undefined
+    })()
+
+    if (customDeviceId) {
+      serverLogger.info('Voice chat using custom device_id', { deviceId: customDeviceId })
+    }
+  }
+
   serverLogger.info('Starting voice chat', { AppId: voiceChat.AppId, RoomId: voiceChat.RoomId, TaskId: voiceChat.TaskId })
   return voiceChat
 }
@@ -191,7 +241,7 @@ export const createRequestHandler = (env: RuntimeEnv) => {
     try {
       switch (action) {
         case 'StartVoiceChat':
-          requestBody = buildStartVoiceChatPayload(scene)
+          requestBody = buildStartVoiceChatPayload(scene, rawBody)
           break
         case 'StopVoiceChat':
           requestBody = buildStopVoiceChatPayload(scene)
