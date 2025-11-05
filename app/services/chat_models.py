@@ -33,12 +33,14 @@ class ChatStreamPayload(BaseModel):
 
 def prepare_conversation(messages: List[MessagePayload]) -> Tuple[List[ChatMessage], ChatMessage]:
     if not messages:
-        raise ValueError("messages must not be empty")
+        return [], ChatMessage(role="user", content="")
 
     converted = [ChatMessage(role=item.role, content=item.content or "") for item in messages]
     last_message = converted[-1]
-    if last_message.role != "user":
-        raise ValueError("The last message must have role 'user'")
-
     history = converted[:-1]
+
+    if last_message.role != "user":
+        history = converted
+        last_message = ChatMessage(role="user", content="")
+
     return history, last_message
