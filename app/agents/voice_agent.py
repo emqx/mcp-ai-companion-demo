@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import asyncio
 from typing import AsyncGenerator, List, Optional, Sequence
 
 from llama_index.llms.openai_like import OpenAILike
@@ -100,12 +99,6 @@ class VoiceAgent:
         self.mcp_tools = tools_list
         self._tool_signature = signature
 
-        if not tools_list:
-            if self.function_agent is not None:
-                logger.info("VoiceAgent cleared MCP bindings; reverting to direct LLM")
-            self.function_agent = None
-            return
-
         tool_names = [
             tool.metadata.name
             if hasattr(tool, "metadata") and hasattr(tool.metadata, "name")
@@ -120,11 +113,6 @@ class VoiceAgent:
         self._initialize_function_agent()
 
     def _initialize_function_agent(self):
-        if not self.mcp_tools:
-            logger.warning("No MCP tools available for VoiceAgent; skipping function agent initialization")
-            self.function_agent = None
-            return
-
         llm = self._build_llama_index_llm()
         if llm is None:
             self.function_agent = None
@@ -147,11 +135,14 @@ class VoiceAgent:
                 for tool in self.mcp_tools
                 if hasattr(tool, "metadata") and hasattr(tool.metadata, "name")
             ]
-            logger.info(
-                "Voice FunctionAgent initialized with %s tools: %s",
-                len(tool_names),
-                tool_names or "[unknown]",
-            )
+            if tool_names:
+                logger.info(
+                    "Voice FunctionAgent initialized with %s tools: %s",
+                    len(tool_names),
+                    tool_names,
+                )
+            else:
+                logger.info("Voice FunctionAgent initialized without MCP tools; using base LLM only")
         except Exception as exc:
             logger.error("Failed to initialize Voice FunctionAgent: %s", exc)
             self.function_agent = None
@@ -212,58 +203,9 @@ class VoiceAgent:
 
     async def generate_response_stream(self, user_input: str) -> AsyncGenerator[str, None]:
         if not self.function_agent:
-            logger.warning("FunctionAgent unavailable for VoiceAgent; falling back to direct LLM response")
-            llm = self._ensure_direct_llm()
-            if llm is None:
-                logger.error("Unable to obtain fallback LLM for VoiceAgent")
-                raise RuntimeError("Voice FunctionAgent unavailable")
-
-            aggregated_chunks: List[str] = []
-            stream_iterator = None
-
-            try:
-                stream_iterator = await llm.astream_complete(user_input)  # type: ignore[attr-defined]
-            except AttributeError:
-                stream_iterator = None
-            except NotImplementedError:
-                stream_iterator = None
-
-            if stream_iterator is not None:
-                try:
-                    async for part in stream_iterator:
-                        delta = getattr(part, "delta", None) or getattr(part, "text", "")
-                        if delta:
-                            aggregated_chunks.append(delta)
-                            yield delta
-                finally:
-                    try:
-                        final_response = await stream_iterator.get_final_response()  # type: ignore[attr-defined]
-                        if final_response and getattr(final_response, "text", None):
-                            aggregated_chunks = [final_response.text]
-                    except AttributeError:
-                        pass
-                    except NotImplementedError:
-                        pass
-                    except Exception as exc:  # pragma: no cover - defensive
-                        logger.debug("Failed to obtain final streaming response: %s", exc)
-
-            if not aggregated_chunks:
-                response = await llm.acomplete(user_input)
-                text = getattr(response, "text", str(response))
-                aggregated_chunks.append(text)
-                yield text
-
-            assistant_text = "".join(aggregated_chunks).strip()
-            assistant_message = ChatMessage(role="assistant", content=assistant_text)
-            self.history.append(assistant_message)
-
-            if self.history_length > 0:
-                retain = self.history_length * 2
-                if len(self.history) > retain:
-                    self.history = self.history[-retain:]
-
-            logger.info("assistant reply: %s", assistant_text)
-            return
+            logger.warning("FunctionAgent unavailable for VoiceAgent; no MCP tools bound")
+            logger.error("Voice FunctionAgent unavailable; aborting request")
+            raise RuntimeError("Voice FunctionAgent unavailable")
 
         user_message = ChatMessage(role="user", content=user_input)
         self.history.append(user_message)
