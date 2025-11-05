@@ -92,6 +92,32 @@ See `.env.example` for all available options and their defaults.
 
 `VOLC_INTERRUPT_KEYWORDS` accepts either a comma-separated list or a JSON array string. The defaults cover common Chinese and English interrupt keywords, e.g. "谢谢", "停", "Stop".
 
+### CustomLLM integration
+
+Set `VOLC_LLM_MODE=CustomLLM` when you want VolcEngine to call a third-party agent instead of an Ark endpoint. The proxy fills the `StartVoiceChat` payload directly from environment variables:
+
+- `VOLC_LLM_URL` (required): HTTPS endpoint of your agent (must support SSE and return `data: [DONE]`).
+- `VOLC_LLM_API_KEY` (optional): forwarded as `Authorization: Bearer <token>`.
+- `VOLC_LLM_MODEL_NAME`: copied to the `model` field of each request.
+- `VOLC_LLM_TEMPERATURE`, `VOLC_LLM_TOP_P`, `VOLC_LLM_MAX_TOKENS`: numeric sampling parameters.
+- `VOLC_LLM_HISTORY_LENGTH`: controls how many turns VolcEngine sends in `messages`.
+- `VOLC_LLM_EXTRA_HEADERS`, `VOLC_LLM_STREAM_OPTIONS`, `VOLC_LLM_USER_PROMPTS`: JSON strings for advanced options documented by VolcEngine.
+
+Example snippet for a locally hosted agent:
+
+```env
+VOLC_LLM_MODE=CustomLLM
+VOLC_LLM_URL=https://demo.emqx.com:8081/chat-stream
+VOLC_LLM_API_KEY=4ecf5336172f1a715196f8bbd35df00d
+VOLC_LLM_MODEL_NAME=qwen-flash
+VOLC_LLM_TEMPERATURE=0.7
+VOLC_LLM_TOP_P=0.9
+VOLC_LLM_MAX_TOKENS=512
+VOLC_LLM_HISTORY_LENGTH=5
+VOLC_LLM_ENABLE_ROUND_ID=true
+VOLC_LLM_STREAM_OPTIONS={"include_usage":true}
+```
+
 ### Selecting a natural TTS profile
 
 - `VOLC_TTS_MODE`:
