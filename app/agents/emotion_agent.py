@@ -1,8 +1,9 @@
 import logging
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Sequence
 
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.agent import FunctionAgent
+from llama_index.core.tools import BaseTool
 
 from mcp_client_init import McpMqttClient
 
@@ -34,9 +35,10 @@ class EmotionAgent:
         self.system_prompt = load_system_prompt(system_prompt_file)
 
         # MCP tools and emotion agent
-        self.mcp_tools: List = []
+        self.mcp_tools: List[BaseTool] = []
         self.mcp_client: Optional[McpMqttClient] = None
         self.agent: Optional[FunctionAgent] = None
+        self._tool_signature: Optional[tuple[str, ...]] = None
 
         self.llm: Optional[OpenAILike] = self._build_llama_index_llm()
 
@@ -45,23 +47,40 @@ class EmotionAgent:
         else:
             logger.error("EmotionAgent LLM initialization failed; agent will not be available until credentials are provided")
 
-    def set_mcp_client(self, mcp_client: McpMqttClient):
-        """Set MCP client"""
+    def update_mcp_context(self, mcp_client: Optional[McpMqttClient], tools: Sequence[BaseTool]) -> None:
+        """Attach MCP client and rebuild filtered tool set when changed."""
+
+        tools_list = list(tools) if tools else []
+        signature = tuple(
+            tool.metadata.name if hasattr(tool, "metadata") and hasattr(tool.metadata, "name") else str(tool)
+            for tool in tools_list
+        )
+
+        if self.mcp_client is mcp_client and self._tool_signature == signature:
+            return
+
         self.mcp_client = mcp_client
-        if mcp_client:
-            self.mcp_tools = getattr(mcp_client, "mcp_tools", [])
-            tool_names = [
-                tool.metadata.name
-                if hasattr(tool, "metadata") and hasattr(tool.metadata, "name")
-                else str(tool)
-                for tool in self.mcp_tools
-            ]
-            logger.info(
-                "EmotionAgent received MCP tools (%s): %s",
-                len(tool_names),
-                ", ".join(tool_names) if tool_names else "[unknown]",
-            )
-            self._initialize_function_agent()
+        self.mcp_tools = tools_list
+        self._tool_signature = signature
+
+        if not tools_list:
+            if self.agent is not None:
+                logger.info("EmotionAgent cleared MCP bindings; tool agent disabled")
+            self.agent = None
+            return
+
+        tool_names = [
+            tool.metadata.name
+            if hasattr(tool, "metadata") and hasattr(tool.metadata, "name")
+            else str(tool)
+            for tool in tools_list
+        ]
+        logger.info(
+            "EmotionAgent received MCP tools (%s): %s",
+            len(tool_names),
+            ", ".join(tool_names) if tool_names else "[unknown]",
+        )
+        self._initialize_function_agent()
 
     def _initialize_function_agent(self):
         """Initialize FunctionAgent"""

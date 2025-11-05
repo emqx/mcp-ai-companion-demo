@@ -1,12 +1,15 @@
 import os
 import time
 import json
+import random
+import string
 import anyio
-from typing import Optional, AsyncGenerator, Dict, Any
+from typing import Optional, AsyncGenerator, Dict, Any, Sequence
 from dataclasses import dataclass, replace
 from enum import Enum
 
-from mcp_client_init import McpMqttClient
+from mcp_client_init import McpMqttClient, _tool_signature
+from llama_index.core.tools import BaseTool
 from mcp.shared.mqtt import MqttOptions
 from agents.emotion_agent import EmotionAgent
 from agents.voice_agent import VoiceAgent
@@ -14,6 +17,35 @@ from utils.colored_logger import get_agent_logger
 from utils.config import LLMSettings, get_llm_settings
 
 logger = get_agent_logger("chat")
+
+MAX_MQTT_CLIENT_ID_LENGTH = 23
+
+
+def _generate_default_client_id() -> str:
+    """Generate a short, MQTT-safe client ID (<=23 chars)."""
+    suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    return f"mcpapp-{suffix}"
+
+
+def _prepare_mqtt_client_id(raw_value: Optional[str]) -> str:
+    """Sanitize and normalize MQTT client IDs to avoid broker rejections."""
+    client_id = (raw_value or "").strip()
+    if not client_id:
+        client_id = _generate_default_client_id()
+
+    sanitized = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in client_id)
+    if not sanitized:
+        sanitized = _generate_default_client_id()
+
+    if len(sanitized) > MAX_MQTT_CLIENT_ID_LENGTH:
+        logger.warning(
+            "MQTT client ID '%s' exceeds %s characters; trimming to comply with broker limits",
+            sanitized,
+            MAX_MQTT_CLIENT_ID_LENGTH,
+        )
+        sanitized = sanitized[:MAX_MQTT_CLIENT_ID_LENGTH]
+
+    return sanitized
 
 
 class ResponseType(Enum):
@@ -99,22 +131,74 @@ class ConversationWorkflow:
         )
 
         self.mcp_client: Optional[McpMqttClient] = None
+        self._current_server_name: Optional[str] = None
+        self._active_tool_signature: Optional[tuple[str, ...]] = None
+        self._owns_mcp_client = False
 
         logger.info("initialized with provider=%s", self.llm_settings.provider)
         self.tg: anyio.abc.TaskGroup | None = None
         self._tg_entered = False
 
-    def _reinit_agents(self):
-        """Simple reinit function when MCP tools are updated"""
-        logger.info("Reinitializing agents with updated MCP tools")
+    def _reinit_agents(
+        self,
+        server_name: Optional[str] = None,
+        tools: Optional[Sequence[BaseTool]] = None,
+    ) -> None:
+        """Refresh agent bindings when MCP tools change."""
 
-        # Set MCP client for emotion control agent
-        self.emotion_agent.set_mcp_client(self.mcp_client)
+        if not self.mcp_client:
+            return
 
-        # Set MCP client for voice response agent
-        self.voice_agent.set_mcp_client(self.mcp_client)
+        logger.info(
+            "Reinitializing agents with updated MCP tools (server=%s)",
+            server_name or self._current_server_name,
+        )
+
+        resolved_tools: Sequence[BaseTool]
+        if tools is not None:
+            resolved_tools = tools
+        elif server_name:
+            resolved_tools = self.mcp_client.get_tools_for_server(server_name)
+        else:
+            resolved_tools = getattr(self.mcp_client, "mcp_tools", [])
+
+        self.configure_mcp(
+            mcp_client=self.mcp_client,
+            device_id=self.device_id,
+            server_name=server_name or self._current_server_name,
+            tools=resolved_tools,
+        )
 
         logger.info("Agents reinitialized successfully")
+
+    def configure_mcp(
+        self,
+        *,
+        mcp_client: Optional[McpMqttClient],
+        device_id: Optional[str],
+        server_name: Optional[str],
+        tools: Sequence[BaseTool],
+    ) -> None:
+        """Bind workflow to shared MCP client and tool set."""
+
+        tools_list = list(tools) if tools else []
+        signature = _tool_signature(tools_list)
+
+        self.mcp_client = mcp_client
+        self.device_id = device_id
+        self._current_server_name = server_name
+
+        if (
+            self._active_tool_signature == signature
+            and self.emotion_agent.mcp_client is mcp_client
+            and self.voice_agent.mcp_client is mcp_client
+        ):
+            # Nothing new to apply
+            return
+
+        self._active_tool_signature = signature
+        self.emotion_agent.update_mcp_context(mcp_client, tools_list)
+        self.voice_agent.update_mcp_context(mcp_client, tools_list)
 
     async def init_mcp(
         self,
@@ -131,7 +215,7 @@ class ConversationWorkflow:
             password=None,
         )
 
-        mqtt_clientid = os.getenv("MQTT_CLIENT_ID") or f"mcp_ai_companion_{os.getpid()}"
+        mqtt_clientid = _prepare_mqtt_client_id(os.getenv("MQTT_CLIENT_ID") or f"mcp_ai_companion_{os.getpid()}")
 
         self.mcp_client = McpMqttClient(
             mqtt_options=mqtt_options,
@@ -141,6 +225,7 @@ class ConversationWorkflow:
             device_id=device_to_use,
             on_tools_updated=self._reinit_agents
         )
+        self._owns_mcp_client = True
 
         # Start MCP
         if self.tg is None:
@@ -157,18 +242,25 @@ class ConversationWorkflow:
             logger.info(f"MCP connected with device {device_to_use}")
             self.device_id = device_to_use
 
-            # Wait for tools to load
-            max_wait_time = 10  # seconds
+            # Wait for tools to load (short timeout; fallback to plain LLM if none)
+            try:
+                max_wait_time = float(os.getenv("MCP_TOOLS_WAIT_SECONDS", "2"))
+            except ValueError:
+                max_wait_time = 2.0
             wait_interval = 0.5  # seconds
             waited_time = 0
 
             while waited_time < max_wait_time:
-                if self.mcp_client.mcp_tools:
+                current_tools = self.mcp_client.get_tools_for_server(server_name_filter)
+                if not current_tools:
+                    current_tools = self.mcp_client.mcp_tools
+
+                if current_tools:
                     tool_names = [
                         tool.metadata.name
                         if hasattr(tool, "metadata") and hasattr(tool.metadata, "name")
                         else str(tool)
-                        for tool in self.mcp_client.mcp_tools
+                        for tool in current_tools
                     ]
                     logger.info(
                         "MCP tools loaded (%s): %s",
@@ -176,11 +268,12 @@ class ConversationWorkflow:
                         ", ".join(tool_names) if tool_names else "[unknown]",
                     )
 
-                    # Set MCP client for emotion control agent
-                    self.emotion_agent.set_mcp_client(self.mcp_client)
-
-                    # Set MCP client for voice response agent
-                    self.voice_agent.set_mcp_client(self.mcp_client)
+                    self.configure_mcp(
+                        mcp_client=self.mcp_client,
+                        device_id=device_to_use,
+                        server_name=server_name_filter,
+                        tools=current_tools,
+                    )
                     break
 
                 await anyio.sleep(wait_interval)
@@ -188,7 +281,13 @@ class ConversationWorkflow:
                 logger.debug(f"waiting for MCP tools... ({waited_time:.1f}s)")
 
             if not self.mcp_client.mcp_tools:
-                logger.warning(f"no MCP tools loaded after {max_wait_time}s timeout")
+                logger.warning(f"no MCP tools loaded after {max_wait_time}s; continuing without tool bindings")
+                self.configure_mcp(
+                    mcp_client=self.mcp_client,
+                    device_id=device_to_use,
+                    server_name=server_name_filter,
+                    tools=[],
+                )
         else:
             logger.error("failed to connect MCP")
 
@@ -266,9 +365,10 @@ class ConversationWorkflow:
     async def shutdown(self):
         """Shutdown agent and connections"""
         logger.info("shutting down")
-        if self.mcp_client:
+        if self._owns_mcp_client and self.mcp_client:
             await self.mcp_client.stop()
-        if self.tg and self._tg_entered:
+        if self._owns_mcp_client and self.tg and self._tg_entered:
             await self.tg.__aexit__(None, None, None)
             self._tg_entered = False
             self.tg = None
+        self._owns_mcp_client = False

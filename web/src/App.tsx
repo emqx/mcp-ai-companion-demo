@@ -104,13 +104,15 @@ function App() {
     saveMqttConfig(config)
   }, [])
 
-  const { isConnected: isMqttConnected, isMcpInitialized } = useMcpMqttServer({
+  const { client: mcpClient, isConnected: isMqttConnected, isMcpInitialized } = useMcpMqttServer({
     brokerUrl: mqttConfig.brokerUrl,
     username: mqttConfig.username,
     password: mqttConfig.password,
     autoConnect: true,
     callbacks,
   })
+
+  const deviceId = useMemo(() => mcpClient?.getServerName?.(), [mcpClient])
 
   const {
     localStream,
@@ -126,6 +128,7 @@ function App() {
     isVideoEnabled,
     cleanup: cleanupWebRTC,
   } = useVolcRtc({
+    deviceId,
     onASRResponse: (text?: string) => {
       conversationLogger.user(text)
       setLlmLoading('processing')

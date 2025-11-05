@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, AsyncGenerator, Dict, Optional
 
 from fastapi import HTTPException
@@ -96,14 +97,22 @@ async def stream_chat_response(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    async with service_state.lock:
-        voice_agent = service_state.workflow.voice_agent
-        workflow = service_state.workflow
+    if not payload.device_id:
+        raise HTTPException(status_code=400, detail="device_id is required")
+    target_device_id = payload.device_id
+
+    try:
+        session = await service_state.ensure_mcp(target_device_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    workflow = session.workflow
+
+    async with session.lock:
+        voice_agent = workflow.voice_agent
         prompt_message_count = len(history) + 1
 
-        await service_state.ensure_mcp(payload.device_id)
-
-        snapshot = service_state.snapshot_voice_agent_state()
+        snapshot = service_state.snapshot_voice_agent_state(session)
         voice_agent.history = list(history)
 
         if payload.temperature is not None:
@@ -124,9 +133,6 @@ async def stream_chat_response(
         if payload.device_id:
             workflow.device_id = payload.device_id
             voice_agent.device_id = payload.device_id
-            service_state.default_device_id = payload.device_id
-        elif workflow.device_id:
-            service_state.default_device_id = workflow.device_id
 
         model_name = voice_agent.model or service_state.settings.model or ""
 
@@ -201,4 +207,5 @@ async def stream_chat_response(
             logger.error("Workflow streaming failed: %s", exc)
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         finally:
-            service_state.restore_voice_agent_state(snapshot)
+            service_state.restore_voice_agent_state(session, snapshot)
+            session.last_used = time.time()
