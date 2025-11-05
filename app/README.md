@@ -23,6 +23,20 @@ uv run --env-file .env python custom_llm_service.py \
   --port 8081
 ```
 
+### HTTPS (optional)
+
+The service can terminate TLS directly through uvicorn. Supply the certificate/key pair (PEM format):
+
+```bash
+uv run --env-file .env python custom_llm_service.py \
+  --host 0.0.0.0 \
+  --port 8081 \
+  --ssl-certfile /root/code/emqx-multimedia-proxy/docker/certs/fullchain.pem \
+  --ssl-keyfile /root/code/emqx-multimedia-proxy/docker/certs/privkey.pem
+```
+
+Adjust the filenames to match the certificate bundle and private key present under `/root/code/emqx-multimedia-proxy/docker/certs`. If the key is encrypted, add `--ssl-keyfile-password <password>`. Provide a CA bundle with `--ssl-ca-certs` only when mutual TLS is required.
+
 Notes:
 
 - `--api-key` overrides `CUSTOM_LLM_API_KEY` from `.env`. Pick a strong random token (e.g. `openssl rand -hex 16`) for production and require clients to send `Authorization: Bearer <token>`.

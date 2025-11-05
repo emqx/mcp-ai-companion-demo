@@ -107,7 +107,14 @@ def main():
     parser.add_argument("--host", default="0.0.0.0", help="Service host (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=8081, help="Service port (default: 8081)")
     parser.add_argument("--api-key", default=None, help="Bearer token to require from requests (overrides CUSTOM_LLM_API_KEY)")
+    parser.add_argument("--ssl-certfile", default=None, help="Path to TLS certificate file (PEM)")
+    parser.add_argument("--ssl-keyfile", default=None, help="Path to TLS private key file (PEM)")
+    parser.add_argument("--ssl-keyfile-password", default=None, help="Password for the TLS private key, if encrypted")
+    parser.add_argument("--ssl-ca-certs", default=None, help="Path to custom CA bundle for client verification")
     args = parser.parse_args()
+
+    if (args.ssl_certfile and not args.ssl_keyfile) or (args.ssl_keyfile and not args.ssl_certfile):
+        parser.error("--ssl-certfile and --ssl-keyfile must be provided together")
 
     expected_api_key = args.api_key or os.getenv("CUSTOM_LLM_API_KEY")
 
@@ -117,7 +124,16 @@ def main():
         logger.error(f"Failed to initialize service: {exc}")
         raise
 
-    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+    ssl_kwargs = {}
+    if args.ssl_certfile:
+        ssl_kwargs["ssl_certfile"] = args.ssl_certfile
+        ssl_kwargs["ssl_keyfile"] = args.ssl_keyfile
+        if args.ssl_keyfile_password:
+            ssl_kwargs["ssl_keyfile_password"] = args.ssl_keyfile_password
+        if args.ssl_ca_certs:
+            ssl_kwargs["ssl_ca_certs"] = args.ssl_ca_certs
+
+    uvicorn.run(app, host=args.host, port=args.port, log_level="info", **ssl_kwargs)
 
 
 if __name__ == "__main__":
