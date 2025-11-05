@@ -90,13 +90,6 @@ class ServiceState:
         self.registry_lock = anyio.Lock()
         # Backwards compatibility with previous attribute name
         self.lock = self.registry_lock
-        self._trace_seq = 0
-
-    def _trace(self, tag: str, message: str, *args) -> None:
-        self._trace_seq += 1
-        prefix = f"[STATE-{self._trace_seq:05d}] {tag} "
-        formatted = message % args if args else message
-        print(prefix + formatted, flush=True)
 
     async def start(self) -> None:
         await self.registry.ensure_started()
@@ -122,7 +115,6 @@ class ServiceState:
         if not device_id:
             raise RuntimeError("device_id is required to initialize MCP")
 
-        self._trace("ensure_mcp", "device_id=%s", device_id)
         return await self._ensure_session_for_device(device_id)
 
     async def _ensure_session_for_device(self, device_id: str) -> DeviceSession:
@@ -135,10 +127,8 @@ class ServiceState:
         async with self.registry_lock:
             existing = self.sessions.get(device_id)
             if existing:
-                self._trace("get_session", "reuse existing session device_id=%s", device_id)
                 return existing
 
-            self._trace("get_session", "create new session device_id=%s", device_id)
             workflow = self._create_workflow(device_id=device_id)
             session = DeviceSession(workflow=workflow, lock=anyio.Lock(), device_id=device_id)
             self.sessions[device_id] = session
@@ -178,13 +168,6 @@ class ServiceState:
 
         tools = self.registry.get_tools_now(server_name)
         if not tools and wait_timeout > 0:
-            self._trace(
-                "prepare_session",
-                "waiting for tools device_id=%s server=%s timeout=%.2fs",
-                device_id,
-                server_name,
-                wait_timeout,
-            )
             tools = await self.registry.wait_for_tools(server_name, timeout=wait_timeout)
 
         workflow.configure_mcp(
@@ -192,13 +175,6 @@ class ServiceState:
             device_id=device_id,
             server_name=server_name,
             tools=tools,
-        )
-        self._trace(
-            "prepare_session",
-            "configured device_id=%s server=%s tools=%s",
-            device_id,
-            server_name,
-            bool(tools),
         )
         session.initialized = True
 
