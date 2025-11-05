@@ -13,6 +13,34 @@ const asOptionalString = (value: unknown): string | undefined => {
   return trimmed.length ? trimmed : undefined
 }
 
+const toJsonObject = (value?: string): Record<string, unknown> | undefined => {
+  if (!value) {
+    return undefined
+  }
+  try {
+    const parsed = JSON.parse(value)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+  } catch (error) {
+    // Ignore JSON parsing errors and fall back to undefined
+  }
+  return undefined
+}
+
+const toJsonArray = (value?: string): unknown[] | undefined => {
+  if (!value) {
+    return undefined
+  }
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : undefined
+  } catch (error) {
+    // Ignore JSON parsing errors and fall back to undefined
+  }
+  return undefined
+}
+
 // Create scene configuration directly from environment variables
 const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
   const roomId = randomUUID()
@@ -130,6 +158,70 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
     ttsConfig.IgnoreBracketText = env.VOLC_TTS_IGNORE_BRACKET_TEXT
   }
 
+  const llmConfig: Record<string, unknown> = {
+    Mode: env.VOLC_LLM_MODE,
+    VisionConfig: {
+      Enable: env.VOLC_LLM_VISION_ENABLE,
+    },
+  }
+
+  const systemMessage = asOptionalString(env.VOLC_LLM_SYSTEM_MESSAGE)
+  if (systemMessage) {
+    llmConfig.SystemMessages = [systemMessage]
+  }
+
+  if (env.VOLC_LLM_ENDPOINT_ID) {
+    llmConfig.EndPointId = env.VOLC_LLM_ENDPOINT_ID
+  }
+
+  if (env.VOLC_LLM_MODEL_NAME) {
+    llmConfig.ModelName = env.VOLC_LLM_MODEL_NAME
+  }
+
+  if (env.VOLC_LLM_HISTORY_LENGTH !== undefined) {
+    llmConfig.HistoryLength = env.VOLC_LLM_HISTORY_LENGTH
+  }
+
+  if (env.VOLC_LLM_ENABLE_ROUND_ID) {
+    llmConfig.EnableRoundId = true
+  }
+
+  const setNumericConfig = (key: string, value: number | undefined) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      llmConfig[key] = value
+    }
+  }
+
+  setNumericConfig('Temperature', env.VOLC_LLM_TEMPERATURE)
+  setNumericConfig('TopP', env.VOLC_LLM_TOP_P)
+  setNumericConfig('MaxTokens', env.VOLC_LLM_MAX_TOKENS)
+
+  const extraHeaders = toJsonObject(env.VOLC_LLM_EXTRA_HEADERS)
+  if (extraHeaders) {
+    llmConfig.ExtraHeader = extraHeaders
+  }
+
+  const userPrompts = toJsonArray(env.VOLC_LLM_USER_PROMPTS)
+  if (userPrompts) {
+    llmConfig.UserPrompts = userPrompts
+  }
+
+  const streamOptions = toJsonObject(env.VOLC_LLM_STREAM_OPTIONS)
+  if (streamOptions) {
+    llmConfig.StreamOptions = streamOptions
+  }
+
+  if (env.VOLC_LLM_MODE === 'CustomLLM') {
+    if (!env.VOLC_LLM_URL) {
+      throw new Error('VOLC_LLM_URL is required when VOLC_LLM_MODE=CustomLLM')
+    }
+    llmConfig.Url = env.VOLC_LLM_URL
+
+    if (env.VOLC_LLM_API_KEY) {
+      llmConfig.APIKey = env.VOLC_LLM_API_KEY
+    }
+  }
+
   const scene: SceneFile = {
     SceneConfig: {
       icon: env.VOLC_SCENE_ICON,
@@ -161,14 +253,7 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
       Config: {
         ASRConfig: asrConfig,
         TTSConfig: ttsConfig,
-        LLMConfig: {
-          Mode: env.VOLC_LLM_MODE,
-          EndPointId: env.VOLC_LLM_ENDPOINT_ID || '',
-          SystemMessages: [env.VOLC_LLM_SYSTEM_MESSAGE],
-          VisionConfig: {
-            Enable: env.VOLC_LLM_VISION_ENABLE,
-          },
-        },
+        LLMConfig: llmConfig,
         AvatarConfig: {
           Enabled: env.VOLC_AVATAR_ENABLED,
           AvatarType: env.VOLC_AVATAR_TYPE,

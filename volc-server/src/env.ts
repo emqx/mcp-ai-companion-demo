@@ -25,6 +25,14 @@ const parseNumber = (value: string | undefined, fallback: number): number => {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+const parseOptionalNumber = (value: string | undefined): number | undefined => {
+  if (value === undefined) {
+    return undefined
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
 const parseKeywords = (value: string | undefined): string[] => {
   if (!value) return [...DEFAULT_INTERRUPT_KEYWORDS]
   try {
@@ -108,8 +116,19 @@ const envSchema = z.object({
   // LLM configuration
   VOLC_LLM_MODE: z.string().default('ArkV3'),
   VOLC_LLM_ENDPOINT_ID: z.string().optional(),
-  VOLC_LLM_SYSTEM_MESSAGE: z.string().default('你是 EMQ，性格幽默又善解人意。你在表达时需简明扼要，有自己的观点。'),
+  VOLC_LLM_SYSTEM_MESSAGE: z.string().default(''),
   VOLC_LLM_VISION_ENABLE: z.boolean().default(false),
+  VOLC_LLM_URL: z.string().optional(),
+  VOLC_LLM_API_KEY: z.string().optional(),
+  VOLC_LLM_EXTRA_HEADERS: z.string().optional(),
+  VOLC_LLM_MODEL_NAME: z.string().optional(),
+  VOLC_LLM_TEMPERATURE: z.number().optional(),
+  VOLC_LLM_TOP_P: z.number().optional(),
+  VOLC_LLM_MAX_TOKENS: z.number().optional(),
+  VOLC_LLM_HISTORY_LENGTH: z.number().optional(),
+  VOLC_LLM_ENABLE_ROUND_ID: z.boolean().default(false),
+  VOLC_LLM_USER_PROMPTS: z.string().optional(),
+  VOLC_LLM_STREAM_OPTIONS: z.string().optional(),
 
   // Agent configuration
   VOLC_AGENT_USER_ID: z.string().default('emq-ai-bot'),
@@ -163,6 +182,17 @@ export const getEnv = (): RuntimeEnv => {
     VOLC_TTS_EMOTION: Bun.env.VOLC_TTS_EMOTION || undefined,
     VOLC_TTS_EMOTION_INTENSITY: parseNumber(Bun.env.VOLC_TTS_EMOTION_INTENSITY, 0),
     VOLC_LLM_VISION_ENABLE: Bun.env.VOLC_LLM_VISION_ENABLE === 'true',
+    VOLC_LLM_URL: Bun.env.VOLC_LLM_URL || undefined,
+    VOLC_LLM_API_KEY: Bun.env.VOLC_LLM_API_KEY || undefined,
+    VOLC_LLM_EXTRA_HEADERS: Bun.env.VOLC_LLM_EXTRA_HEADERS || undefined,
+    VOLC_LLM_MODEL_NAME: Bun.env.VOLC_LLM_MODEL_NAME || undefined,
+    VOLC_LLM_TEMPERATURE: parseOptionalNumber(Bun.env.VOLC_LLM_TEMPERATURE),
+    VOLC_LLM_TOP_P: parseOptionalNumber(Bun.env.VOLC_LLM_TOP_P),
+    VOLC_LLM_MAX_TOKENS: parseOptionalNumber(Bun.env.VOLC_LLM_MAX_TOKENS),
+    VOLC_LLM_HISTORY_LENGTH: parseOptionalNumber(Bun.env.VOLC_LLM_HISTORY_LENGTH),
+    VOLC_LLM_ENABLE_ROUND_ID: parseBoolean(Bun.env.VOLC_LLM_ENABLE_ROUND_ID, false),
+    VOLC_LLM_USER_PROMPTS: Bun.env.VOLC_LLM_USER_PROMPTS || undefined,
+    VOLC_LLM_STREAM_OPTIONS: Bun.env.VOLC_LLM_STREAM_OPTIONS || undefined,
     VOLC_AGENT_ENABLE_CONVERSATION_CALLBACK: Bun.env.VOLC_AGENT_ENABLE_CONVERSATION_CALLBACK !== 'false',
     VOLC_AGENT_ANS_MODE: parseNumber(Bun.env.VOLC_AGENT_ANS_MODE, 2),
     VOLC_AGENT_VOICEPRINT_MODE: parseNumber(Bun.env.VOLC_AGENT_VOICEPRINT_MODE, 1),
