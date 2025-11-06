@@ -40,6 +40,29 @@ export function buildApiUrl(path: string): string {
 }
 
 /**
+ * Resolve the upload endpoint for captured photos
+ * Falls back to `/api/upload` when not provided via environment variables
+ */
+export function getUploadEndpoint(): string {
+  return import.meta.env.VITE_UPLOAD_ENDPOINT || '/api/upload'
+}
+
+/**
+ * Resolve a path or absolute URL against the current origin
+ */
+export function resolveAbsoluteUrl(pathOrUrl: string): URL {
+  return new URL(pathOrUrl, getCurrentHost())
+}
+
+/**
+ * Build the download URL for an uploaded photo using the upload endpoint origin
+ */
+export function buildDownloadUrl(fileId: string): string {
+  const uploadUrl = resolveAbsoluteUrl(getUploadEndpoint())
+  return `${uploadUrl.origin}/api/download/${fileId}`
+}
+
+/**
  * Build a WebSocket URL with the current host
  * @param path - The WebSocket path (e.g., '/signaling')
  * @param port - Optional port number (defaults to 4000 for backend API)
