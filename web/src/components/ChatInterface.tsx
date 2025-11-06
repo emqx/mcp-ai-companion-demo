@@ -83,31 +83,28 @@ export function ChatInterface({
     const videoElement = videoRef?.current
     if (!videoElement) return
 
-    if (!showVideo) {
+    const pausePlayback = () => {
       if (!videoElement.paused) {
         videoElement.pause()
       }
+    }
+
+    const detachStream = () => {
+      pausePlayback()
       if (videoElement.srcObject) {
         videoElement.srcObject = null
       }
-      return
     }
 
-    const stream = webrtc.localStream ?? webrtc.remoteStream
+    const stream = showVideo ? webrtc.localStream ?? webrtc.remoteStream : null
     if (!stream) {
-      if (!videoElement.paused) {
-        videoElement.pause()
-      }
-      if (videoElement.srcObject) {
-        videoElement.srcObject = null
-      }
+      detachStream()
       return
     }
 
-    if (videoElement.srcObject !== stream) {
-      if (!videoElement.paused) {
-        videoElement.pause()
-      }
+    const currentStream = videoElement.srcObject as MediaStream | null
+    if (currentStream !== stream) {
+      pausePlayback()
       videoElement.srcObject = stream
       appLogger.info(
         webrtc.localStream

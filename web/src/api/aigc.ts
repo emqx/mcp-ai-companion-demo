@@ -30,7 +30,9 @@ export const startVoiceChat = async (
   })
 }
 
-export const stopVoiceChat = async (sceneId: string): Promise<ApiResult<StopVoiceChatResult>> => {
+export const stopVoiceChat = async (
+  sceneId: string,
+): Promise<ApiResult<StopVoiceChatResult>> => {
   return request<StopVoiceChatResult>('/proxy', {
     query: {
       Action: 'StopVoiceChat',
