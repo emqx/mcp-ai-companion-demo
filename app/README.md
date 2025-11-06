@@ -23,6 +23,14 @@ uv run --env-file .env python custom_llm_service.py \
   --port 8081
 ```
 
+> Note: make sure to run `uv sync` after pulling new changes so the required dependencies (including `python-multipart` for photo uploads) are installed in the virtual environment.
+
+# Photo Upload API
+
+- `POST /api/upload` — accepts `multipart/form-data` with a `file` field and stores the image under `app/uploads/` by default.
+- `GET /api/download/{file_id}` — serves the stored image back to the browser.
+- Configure the storage location via `PHOTO_UPLOAD_DIR` (relative paths resolve inside the `app/` directory).
+
 ### HTTPS (optional)
 
 The service can terminate TLS directly through uvicorn. Supply the certificate/key pair (PEM format):

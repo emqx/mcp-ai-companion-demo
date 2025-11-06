@@ -4,13 +4,14 @@ import argparse
 import os
 import time
 import uuid
+from pathlib import Path
 from dataclasses import replace
 from typing import Callable, Optional, TYPE_CHECKING
 
 import uvicorn
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 
 from services.chat_models import ChatStreamPayload
@@ -24,6 +25,27 @@ if TYPE_CHECKING:
 
 
 logger = get_agent_logger("custom_llm_service")
+
+APP_DIR = Path(__file__).resolve().parent
+DEFAULT_UPLOAD_DIR = APP_DIR / "uploads"
+
+
+def resolve_upload_dir() -> Path:
+    """Resolve the upload directory, defaulting inside the app package."""
+    configured = os.getenv("PHOTO_UPLOAD_DIR")
+    if not configured:
+        return DEFAULT_UPLOAD_DIR
+
+    candidate = Path(configured).expanduser()
+    if not candidate.is_absolute():
+        candidate = (APP_DIR / candidate).resolve()
+    else:
+        candidate = candidate.resolve()
+
+    return candidate
+
+
+UPLOAD_DIR = resolve_upload_dir()
 
 
 def build_app(
@@ -40,6 +62,9 @@ def build_app(
         settings=llm_settings,
         workflow_factory=workflow_factory,
     )
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    logger.info("Using photo upload directory: %s", UPLOAD_DIR)
 
     async def lifespan(_: FastAPI):
         await state.start()
@@ -124,6 +149,35 @@ def build_app(
         )
 
         return StreamingResponse(stream, media_type="text/event-stream")
+
+    @app.post("/api/upload")
+    async def upload_photo(file: UploadFile = File(...)):
+        filename = Path(file.filename or "")
+        suffix = filename.suffix if filename.suffix else ".jpg"
+        file_id = f"{uuid.uuid4().hex}{suffix}"
+        destination = UPLOAD_DIR / file_id
+
+        try:
+            with destination.open("wb") as buffer:
+                while True:
+                    chunk = await file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    buffer.write(chunk)
+        finally:
+            await file.close()
+
+        logger.info("Photo uploaded: %s (%s)", file_id, destination)
+        return {"file_id": file_id}
+
+    @app.get("/api/download/{file_id}")
+    async def download_photo(file_id: str):
+        safe_id = Path(file_id).name
+        file_path = UPLOAD_DIR / safe_id
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(status_code=404, detail="File not found")
+
+        return FileResponse(file_path, filename=file_path.name)
 
     return app
 

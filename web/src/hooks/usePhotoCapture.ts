@@ -1,9 +1,12 @@
 import { useCallback } from 'react'
 import { appLogger } from '@/utils/logger'
-import { capturePhotoFromVideo } from '@/utils/photo-capture'
+import { capturePhotoFromVideo, isVideoReadyForCapture } from '@/utils/photo-capture'
+import { getUploadEndpoint } from '@/utils/host'
 import type { PhotoCaptureResult } from '@/tools/types'
 
 export function usePhotoCapture() {
+  const uploadEndpoint = getUploadEndpoint()
+
   const captureFromLocalCamera = useCallback(async (quality: number = 0.9): Promise<PhotoCaptureResult> => {
     let tempLocalStream: MediaStream | null = null
     let tempVideoElement: HTMLVideoElement | null = null
@@ -48,7 +51,7 @@ export function usePhotoCapture() {
       const result = await capturePhotoFromVideo(tempVideoElement, 'local', {
         quality,
         upload: {
-          url: '/api/upload',
+          url: uploadEndpoint,
           formFieldName: 'file',
         },
       })
@@ -68,9 +71,29 @@ export function usePhotoCapture() {
         tempVideoElement.remove()
       }
     }
-  }, [])
+  }, [uploadEndpoint])
+
+  const captureFromVideoElement = useCallback(
+    async (videoElement: HTMLVideoElement, source: 'local' | 'remote', quality: number = 0.9): Promise<PhotoCaptureResult> => {
+      if (!isVideoReadyForCapture(videoElement)) {
+        throw new Error('Video stream is not ready for capture')
+      }
+
+      const result = await capturePhotoFromVideo(videoElement, source, {
+        quality,
+        upload: {
+          url: uploadEndpoint,
+          formFieldName: 'file',
+        },
+      })
+
+      return result
+    },
+    [uploadEndpoint],
+  )
 
   return {
     captureFromLocalCamera,
+    captureFromVideoElement,
   }
 }

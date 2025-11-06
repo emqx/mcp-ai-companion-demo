@@ -264,7 +264,15 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
         await rtcClient.publishStream(MediaType.AUDIO)
       }
       if (isVideoEnabled) {
-        await rtcClient.startVideoCapture()
+        try {
+          await rtcClient.startVideoCapture()
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          // Ignore SDK errors thrown when the capture session is already active
+          if (!message.includes('Has already capture')) {
+            throw err
+          }
+        }
         await rtcClient.publishStream(MediaType.VIDEO)
         refreshLocalStream()
       }
@@ -363,7 +371,14 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
         if (connectionState !== 'connected') {
           await connect()
         }
-        await rtcClient.startVideoCapture()
+        try {
+          await rtcClient.startVideoCapture()
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          if (!message.includes('Has already capture')) {
+            throw err
+          }
+        }
         await rtcClient.publishStream(MediaType.VIDEO)
         refreshLocalStream()
       } else {

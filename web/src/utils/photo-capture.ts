@@ -1,6 +1,6 @@
 import type { PhotoCaptureResult } from '@/tools/types'
 import { toast } from 'sonner'
-import { buildApiUrl } from '@/utils/host'
+import { buildDownloadUrl } from '@/utils/host'
 
 /**
  * Configuration for photo upload
@@ -93,8 +93,8 @@ export async function capturePhotoFromVideo(
       const uploadResult = await uploadPhoto(result, upload)
       console.log('Photo uploaded successfully:', filename, 'file_id:', uploadResult.file_id)
 
-      // Construct download URL with the file_id using dynamic host
-      const downloadUrl = buildApiUrl(`/api/download/${uploadResult.file_id}`)
+      // Construct download URL bound to the upload server origin
+      const downloadUrl = buildDownloadUrl(uploadResult.file_id)
       result.downloadUrl = downloadUrl
 
       // Show success notification

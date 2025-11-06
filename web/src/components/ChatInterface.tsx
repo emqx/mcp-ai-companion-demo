@@ -84,19 +84,30 @@ export function ChatInterface({
     if (!videoElement) return
 
     if (!showVideo) {
-      videoElement.pause()
-      videoElement.srcObject = null
+      if (!videoElement.paused) {
+        videoElement.pause()
+      }
+      if (videoElement.srcObject) {
+        videoElement.srcObject = null
+      }
       return
     }
 
     const stream = webrtc.localStream ?? webrtc.remoteStream
     if (!stream) {
-      videoElement.pause()
-      videoElement.srcObject = null
+      if (!videoElement.paused) {
+        videoElement.pause()
+      }
+      if (videoElement.srcObject) {
+        videoElement.srcObject = null
+      }
       return
     }
 
     if (videoElement.srcObject !== stream) {
+      if (!videoElement.paused) {
+        videoElement.pause()
+      }
       videoElement.srcObject = stream
       appLogger.info(
         webrtc.localStream
@@ -108,11 +119,13 @@ export function ChatInterface({
     videoElement.muted = true
     videoElement.playsInline = true
 
-    const playPromise = videoElement.play()
-    if (playPromise && typeof playPromise.then === 'function') {
-      playPromise.catch((error) => {
-        appLogger.warn('📺 Video playback failed', error)
-      })
+    if (videoElement.paused) {
+      const playPromise = videoElement.play()
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.catch((error) => {
+          appLogger.warn('📺 Video playback failed', error)
+        })
+      }
     }
   }, [showVideo, videoRef, webrtc.localStream, webrtc.remoteStream])
 

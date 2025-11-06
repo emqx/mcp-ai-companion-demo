@@ -35,6 +35,7 @@ function App() {
   })
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
+  const closePreviewTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
   const onCameraControl = useCallback((enabled: boolean) => {
     appLogger.info(`📷 Camera control: ${enabled ? 'ON' : 'OFF'}`)
     setShowVideo(enabled)
@@ -49,10 +50,20 @@ function App() {
 
   // Photo capture function that always uses local camera
   const onTakePhoto = useCallback(
-    async (source: 'local' | 'remote', quality: number): Promise<PhotoCaptureResult> => {
-      appLogger.info(`📸 Taking photo: source=${source}, quality=${quality}`)
-      // Always use local camera for photo capture regardless of source parameter
-      return await captureFromLocalCamera(quality)
+    async (_source: 'local' | 'remote' = 'local', quality: number): Promise<PhotoCaptureResult> => {
+      appLogger.info(`📸 Taking photo with local camera, quality=${quality}`)
+      const result = await captureFromLocalCamera(quality)
+
+      if (closePreviewTimeoutRef.current) {
+        clearTimeout(closePreviewTimeoutRef.current)
+      }
+      closePreviewTimeoutRef.current = window.setTimeout(() => {
+        setShowVideo(false)
+        appLogger.info('📷 Photo capture timeout reached, camera preview disabled')
+        closePreviewTimeoutRef.current = null
+      }, 3000)
+      appLogger.info('📷 Photo captured, camera preview will close in 3 seconds')
+      return result
     },
     [captureFromLocalCamera],
   )
@@ -160,6 +171,21 @@ function App() {
   })
 
   useEffect(() => {
+    if (showVideo === isVideoEnabled) {
+      return
+    }
+    const syncVideoState = async () => {
+      try {
+        await toggleVideo(showVideo)
+      } catch (error) {
+        appLogger.error('🎥 Failed to sync video state with camera control', error)
+        setShowVideo(isVideoEnabled)
+      }
+    }
+    void syncVideoState()
+  }, [showVideo, isVideoEnabled, toggleVideo])
+
+  useEffect(() => {
     if (isMqttConnected && isMcpInitialized) {
       appLogger.info('🚀 MCP Server ready to receive commands')
     }
@@ -184,8 +210,18 @@ function App() {
       if (cleanupWebRTC) {
         void cleanupWebRTC()
       }
+      if (closePreviewTimeoutRef.current) {
+        clearTimeout(closePreviewTimeoutRef.current)
+      }
     }
   }, [cleanupWebRTC])
+
+  useEffect(() => {
+    if (showVideo && closePreviewTimeoutRef.current) {
+      clearTimeout(closePreviewTimeoutRef.current)
+      closePreviewTimeoutRef.current = null
+    }
+  }, [showVideo])
 
   return (
     <>

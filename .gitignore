@@ -242,3 +242,6 @@ mcp-ai-companion-demo-web-*.tar.gz
 .tmp/
 .cache
 .env
+
+# Uploaded photo artifacts
+app/uploads/
