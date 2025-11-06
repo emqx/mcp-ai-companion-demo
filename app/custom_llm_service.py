@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import os
 import time
 import uuid
@@ -46,6 +47,21 @@ def resolve_upload_dir() -> Path:
 
 
 UPLOAD_DIR = resolve_upload_dir()
+MAX_UPLOAD_RETENTION = 180.0  # seconds
+
+
+def _parse_positive_float(value: Optional[str], default: float, *, clamp: Optional[float] = None) -> float:
+    if not value:
+        return default
+    try:
+        parsed = float(value)
+        if parsed <= 0:
+            return default
+        if clamp is not None:
+            return min(parsed, clamp)
+        return parsed
+    except ValueError:
+        return default
 
 
 def build_app(
@@ -63,14 +79,62 @@ def build_app(
         workflow_factory=workflow_factory,
     )
 
+    upload_retention = _parse_positive_float(
+        os.getenv("UPLOAD_RETENTION_SECONDS"),
+        MAX_UPLOAD_RETENTION,
+        clamp=MAX_UPLOAD_RETENTION,
+    )
+    cleanup_interval = _parse_positive_float(os.getenv("UPLOAD_CLEANUP_INTERVAL_SECONDS"), 60, clamp=MAX_UPLOAD_RETENTION)
+
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     logger.info("Using photo upload directory: %s", UPLOAD_DIR)
 
+    async def cleanup_uploads(stop_event: asyncio.Event) -> None:
+        """Periodically remove uploaded files older than the retention window."""
+        if upload_retention <= 0:
+            return
+
+        while not stop_event.is_set():
+            cutoff = time.time() - upload_retention
+            removed = 0
+
+            for file_path in UPLOAD_DIR.iterdir():
+                if stop_event.is_set():
+                    break
+                if not file_path.is_file():
+                    continue
+                try:
+                    if file_path.stat().st_mtime < cutoff:
+                        file_path.unlink(missing_ok=True)
+                        removed += 1
+                except FileNotFoundError:
+                    continue
+                except Exception as exc:
+                    logger.warning("Failed to delete expired upload %s: %s", file_path, exc)
+
+            if removed:
+                logger.info("Removed %s expired uploads", removed)
+
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=cleanup_interval)
+            except asyncio.TimeoutError:
+                continue
+
     async def lifespan(_: FastAPI):
+        stop_event = asyncio.Event()
+        cleanup_task: asyncio.Task | None = None
         await state.start()
         try:
+            if upload_retention > 0:
+                cleanup_task = asyncio.create_task(cleanup_uploads(stop_event))
             yield
         finally:
+            stop_event.set()
+            if cleanup_task:
+                try:
+                    await cleanup_task
+                except Exception as exc:
+                    logger.warning("Upload cleanup task terminated with error: %s", exc)
             await state.shutdown()
 
     app = FastAPI(title="Custom LLM SSE Service", lifespan=lifespan)

@@ -30,6 +30,7 @@ uv run --env-file .env python custom_llm_service.py \
 - `POST /api/upload` — accepts `multipart/form-data` with a `file` field and stores the image under `app/uploads/` by default.
 - `GET /api/download/{file_id}` — serves the stored image back to the browser.
 - Configure the storage location via `PHOTO_UPLOAD_DIR` (relative paths resolve inside the `app/` directory).
+- Old uploads are purged periodically; tune `UPLOAD_RETENTION_SECONDS` (default 180s, capped at 180s) and `UPLOAD_CLEANUP_INTERVAL_SECONDS` (default 60s) to control the cleanup window.
 
 ### HTTPS (optional)
 
