@@ -8,9 +8,10 @@ from dataclasses import replace
 from typing import Callable, Optional, TYPE_CHECKING
 
 import uvicorn
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 
 from services.chat_models import ChatStreamPayload
 from services.chat_stream_utils import parse_custom_payload, stream_chat_response
@@ -58,6 +59,30 @@ def build_app(
     app.state.service_state = state
     app.state.expected_api_key = expected_api_key
 
+    @app.middleware('http')
+    async def log_chat_stream_request(request: Request, call_next):
+        if request.url.path == '/chat-stream':
+            body = await request.body()
+            try:
+                logger.info('Raw request body: %s', body.decode('utf-8', errors='replace'))
+            except Exception:  # pragma: no cover - defensive
+                logger.info('Raw request body (binary, %d bytes)', len(body))
+
+        response = await call_next(request)
+        return response
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        logger.error(
+            "Request validation failed: %s",
+            {
+                "path": str(request.url),
+                "errors": exc.errors(),
+                "body": exc.body,
+            },
+        )
+        return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
     async def verify_authorization(authorization: Optional[str] = Header(None)):
         expected = app.state.expected_api_key
         if expected is None:
@@ -72,6 +97,7 @@ def build_app(
         payload: ChatStreamPayload,
         _: None = Depends(verify_authorization),
     ):
+        logger.info("Chat payload received: %s", payload.model_dump())
         service_state: ServiceState = app.state.service_state
         stream_flag = True if payload.stream is None else bool(payload.stream)
         custom_payload = parse_custom_payload(payload.custom)
