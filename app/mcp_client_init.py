@@ -3,7 +3,7 @@ import re
 import traceback
 from contextlib import AsyncExitStack
 from datetime import timedelta
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Awaitable, cast
 
 import anyio
 from llama_index.core.tools import BaseTool, FunctionTool
@@ -469,6 +469,7 @@ class McpServerRegistry:
         server_name_prefix: str = "web-ui-hardware-controller/",
         server_name_filter: Optional[str] = None,
         clientid: Optional[str] = None,
+        on_server_offline: Optional[Callable[[str], Awaitable[None]]] = None,
     ) -> None:
         self.mqtt_options = mqtt_options
         self.server_name_prefix = server_name_prefix
@@ -488,6 +489,7 @@ class McpServerRegistry:
         self._tg: Optional[anyio.abc.TaskGroup] = None
         self._tg_entered = False
         self._started = False
+        self._offline_callback = on_server_offline
 
     async def ensure_started(self) -> None:
         await self.start()
@@ -545,6 +547,11 @@ class McpServerRegistry:
         if status == "offline":
             self._tools.pop(server_name, None)
             self._tool_events.pop(server_name, None)
+            if self._offline_callback and self._tg and self._tg_entered:
+                try:
+                    self._tg.start_soon(self._offline_callback, server_name)
+                except Exception as exc:
+                    logger.warning("Failed to schedule offline callback for %s: %s", server_name, exc)
 
     def derive_server_name(self, device_id: str) -> str:
         if device_id.startswith(self.server_name_prefix):

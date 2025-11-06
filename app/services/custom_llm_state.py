@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import time
 from dataclasses import dataclass, field, replace
@@ -11,9 +10,10 @@ import anyio
 from conversation_workflow import ConversationWorkflow
 from mcp_client_init import McpServerRegistry
 from mcp.shared.mqtt import MqttOptions
+from utils.colored_logger import get_agent_logger
 from utils.config import LLMSettings
 
-logger = logging.getLogger(__name__)
+logger = get_agent_logger("service_state")
 
 
 def sanitize_for_log(value: Optional[str]) -> Optional[str]:
@@ -83,6 +83,7 @@ class ServiceState:
             server_name_prefix=self.mcp_server_name_prefix,
             server_name_filter=registry_filter,
             clientid=registry_client_id,
+            on_server_offline=self._handle_server_offline,
         )
 
         self.sessions: Dict[str, DeviceSession] = {}
@@ -178,6 +179,38 @@ class ServiceState:
         )
         session.initialized = True
 
+    async def release_session(self, device_id: str) -> bool:
+        """Release and shutdown the workflow/session for a given device."""
+        async with self.registry_lock:
+            session = self.sessions.get(device_id)
+        if not session:
+            logger.info("release_session skipped; no session for device '%s'", sanitize_for_log(device_id))
+            return False
+
+        try:
+            async with session.lock:
+                logger.info(
+                    "Shutting down workflow for device '%s'",
+                    sanitize_for_log(device_id),
+                )
+                await session.workflow.shutdown()
+                session.initialized = False
+        except Exception as exc:
+            logger.warning(
+                "Failed to shutdown workflow for device '%s': %s",
+                sanitize_for_log(device_id),
+                exc,
+            )
+            raise
+
+        async with self.registry_lock:
+            existing = self.sessions.get(device_id)
+            if existing is session:
+                self.sessions.pop(device_id, None)
+
+        logger.info("Session released for device '%s'", sanitize_for_log(device_id))
+        return True
+
     def _derive_server_filter(self, device_id: str) -> str:
         if device_id.startswith(self.mcp_server_name_prefix):
             return device_id
@@ -194,3 +227,44 @@ class ServiceState:
 
     def restore_voice_agent_state(self, session: DeviceSession, snapshot: Dict[str, Any]) -> None:
         session.restore_voice_agent_state(snapshot)
+
+    async def _handle_server_offline(self, server_name: str) -> None:
+        """Cleanup cached session when MCP server disconnects."""
+        logger.info("Server offline: %s", sanitize_for_log(server_name))
+        device_id = server_name
+        try:
+            released = await self.release_session(device_id)
+            if released:
+                return
+        except Exception as exc:
+            logger.warning(
+                "Failed to release session for offline server '%s': %s",
+                sanitize_for_log(device_id),
+                exc,
+            )
+            return
+
+        # Attempt fallback lookup for devices whose derived filter matches the server
+        fallback_device: Optional[str] = None
+        async with self.registry_lock:
+            for candidate in self.sessions.keys():
+                if self._derive_server_filter(candidate) == server_name:
+                    fallback_device = candidate
+                    break
+        if fallback_device and fallback_device != device_id:
+            try:
+                released = await self.release_session(fallback_device)
+                if released:
+                    logger.info("Session released for fallback device '%s'", sanitize_for_log(fallback_device))
+            except Exception as exc:
+                logger.warning(
+                    "Failed to release fallback session '%s' for offline server '%s': %s",
+                    sanitize_for_log(fallback_device),
+                    sanitize_for_log(server_name),
+                        exc,
+                    )
+        else:
+            logger.info(
+                "No cached sessions matched offline server: %s",
+                sanitize_for_log(server_name),
+            )
