@@ -30,6 +30,13 @@ class ChatStreamPayload(BaseModel):
     round_id: Optional[str] = None
     device_id: Optional[str] = None
 
+    @field_validator("round_id", mode="before")
+    @classmethod
+    def coerce_round_id(cls, value):
+        if value is None:
+            return value
+        return str(value)
+
 
 def prepare_conversation(messages: List[MessagePayload]) -> Tuple[List[ChatMessage], ChatMessage]:
     if not messages:
