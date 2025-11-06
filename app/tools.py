@@ -1,6 +1,8 @@
+import asyncio
 import os
+
 from openai import OpenAI
-from llama_index.core.tools import ToolOutput
+from llama_index.core.tools import FunctionTool, ToolOutput
 
 api_key = os.environ.get("DASHSCOPE_API_KEY")
 
@@ -42,7 +44,7 @@ def explain_photo(image_url: str, question: str) -> str:
 
 async def explain_photo_async(image_url: str, question: str) -> str:
     """Explain the photo by the question asynchronously. Used when users ask a question about the photo. The image_url is the url of the image."""
-    return explain_photo(image_url, question)
+    return await asyncio.to_thread(explain_photo, image_url, question)
 
 
 def get_first_text_from_tool_output(tool_output: ToolOutput) -> str:
@@ -57,3 +59,12 @@ def get_first_text_from_tool_output(tool_output: ToolOutput) -> str:
                 if hasattr(item, "type") and hasattr(item, "text"):
                     return item.text
     return ""
+
+
+def build_explain_photo_tool() -> FunctionTool:
+    """Create a FunctionTool wrapper for explain_photo_async."""
+    return FunctionTool.from_defaults(
+        name="explain_photo",
+        fn=explain_photo_async,
+        description="Describe the content of an image at the provided URL and answer the given question.",
+    )

@@ -18,6 +18,7 @@ from workflows.events import StopEvent
 from utils.prompt_loader import load_system_prompt
 
 from mcp_client_init import McpMqttClient
+from tools import build_explain_photo_tool
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +122,18 @@ class VoiceAgent:
 
         system_prompt = self._compose_system_prompt()
 
+        toolset = list(self.mcp_tools)
+
+        try:
+            extra_tool = build_explain_photo_tool()
+            toolset.append(extra_tool)
+            logger.debug("VoiceAgent added local tool: %s", extra_tool.metadata.name)
+        except Exception as exc:
+            logger.error("Failed to build explain_photo tool: %s", exc)
+
         try:
             self.function_agent = FunctionAgent(
-                tools=self.mcp_tools,
+                tools=toolset,
                 llm=llm,
                 verbose=False,
                 system_prompt=system_prompt,
@@ -132,7 +142,7 @@ class VoiceAgent:
             )
             tool_names = [
                 tool.metadata.name
-                for tool in self.mcp_tools
+                for tool in toolset
                 if hasattr(tool, "metadata") and hasattr(tool.metadata, "name")
             ]
             if tool_names:
