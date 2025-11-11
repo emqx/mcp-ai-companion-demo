@@ -35,7 +35,7 @@ function App() {
   })
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
-  const closePreviewTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
+  const closePreviewTimeoutRef = useRef<number | null>(null)
   const onCameraControl = useCallback((enabled: boolean) => {
     appLogger.info(`📷 Camera control: ${enabled ? 'ON' : 'OFF'}`)
     setShowVideo(enabled)
@@ -50,8 +50,8 @@ function App() {
 
   // Photo capture function that always uses local camera
   const onTakePhoto = useCallback(
-    async (_source: 'local' | 'remote' = 'local', quality: number): Promise<PhotoCaptureResult> => {
-      appLogger.info(`📸 Taking photo with local camera, quality=${quality}`)
+    async (source: 'local' | 'remote' = 'local', quality: number): Promise<PhotoCaptureResult> => {
+      appLogger.info(`📸 Taking photo with local camera, source=${source}, quality=${quality}`)
       const result = await captureFromLocalCamera(quality)
 
       if (closePreviewTimeoutRef.current) {
