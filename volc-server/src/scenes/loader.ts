@@ -41,7 +41,9 @@ const toJsonArray = (value?: string): unknown[] | undefined => {
   return undefined
 }
 
-// Create scene configuration directly from environment variables
+/**
+ * Create the in-memory scene representation directly from environment variables.
+ */
 const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
   const roomId = randomUUID()
   const userId = randomUUID()
@@ -271,6 +273,9 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
   return scene
 }
 
+/**
+ * Generate a 24h RTC token for the provided RTCConfig in-place.
+ */
 const buildToken = (rtc: SceneFile['RTCConfig'], appKey: string) => {
   const { AppId, RoomId, UserId } = rtc
   if (!AppId) {
@@ -294,6 +299,9 @@ const buildToken = (rtc: SceneFile['RTCConfig'], appKey: string) => {
   rtc.Token = token.serialize()
 }
 
+/**
+ * Strip sensitive fields and produce the scene summary returned to the web client.
+ */
 const deriveSceneConfig = (scene: SceneFile): SceneSummary => {
   const { SceneConfig, RTCConfig, VoiceChat } = scene
   SceneConfig.id = SceneConfig.id || scene.SceneConfig.name || ''
@@ -311,6 +319,9 @@ const deriveSceneConfig = (scene: SceneFile): SceneSummary => {
   }
 }
 
+/**
+ * Build the scene map from environment variables (currently single-scene).
+ */
 export const loadScenes = (env: RuntimeEnv) => {
   const scenes = new Map<string, SceneFile>()
 
@@ -325,6 +336,9 @@ export const loadScenes = (env: RuntimeEnv) => {
   return scenes
 }
 
+/**
+ * Create the `/getScenes` response payload from the cached scenes.
+ */
 export const summarizeScenes = (scenes: Map<string, SceneFile>) => {
   return Array.from(scenes.values()).map((scene) => {
     const cloned = cloneScene(scene)
@@ -336,6 +350,9 @@ export const getScene = (scenes: Map<string, SceneFile>, sceneId: string) => {
   return scenes.get(sceneId)
 }
 
+/**
+ * Refresh the RTC token just before calling VolcEngine.
+ */
 export const prepareSceneForRequest = (scene: SceneFile) => {
   const appKey = scene.RTCConfig.AppKey
   if (!appKey) {

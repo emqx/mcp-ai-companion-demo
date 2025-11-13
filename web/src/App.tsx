@@ -115,7 +115,11 @@ function App() {
     saveMqttConfig(config)
   }, [])
 
-  const { client: mcpClient, isConnected: isMqttConnected, isMcpInitialized } = useMcpMqttServer({
+  const {
+    client: mcpClient,
+    isConnected: isMqttConnected,
+    isMcpInitialized,
+  } = useMcpMqttServer({
     brokerUrl: mqttConfig.brokerUrl,
     username: mqttConfig.username,
     password: mqttConfig.password,
@@ -251,11 +255,7 @@ function App() {
         volume={volume}
         isMuted={isMuted}
         settingsSlot={
-          <Settings
-            config={mqttConfig}
-            onConfigChange={handleMqttConfigChange}
-            isConnected={isMqttConnected}
-          />
+          <Settings config={mqttConfig} onConfigChange={handleMqttConfigChange} isConnected={isMqttConnected} />
         }
       />
       <Toaster />

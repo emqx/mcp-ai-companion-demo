@@ -58,6 +58,10 @@ const stringifyCustomPayload = (value: unknown): string | undefined => {
   }
 }
 
+/**
+ * Merge the cached scene definition with the incoming proxy payload
+ * (notably `LLMCustom`) before calling StartVoiceChat.
+ */
 const buildStartVoiceChatPayload = (scene: SceneFile, payload?: ProxyPayload) => {
   const prepared = prepareSceneForRequest(scene)
   const voiceChat = clone(prepared.VoiceChat)
@@ -97,6 +101,9 @@ const buildStartVoiceChatPayload = (scene: SceneFile, payload?: ProxyPayload) =>
   return voiceChat
 }
 
+/**
+ * Produce the minimal StopVoiceChat payload for the given scene.
+ */
 const buildStopVoiceChatPayload = (scene: SceneFile) => {
   const prepared = prepareSceneForRequest(scene)
   const { AppId, RoomId, TaskId } = prepared.VoiceChat
@@ -111,6 +118,10 @@ const buildStopVoiceChatPayload = (scene: SceneFile) => {
   }
 }
 
+/**
+ * Either honour the caller’s access-info overrides or fall back to
+ * the scene’s VoiceChat defaults.
+ */
 const buildAccessInfoPayload = (scene: SceneFile, payload: ProxyPayload) => {
   const extras = { ...payload }
   delete extras.SceneID
@@ -136,6 +147,10 @@ const buildAccessInfoPayload = (scene: SceneFile, payload: ProxyPayload) => {
   return defaultAccessInfo
 }
 
+/**
+ * Sign and forward a protected VolcEngine RTC API call using either
+ * scene-specific credentials or the global env credentials.
+ */
 const callVolcApi = async (scene: SceneFile, env: RuntimeEnv, action: string, version: string, body: unknown) => {
   serverLogger.info(`Calling VolcEngine API: ${action}`, { version })
 
@@ -178,6 +193,9 @@ const callVolcApi = async (scene: SceneFile, env: RuntimeEnv, action: string, ve
 
 const makeSceneSummaries = (scenes: Map<string, SceneFile>): SceneSummary[] => summarizeScenes(scenes)
 
+/**
+ * Create the HTTP handler that powers /getScenes and /proxy.
+ */
 export const createRequestHandler = (env: RuntimeEnv) => {
   const scenes = loadScenes(env)
   serverLogger.info('Request handler initialized', { sceneCount: scenes.size, defaultScene: env.VOLC_SCENE_DEFAULT })
@@ -209,6 +227,9 @@ export const createRequestHandler = (env: RuntimeEnv) => {
     })
   }
 
+  /**
+   * Route /proxy requests to the corresponding VolcEngine action.
+   */
   const handleProxy = async (req: Request) => {
     const url = new URL(req.url)
     const action = url.searchParams.get('Action')

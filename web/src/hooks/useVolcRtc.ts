@@ -7,6 +7,9 @@ import type { SceneSummary } from '@/types/aigc'
 import { parseAigcBinaryMessage, MESSAGE_TYPE, AGENT_BRIEF_CODE } from '@/utils/aigcMessages'
 import { MediaType } from '@volcengine/rtc'
 
+/**
+ * Hook options map directly to Volc StartVoiceChat metadata and UI callbacks.
+ */
 export interface UseVolcRtcOptions extends Pick<UseWebRTCMqttOptions, 'onASRResponse' | 'onTTSText' | 'onMessage'> {
   sceneId?: string
   deviceId?: string
@@ -27,6 +30,13 @@ const stageToLoadingStatus = (code?: number) => {
   }
 }
 
+/**
+ * useVolcRtc orchestrates the Volc RTC connection lifecycle:
+ *   - fetch scene metadata / RTC tokens
+ *   - join and publish local audio/video
+ *   - start/stop StartVoiceChat via the proxy
+ *   - route subtitles/status messages back to the UI
+ */
 export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMessage }: UseVolcRtcOptions): UseWebRTCReturn {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
@@ -42,7 +52,7 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
   const pendingConnectRef = useRef(false)
 
   useEffect(() => {
-    rtcClient.setAiAnsMode(AnsMode.MEDIUM)
+    rtcClient.setAiAnsMode(AnsMode.HIGH)
     rtcClient.setAiAnsEnabled(true)
   }, [])
 
@@ -59,6 +69,9 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
     [],
   )
 
+  /**
+   * Lazily load the Volc scene configuration and cache it for reuse.
+   */
   const ensureSceneConfig = useCallback(async () => {
     if (sceneRef.current) {
       return sceneRef.current
@@ -77,6 +90,9 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
     return selected
   }, [sceneId])
 
+  /**
+   * Attempt to read the local preview stream from the RTC engine.
+   */
   const tryUpdateLocalStream = useCallback(() => {
     const stream = rtcClient.getLocalMediaStream()
     if (stream) {
@@ -86,6 +102,9 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
     return false
   }, [])
 
+  /**
+   * Retry local stream retrieval a few times to allow tracks to settle.
+   */
   const refreshLocalStream = useCallback(
     (attempt = 0) => {
       if (tryUpdateLocalStream()) {
@@ -101,6 +120,9 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
     [tryUpdateLocalStream],
   )
 
+  /**
+   * Decode Volc binary messages (subtitles, brief/status) for ASR/TTS callbacks.
+   */
   const handleBinaryMessage = useCallback((buffer: ArrayBuffer) => {
       const parsed = parseAigcBinaryMessage(buffer)
       if (!parsed) return
@@ -228,6 +250,9 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
     }
   }, [handleBinaryMessage, updateRemoteStream])
 
+  /**
+   * Establish RTC connectivity, publish local media, and ensure StartVoiceChat is active.
+   */
   const connect = useCallback(async () => {
     if (pendingConnectRef.current || connectionState === 'connected') {
       return
@@ -295,6 +320,9 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
     }
   }, [connectionState, deviceId, ensureSceneConfig, isAudioEnabled, isVideoEnabled, refreshLocalStream])
 
+  /**
+   * Gracefully stop StartVoiceChat, unpublish tracks, and leave the room.
+   */
   const disconnect = useCallback(async () => {
     pendingConnectRef.current = false
     const scene = sceneRef.current
@@ -335,6 +363,9 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
     setConnectionState('disconnected')
   }, [])
 
+  /**
+   * Toggle microphone publishing state, reconnecting if necessary.
+   */
   const toggleAudio = useCallback(
     async (enabled?: boolean) => {
       const shouldEnable = enabled ?? !isAudioEnabled
@@ -359,6 +390,9 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
     [connect, connectionState, isAudioEnabled],
   )
 
+  /**
+   * Toggle camera publishing state, reconnecting if necessary.
+   */
   const toggleVideo = useCallback(
     async (enabled?: boolean) => {
       const shouldEnable = enabled ?? !isVideoEnabled
