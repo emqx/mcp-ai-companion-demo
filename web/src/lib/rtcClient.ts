@@ -73,6 +73,9 @@ class RtcClient {
 
   private readonly aiAnsConstraint: Record<string, string | number> = {}
 
+  /**
+   * Replace event listeners at runtime and lazily register them on the SDK engine.
+   */
   setListeners(listeners: RtcEventListeners) {
     this.listeners = { ...listeners }
     if (this.engine && !this.registered) {
@@ -80,6 +83,9 @@ class RtcClient {
     }
   }
 
+  /**
+   * Wire SDK events to the provided callbacks. Executed once per engine instance.
+   */
   private registerEventHandlers(engine: IRTCEngine) {
     if (this.registered) return
 
@@ -99,6 +105,9 @@ class RtcClient {
     this.registered = true
   }
 
+  /**
+   * Subscribe to AI-ANS lifecycle events to react to unsupported/overload cases.
+   */
   private bindAiAnsEvents(extension: RTCAIAnsExtension) {
     if (this.aiAnsEventsBound) {
       return
@@ -109,6 +118,9 @@ class RtcClient {
     this.aiAnsEventsBound = true
   }
 
+  /**
+   * Probe AI-ANS support on the current platform and enable it if available.
+   */
   private async setupAiAnsExtension(extension: RTCAIAnsExtension) {
     this.aiAnsExtension = extension
     this.bindAiAnsEvents(extension)
@@ -127,6 +139,9 @@ class RtcClient {
     }
   }
 
+  /**
+   * Apply the configured ANS mode to the extension.
+   */
   private async applyAiAnsMode() {
     if (!this.aiAnsExtension) return
     try {
@@ -136,13 +151,11 @@ class RtcClient {
     }
   }
 
+  /**
+   * Enable AI-ANS if the extension is supported and not manually disabled.
+   */
   private enableAiAns() {
-    if (
-      !this.aiAnsExtension ||
-      this.aiAnsEnabled ||
-      this.aiAnsSupported === false ||
-      this.aiAnsManuallyDisabled
-    ) {
+    if (!this.aiAnsExtension || this.aiAnsEnabled || this.aiAnsSupported === false || this.aiAnsManuallyDisabled) {
       return
     }
     try {
@@ -154,6 +167,9 @@ class RtcClient {
     }
   }
 
+  /**
+   * Disable AI-ANS and record the reason for logging.
+   */
   private disableAiAns(reason?: string) {
     if (!this.aiAnsExtension || !this.aiAnsEnabled) {
       return
@@ -168,6 +184,9 @@ class RtcClient {
     }
   }
 
+  /**
+   * Change the desired AI-ANS mode at runtime.
+   */
   setAiAnsMode(mode: AnsMode) {
     this.aiAnsMode = mode
     void (async () => {
@@ -191,6 +210,9 @@ class RtcClient {
     this.disableAiAns('error')
   }
 
+  /**
+   * Manually toggle AI-ANS on/off; remembers whether the user disabled it.
+   */
   setAiAnsEnabled(enabled: boolean) {
     this.aiAnsManuallyDisabled = !enabled
     if (!enabled) {
@@ -211,6 +233,9 @@ class RtcClient {
     return this.aiAnsSupported === true
   }
 
+  /**
+   * Lazily create an RTC engine for the provided AppId and reuse it.
+   */
   private ensureEngine(appId: string) {
     if (this.engine) {
       return this.engine
@@ -248,10 +273,16 @@ class RtcClient {
     return engine
   }
 
+  /**
+   * Store the latest RTC credentials so future join attempts can reuse them.
+   */
   setBasicInfo(info: BasicInfo) {
     this.basicInfo = info
   }
 
+  /**
+   * Join the RTC room using the provided/basic credentials and configure auto-publish options.
+   */
   async joinRoom(info?: BasicInfo) {
     const basic = info ?? this.basicInfo
     if (!basic) {
@@ -279,6 +310,9 @@ class RtcClient {
     )
   }
 
+  /**
+   * Leave the current RTC room and destroy the engine to release devices.
+   */
   async leaveRoom() {
     if (!this.engine) return
 
@@ -292,51 +326,81 @@ class RtcClient {
     }
   }
 
+  /**
+   * Begin microphone capture using the optional deviceId.
+   */
   async startAudioCapture(deviceId?: string) {
     if (!this.engine) return
     await this.engine.startAudioCapture(deviceId)
   }
 
+  /**
+   * Stop microphone capture.
+   */
   async stopAudioCapture() {
     if (!this.engine) return
     await this.engine.stopAudioCapture()
   }
 
+  /**
+   * Begin camera capture using the optional deviceId.
+   */
   async startVideoCapture(deviceId?: string) {
     if (!this.engine) return
     await this.engine.startVideoCapture(deviceId)
   }
 
+  /**
+   * Stop camera capture.
+   */
   async stopVideoCapture() {
     if (!this.engine) return
     await this.engine.stopVideoCapture()
   }
 
+  /**
+   * Publish the specified media type (audio/video/screen) to the room.
+   */
   async publishStream(mediaType: MediaType) {
     if (!this.engine) return
     await this.engine.publishStream(mediaType)
   }
 
+  /**
+   * Stop publishing the specified media type.
+   */
   async unpublishStream(mediaType: MediaType) {
     if (!this.engine) return
     await this.engine.unpublishStream(mediaType)
   }
 
+  /**
+   * Subscribe to a remote user's main stream.
+   */
   async subscribeStream(userId: string, mediaType: MediaType) {
     if (!this.engine) return
     await this.engine.subscribeStream(userId, mediaType)
   }
 
+  /**
+   * Unsubscribe from a remote user's main stream.
+   */
   async unsubscribeStream(userId: string, mediaType: MediaType) {
     if (!this.engine) return
     await this.engine.unsubscribeStream(userId, mediaType)
   }
 
+  /**
+   * Subscribe to a remote user's screen stream.
+   */
   async subscribeScreen(userId: string, mediaType: MediaType) {
     if (!this.engine) return
     await this.engine.subscribeScreen(userId, mediaType)
   }
 
+  /**
+   * Build a MediaStream from the currently published local tracks.
+   */
   getLocalMediaStream(): MediaStream | null {
     if (!this.engine) return null
 
@@ -357,33 +421,54 @@ class RtcClient {
     return stream
   }
 
+  /**
+   * Unsubscribe from a remote user's screen stream.
+   */
   async unsubscribeScreen(userId: string, mediaType: MediaType) {
     if (!this.engine) return
     await this.engine.unsubscribeScreen(userId, mediaType)
   }
 
+  /**
+   * Request microphone/camera permissions.
+   */
   async checkPermission(): Promise<EnableDevicesResult> {
     return VERTC.enableDevices({ audio: true, video: true })
   }
 
+  /**
+   * List available microphone devices.
+   */
   async enumerateAudioInputs(): Promise<MediaDeviceInfo[]> {
     return VERTC.enumerateAudioCaptureDevices()
   }
 
+  /**
+   * List available camera devices.
+   */
   async enumerateVideoInputs(): Promise<MediaDeviceInfo[]> {
     return VERTC.enumerateVideoCaptureDevices()
   }
 
+  /**
+   * Switch to the specified microphone device.
+   */
   async setAudioCaptureDevice(deviceId: string) {
     if (!this.engine) return
     await this.engine.setAudioCaptureDevice(deviceId)
   }
 
+  /**
+   * Switch to the specified camera device.
+   */
   async setVideoCaptureDevice(deviceId: string) {
     if (!this.engine) return
     await this.engine.setVideoCaptureDevice(deviceId)
   }
 
+  /**
+   * Attach the local video track to a DOM container.
+   */
   async setLocalVideoPlayer(userId: string, renderDom?: HTMLElement | string) {
     if (!this.engine) return
     await this.engine.setLocalVideoPlayer(StreamIndex.STREAM_INDEX_MAIN, {
@@ -392,6 +477,9 @@ class RtcClient {
     })
   }
 
+  /**
+   * Attach a remote user's video track to a DOM container.
+   */
   async setRemoteVideoPlayer(userId: string, renderDom?: HTMLElement | string) {
     if (!this.engine) return
     await this.engine.setRemoteVideoPlayer(StreamIndex.STREAM_INDEX_MAIN, {
@@ -400,6 +488,9 @@ class RtcClient {
     })
   }
 
+  /**
+   * Aggregate all remote tracks for the given user into a MediaStream.
+   */
   getRemoteMediaStream(userId: string): MediaStream | null {
     if (!this.engine) return null
     const stream = new MediaStream()
@@ -427,22 +518,27 @@ class RtcClient {
     return stream
   }
 
+  // Forward SDK errors to the consumer.
   private handleError = (event: { errorCode: string }) => {
     this.listeners.onError?.(event)
   }
 
+  // Notify when a remote user joins.
   private handleUserJoin = (event: onUserJoinedEvent) => {
     this.listeners.onUserJoin?.(event)
   }
 
+  // Notify when a remote user leaves.
   private handleUserLeave = (event: onUserLeaveEvent) => {
     this.listeners.onUserLeave?.(event)
   }
 
+  // Propagate remote publish events (audio/video).
   private handleUserPublishStream = (event: UserPublishStreamEvent) => {
     this.listeners.onUserPublishStream?.(event)
   }
 
+  // Propagate remote unpublish events and synthetic removal callback.
   private handleUserUnpublishStream = (event: UserUnpublishStreamEvent) => {
     this.listeners.onUserUnpublishStream?.(event)
     if (event && this.listeners.onStreamRemoved) {
@@ -454,10 +550,12 @@ class RtcClient {
     }
   }
 
+  // Propagate screen-share publish events.
   private handleUserPublishScreen = (event: UserPublishStreamEvent) => {
     this.listeners.onUserPublishScreen?.(event)
   }
 
+  // Propagate screen-share unpublish events plus removal callback.
   private handleUserUnpublishScreen = (event: UserUnpublishStreamEvent) => {
     this.listeners.onUserUnpublishScreen?.(event)
     if (event && this.listeners.onStreamRemoved) {
@@ -469,22 +567,27 @@ class RtcClient {
     }
   }
 
+  // Surface remote stream statistics (bitrate, loss, etc.).
   private handleRemoteStreamStats = (event: RemoteStreamStats) => {
     this.listeners.onRemoteStreamStats?.(event)
   }
 
+  // Surface local stream statistics.
   private handleLocalStreamStats = (event: LocalStreamStats) => {
     this.listeners.onLocalStreamStats?.(event)
   }
 
+  // Surface local audio VU meter information.
   private handleLocalAudioPropertiesReport = (event: LocalAudioPropertiesInfo[]) => {
     this.listeners.onLocalAudioPropertiesReport?.(event)
   }
 
+  // Surface remote audio VU meter information.
   private handleRemoteAudioPropertiesReport = (event: RemoteAudioPropertiesInfo[]) => {
     this.listeners.onRemoteAudioPropertiesReport?.(event)
   }
 
+  // Deliver binary room messages (TLV subtitles, status, etc.).
   private handleRoomBinaryMessage = (event: { userId: string; message: ArrayBuffer }) => {
     this.listeners.onRoomBinaryMessage?.(event)
   }

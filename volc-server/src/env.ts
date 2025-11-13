@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+/**
+ * Default interrupt keywords used when VOLC_INTERRUPT_KEYWORDS is not provided.
+ */
 const DEFAULT_INTERRUPT_KEYWORDS = [
   '谢谢',
   '谢谢你',
@@ -19,12 +22,18 @@ const DEFAULT_INTERRUPT_KEYWORDS = [
   'Pause',
 ]
 
+/**
+ * Convert a string env value into a number, returning a fallback when invalid.
+ */
 const parseNumber = (value: string | undefined, fallback: number): number => {
   if (!value) return fallback
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+/**
+ * Variant of parseNumber that preserves `undefined` when parsing fails.
+ */
 const parseOptionalNumber = (value: string | undefined): number | undefined => {
   if (value === undefined) {
     return undefined
@@ -33,6 +42,9 @@ const parseOptionalNumber = (value: string | undefined): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+/**
+ * Accept JSON arrays or comma-separated lists for interrupt keywords.
+ */
 const parseKeywords = (value: string | undefined): string[] => {
   if (!value) return [...DEFAULT_INTERRUPT_KEYWORDS]
   try {
@@ -50,6 +62,9 @@ const parseKeywords = (value: string | undefined): string[] => {
   return keywords.length ? keywords : [...DEFAULT_INTERRUPT_KEYWORDS]
 }
 
+/**
+ * Convert JSON/comma-separated numbers into an array of numeric values.
+ */
 const parseNumberArray = (value: string | undefined): number[] => {
   if (!value) return []
   try {
@@ -68,6 +83,9 @@ const parseNumberArray = (value: string | undefined): number[] => {
     .filter((item) => Number.isFinite(item))
 }
 
+/**
+ * Normalize boolean-ish strings (1/0, true/false, yes/no, on/off).
+ */
 const parseBoolean = (value: string | undefined, fallback = false): boolean => {
   if (value === undefined) return fallback
   const normalized = value.trim().toLowerCase()
@@ -80,6 +98,9 @@ const parseBoolean = (value: string | undefined, fallback = false): boolean => {
   return fallback
 }
 
+/**
+ * Canonical schema describing every env var the Volc proxy consumes.
+ */
 const envSchema = z.object({
   // VolcEngine credentials
   VOLC_ACCESS_KEY_ID: z.string().min(1, 'VOLC_ACCESS_KEY_ID is required'),
@@ -164,6 +185,9 @@ const envSchema = z.object({
 
 export type RuntimeEnv = z.infer<typeof envSchema>
 
+/**
+ * Read and validate Bun.env, converting strings into richer types as necessary.
+ */
 export const getEnv = (): RuntimeEnv => {
   // Convert string environment variables to appropriate types
   const processedEnv = {
