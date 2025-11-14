@@ -219,8 +219,8 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
       isInterruptMode: runtimeConfig.interrupts.mode === 0,
       isVision: Boolean(runtimeConfig.llmConfig.VisionEnable),
       isScreenMode: false,
-      isAvatarScene: runtimeConfig.avatar?.enabled,
-      avatarBgUrl: runtimeConfig.avatar?.backgroundUrl,
+      isAvatarScene: false,
+      avatarBgUrl: '',
     },
     AccountConfig: {
       accessKeyId: env.VOLC_ACCESS_KEY_ID,
@@ -242,15 +242,6 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
         ASRConfig: asrConfig,
         TTSConfig: ttsConfig,
         LLMConfig: llmConfig,
-        AvatarConfig: {
-          Enabled: runtimeConfig.avatar?.enabled,
-          AvatarType: runtimeConfig.avatar?.type,
-          AvatarRole: runtimeConfig.avatar?.role,
-          BackgroundUrl: runtimeConfig.avatar?.backgroundUrl,
-          VideoBitrate: runtimeConfig.avatar?.videoBitrate,
-          AvatarAppID: '',
-          AvatarToken: '',
-        },
         InterruptMode: runtimeConfig.interrupts.mode,
       },
     },
@@ -296,8 +287,8 @@ const deriveSceneConfig = (scene: SceneFile): SceneSummary => {
   SceneConfig.isInterruptMode = config?.InterruptMode === 0
   SceneConfig.isVision = Boolean(config?.LLMConfig?.VisionConfig?.Enable)
   SceneConfig.isScreenMode = config?.LLMConfig?.VisionConfig?.SnapshotConfig?.StreamType === 1
-  SceneConfig.isAvatarScene = Boolean(config?.AvatarConfig?.Enabled)
-  SceneConfig.avatarBgUrl = config?.AvatarConfig?.BackgroundUrl
+  SceneConfig.isAvatarScene = false
+  SceneConfig.avatarBgUrl = ''
   delete RTCConfig.AppKey
   return {
     scene: SceneConfig,

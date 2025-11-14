@@ -3,106 +3,87 @@
  * Fields follow the structure of the Volc StartVoiceChat payload
  * (ASRConfig / TTSConfig / LLMConfig, etc.) for easier copy-and-paste.
  */
+import type { RuntimeConfig } from './types'
 
-export interface SceneSettings {
-  taskId: string
-  icon: string
-  name: string
-  defaultSceneId: string
-}
+const semanticInterruptKeywords = [
+  '暂停',
+  '暂停一下',
+  '停止',
+  '停一下',
+  '先停一下',
+  '先别说',
+  '别说了',
+  '别继续',
+  '打断',
+  '打住',
+  '可以了',
+  '好了',
+  '够了',
+  '下一个',
+  '下一项',
+  '换一个',
+  '我知道了',
+  '谢谢',
+  '收到',
+  '知道了',
+  '不用了',
+  '行了',
+  '先这样',
+  '听到了',
+  '听够了',
+  '等一下',
+  '稍等一下',
+  '别说话',
+  '不用继续',
+  '够啦',
+  '停下',
+  '不想听了',
+  '故事先这样',
+  '先讲到这里',
+  '换个话题',
+  '后面不用说了',
+  '休息一下',
+  '我累了',
+  '先停一会儿',
+  '可以换别的',
+  '不用重复',
+  '我知道接下来',
+  '先告一段落',
+  '到此为止',
+  '别讲故事了',
+  '先聊别的',
+  '停一停',
+  '静一下',
+  '安静一下',
+  '冷静一下',
+  'quiet please',
+  'stop talking',
+  'that is enough',
+  'no more',
+  'all good',
+  'we are good',
+  'you can pause',
+  'please wait',
+  'i am good',
+  'i heard enough',
+  'tell me later',
+  'change topic',
+  'not interested',
+  'story can stop',
+  'take a break',
+  'let us pause',
+  'Stop',
+  'Hold on',
+  'Pause',
+  'Wait',
+  'Enough',
+  'Next one',
+  'You can stop now',
+] as const
 
-export interface AgentSettings {
-  userId: string
-  welcomeMessage: string
-  enableConversationStateCallback: boolean
-  ansMode: number
-  voiceprintMode: number
-}
-
-export interface InterruptSettings {
-  mode: number
-  speechDuration: number
-  silenceTime: number
-  volumeGain: number
-  keywords: string[]
-}
-
-export interface AsrConfig {
-  Provider: string
-  ProviderParams: {
-    Mode: 'smallmodel' | 'bigmodel'
-    Cluster?: string
-    AccessToken?: string
-    ApiResourceId?: string
-    StreamMode?: number
-  }
-  VADConfig?: {
-    SilenceTime?: number
-    PrefixTime?: number
-    SuffixTime?: number
-    AIVAD?: boolean
-  }
-  VolumeGain?: number
-  TurnDetectionMode?: number
-}
-
-export interface TtsConfig {
-  Provider: string
-  Cluster?: string
-  Mode: 'standard' | 'bigtts' | 'bidirection'
-  VoiceType: string
-  SpeedRatio?: number
-  PitchRatio?: number
-  VolumeRatio?: number
-  SpeechRatio?: number
-  PitchRate?: number
-  SpeechRate?: number
-  Emotion?: string
-  EmotionIntensity?: number
-  IgnoreBracketText?: number[]
-  DisableMarkdownFilter?: boolean
-  EnableLatexTn?: boolean
-}
-
-export interface LlmConfig {
-  Mode: 'ArkV3' | 'CustomLLM'
-  EndpointId?: string
-  SystemMessage?: string
-  VisionEnable?: boolean
-  ModelName?: string
-  Temperature?: number
-  TopP?: number
-  MaxTokens?: number
-  HistoryLength?: number
-  EnableRoundId?: boolean
-  UserPrompts?: Array<Record<string, unknown>>
-  StreamOptions?: Record<string, unknown>
-  ExtraHeaders?: Record<string, unknown>
-}
-
-export interface AvatarSettings {
-  enabled: boolean
-  type: string
-  role: string
-  backgroundUrl: string
-  videoBitrate: number
-}
-
-export interface ApiSettings {
-  region: string
-  version: string
-}
-
-export interface RuntimeConfig {
-  scene: SceneSettings
-  agent: AgentSettings
-  interrupts: InterruptSettings
-  asrConfig: AsrConfig
-  ttsConfig: TtsConfig
-  llmConfig: LlmConfig
-  avatar?: AvatarSettings
-  api: ApiSettings
-}
+const semanticHotwordContext = JSON.stringify({
+  hotwords: semanticInterruptKeywords.map((word) => ({ word })),
+})
 
 export const runtimeConfig: RuntimeConfig = {
   scene: {
@@ -115,38 +96,22 @@ export const runtimeConfig: RuntimeConfig = {
     userId: 'emq-ai-bot',
     welcomeMessage: '嗨～我是 EMQ，很高兴见到你！',
     enableConversationStateCallback: true,
-    ansMode: 2,
+    ansMode: 3,
     voiceprintMode: 1,
   },
   interrupts: {
-    mode: 2,
+    mode: 0,
     speechDuration: 400,
     silenceTime: 600,
     volumeGain: 0.5,
-    keywords: [
-      '谢谢',
-      '谢谢你',
-      '我知道了',
-      '好的我知道了',
-      '好的',
-      '停',
-      '暂停',
-      '可以了',
-      '别说了',
-      'Stop',
-      'Thank you',
-      'Got it',
-      "I'm good",
-      'Okay',
-      'Enough',
-      'Pause',
-    ],
+    keywords: [...semanticInterruptKeywords],
   },
   asrConfig: {
     Provider: 'volcano',
     ProviderParams: {
       Mode: 'smallmodel',
       Cluster: 'volcengine_streaming_common',
+      context: semanticHotwordContext,
     },
     VADConfig: {
       SilenceTime: 600,
@@ -189,13 +154,6 @@ export const runtimeConfig: RuntimeConfig = {
     StreamOptions: { include_usage: true },
     ExtraHeaders: undefined,
   },
-  // avatar: {
-  //   enabled: false,
-  //   type: '3min',
-  //   role: '250623-zhibo-linyunzhi',
-  //   backgroundUrl: '',
-  //   videoBitrate: 2000,
-  // },
   api: {
     region: 'cn-north-1',
     version: '2024-12-01',
