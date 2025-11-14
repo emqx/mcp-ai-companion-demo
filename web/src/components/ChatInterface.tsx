@@ -62,22 +62,40 @@ export function ChatInterface({
 
   useEffect(() => {
     const remoteStream = webrtc.remoteStream
+    const audioElement = audioRef.current
 
-    if (remoteStream && audioRef.current) {
-      if (isMuted) {
-        setIsMuted(false)
-        appLogger.info('🔊 Auto unmuted due to remote stream availability')
-      }
-      if (audioRef.current.srcObject !== remoteStream) {
-        audioRef.current.srcObject = remoteStream
-        appLogger.info('🔊 Remote stream connected to audio element')
-      }
-      audioRef.current.volume = volume
-      audioRef.current.muted = false
-    } else if (audioRef.current && audioRef.current.srcObject) {
-      audioRef.current.srcObject = null
+    if (!audioElement) {
+      return
     }
-  }, [audioRef, volume, webrtc.remoteStream, isMuted, setIsMuted])
+
+    if (!remoteStream || isMuted) {
+      if (audioElement.srcObject) {
+        audioElement.srcObject = null
+        appLogger.info('🔇 Audio stream detached from element')
+      }
+      return
+    }
+
+    if (audioElement.srcObject !== remoteStream) {
+      audioElement.srcObject = remoteStream
+      appLogger.info('🔊 Remote stream connected to audio element')
+    }
+  }, [audioRef, webrtc.remoteStream, isMuted])
+
+  useEffect(() => {
+    const stream = webrtc.remoteStream
+    if (!stream) return
+    const audioTracks = stream.getAudioTracks()
+    audioTracks.forEach((track) => {
+      track.enabled = !isMuted
+    })
+
+    return () => {
+      audioTracks.forEach((track) => {
+        track.enabled = true
+      })
+    }
+  }, [webrtc.remoteStream, isMuted])
 
   useEffect(() => {
     const videoElement = videoRef?.current

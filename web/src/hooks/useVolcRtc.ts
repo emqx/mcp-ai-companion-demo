@@ -4,15 +4,19 @@ import type { UseWebRTCReturn, ConnectionState } from '@/types/webrtc'
 import type { UseWebRTCMqttOptions } from '@/hooks/useWebRTCMqtt'
 import { fetchScenes, startVoiceChat, stopVoiceChat } from '@/api/aigc'
 import type { SceneSummary } from '@/types/aigc'
-import { parseAigcBinaryMessage, MESSAGE_TYPE, AGENT_BRIEF_CODE } from '@/utils/aigcMessages'
+import { parseAigcBinaryMessage, MESSAGE_TYPE, AGENT_BRIEF_CODE, type FunctionCallMessage, type FunctionCallEntry } from '@/utils/aigcMessages'
 import { MediaType } from '@volcengine/rtc'
+import { McpTools, createToolContext } from '@/tools'
+import type { ToolHandlerContext } from '@/tools/types'
 
 /**
  * Hook options map directly to Volc StartVoiceChat metadata and UI callbacks.
  */
-export interface UseVolcRtcOptions extends Pick<UseWebRTCMqttOptions, 'onASRResponse' | 'onTTSText' | 'onMessage'> {
+export interface UseVolcRtcOptions
+  extends Pick<UseWebRTCMqttOptions, 'onASRResponse' | 'onTTSText' | 'onMessage'> {
   sceneId?: string
   deviceId?: string
+  toolCallbacks?: ToolHandlerContext | null
 }
 
 const stageToLoadingStatus = (code?: number) => {
@@ -30,6 +34,43 @@ const stageToLoadingStatus = (code?: number) => {
   }
 }
 
+const parseToolArguments = (raw: unknown): Record<string, unknown> => {
+  if (raw === null || raw === undefined) {
+    return {}
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
+    } catch (error) {
+      console.warn('[useVolcRtc] Failed to parse tool arguments', error)
+      return {}
+    }
+  }
+  if (typeof raw === 'object') {
+    return { ...(raw as Record<string, unknown>) }
+  }
+  return {}
+}
+
+const collectFunctionCalls = (payload?: FunctionCallMessage): FunctionCallEntry[] => {
+  if (!payload) {
+    return []
+  }
+  const collections: Array<FunctionCallEntry[] | undefined> = [
+    payload.tool_calls,
+    payload.calls,
+    payload.tools,
+    payload.actions,
+  ]
+  return collections.reduce<FunctionCallEntry[]>((acc, collection) => {
+    if (Array.isArray(collection)) {
+      acc.push(...collection)
+    }
+    return acc
+  }, [])
+}
+
 /**
  * useVolcRtc orchestrates the Volc RTC connection lifecycle:
  *   - fetch scene metadata / RTC tokens
@@ -37,7 +78,14 @@ const stageToLoadingStatus = (code?: number) => {
  *   - start/stop StartVoiceChat via the proxy
  *   - route subtitles/status messages back to the UI
  */
-export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMessage }: UseVolcRtcOptions): UseWebRTCReturn {
+export function useVolcRtc({
+  sceneId,
+  deviceId,
+  onASRResponse,
+  onTTSText,
+  onMessage,
+  toolCallbacks,
+}: UseVolcRtcOptions): UseWebRTCReturn {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
@@ -51,6 +99,11 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
   const voiceChatStartedRef = useRef(false)
   const pendingConnectRef = useRef(false)
   const audioContextRef = useRef<AudioContext | null>(null)
+  const toolCallbacksRef = useRef<ToolHandlerContext | null>(toolCallbacks ? createToolContext(toolCallbacks) : null)
+
+  useEffect(() => {
+    toolCallbacksRef.current = toolCallbacks ? createToolContext(toolCallbacks) : null
+  }, [toolCallbacks])
 
   useEffect(() => {
     rtcClient.setAiAnsMode(AnsMode.HIGH)
@@ -162,6 +215,70 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
     }
   }, [])
 
+  const executeToolCall = useCallback(
+    async (toolName: string, toolArgs: Record<string, unknown>) => {
+      const context = toolCallbacksRef.current
+      if (!context) {
+        console.warn('[useVolcRtc] No tool callbacks registered; skipping tool call', toolName)
+        return
+      }
+      const validation = McpTools.validate(toolName, toolArgs)
+      if (!validation.valid) {
+        console.warn('[useVolcRtc] Tool arguments invalid', { toolName, errors: validation.errors })
+        onMessage?.({
+          type: 'tool',
+          status: 'rejected',
+          tool: toolName,
+          args: toolArgs,
+          reason: validation.errors?.join(', '),
+        } as any)
+        return
+      }
+      try {
+        const result = await McpTools.execute(toolName, toolArgs, context)
+        onMessage?.({
+          type: 'tool',
+          status: result.success ? 'ok' : 'error',
+          tool: toolName,
+          args: toolArgs,
+          message: result.message,
+          data: result.data,
+        } as any)
+      } catch (error) {
+        console.error('[useVolcRtc] Tool execution failed', error)
+        onMessage?.({
+          type: 'tool',
+          status: 'error',
+          tool: toolName,
+          args: toolArgs,
+          reason: error instanceof Error ? error.message : String(error),
+        } as any)
+      }
+    },
+    [onMessage],
+  )
+
+  const handleFunctionCall = useCallback(
+    (payload: FunctionCallMessage) => {
+      const entries = collectFunctionCalls(payload)
+      if (!entries.length) {
+        return
+      }
+      entries.forEach((entry) => {
+        const toolName =
+          entry?.function?.name ?? (typeof entry?.name === 'string' ? entry.name : undefined)
+        if (!toolName) {
+          return
+        }
+        const args = parseToolArguments(
+          entry?.function?.arguments ?? entry?.arguments ?? entry?.params ?? entry?.payload,
+        )
+        void executeToolCall(toolName, args)
+      })
+    },
+    [executeToolCall],
+  )
+
   const handleBinaryMessage = useCallback((buffer: ArrayBuffer) => {
       const parsed = parseAigcBinaryMessage(buffer)
       if (!parsed) return
@@ -217,13 +334,13 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
           break
         }
         case MESSAGE_TYPE.FUNCTION_CALL:
-          // No-op for now
+          handleFunctionCall(parsed.payload)
           break
         default:
           break
       }
     },
-    [onASRResponse, onMessage, onTTSText, playInterruptTone],
+    [handleFunctionCall, onASRResponse, onMessage, onTTSText, playInterruptTone],
   )
 
   useEffect(() => {
@@ -458,10 +575,18 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
         await rtcClient.publishStream(MediaType.VIDEO)
         refreshLocalStream()
       } else {
-        await rtcClient.unpublishStream(MediaType.VIDEO)
-        await rtcClient.stopVideoCapture()
         setIsVideoEnabled(false)
         setLocalStream(null)
+        try {
+          await rtcClient.unpublishStream(MediaType.VIDEO)
+        } catch (err) {
+          console.warn('[useVolcRtc] unpublish video ignored', err)
+        }
+        try {
+          await rtcClient.stopVideoCapture()
+        } catch (err) {
+          console.warn('[useVolcRtc] stop video capture ignored', err)
+        }
       }
     },
     [connect, connectionState, isVideoEnabled, refreshLocalStream],

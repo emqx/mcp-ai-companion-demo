@@ -19,7 +19,8 @@ function App() {
   const [showVideo, setShowVideo] = useState<boolean>(false)
   const [selectedEmotion, setSelectedEmotion] = useState<string>('happy')
   const [volume, setVolume] = useState<number>(1.0) // 0.0 to 1.0
-  const [isMuted, setIsMuted] = useState<boolean>(true)
+  const [isMuted, setIsMutedState] = useState<boolean>(true)
+  const [muteOverride, setMuteOverride] = useState(false)
   const [mqttConfig, setMqttConfig] = useState<MqttConfig>(() => {
     const savedConfig = loadMqttConfig()
     if (savedConfig) {
@@ -68,6 +69,20 @@ function App() {
     [captureFromLocalCamera],
   )
 
+  const applyMute = useCallback((muted: boolean, options?: { manual?: boolean }) => {
+    setIsMutedState((prev) => (prev === muted ? prev : muted))
+    if (options?.manual) {
+      setMuteOverride(true)
+    }
+  }, [])
+
+  const handleSetIsMuted = useCallback(
+    (muted: boolean) => {
+      applyMute(muted, { manual: true })
+    },
+    [applyMute],
+  )
+
   const onVolumeControl = useCallback(
     (newVolume?: number, muted?: boolean) => {
       if (newVolume !== undefined) {
@@ -80,7 +95,7 @@ function App() {
       }
 
       if (muted !== undefined) {
-        setIsMuted(muted)
+        applyMute(muted, { manual: true })
         const message = muted ? t('audio.muted') : t('audio.unmuted')
         appLogger.info(`🔊 Audio ${muted ? 'muted' : 'unmuted'}`)
         toast(message, {
@@ -97,7 +112,7 @@ function App() {
         }
       }
     },
-    [t],
+    [applyMute, t],
   )
 
   const callbacks = useMemo(
@@ -144,6 +159,7 @@ function App() {
     cleanup: cleanupWebRTC,
   } = useVolcRtc({
     deviceId,
+    toolCallbacks: callbacks,
     onASRResponse: (text?: string) => {
       conversationLogger.user(text)
       setLlmLoading('processing')
@@ -169,10 +185,29 @@ function App() {
           toast.error(reason)
           setAiReplyText('')
           setLlmLoading(null)
+        } else if (message.type === 'tool') {
+          const status = message.status
+          if (status === 'error' || status === 'rejected') {
+            const reason = message.reason || message.message || t('common.errorOccurred')
+            toast.error(reason)
+          } else {
+            appLogger.info('🛠️ Tool executed', message)
+          }
         }
       }
     },
   })
+
+  useEffect(() => {
+    if (isWebRTCConnected) {
+      if (!muteOverride) {
+        applyMute(false)
+      }
+    } else {
+      setMuteOverride(false)
+      setIsMutedState(true)
+    }
+  }, [applyMute, isWebRTCConnected, muteOverride])
 
   useEffect(() => {
     if (showVideo === isVideoEnabled) {
@@ -249,7 +284,7 @@ function App() {
         setShowVideo={setShowVideo}
         selectedEmotion={selectedEmotion}
         setSelectedEmotion={setSelectedEmotion}
-        setIsMuted={setIsMuted}
+        setIsMuted={handleSetIsMuted}
         videoRef={videoRef}
         audioRef={audioRef}
         volume={volume}
