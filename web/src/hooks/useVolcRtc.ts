@@ -50,10 +50,18 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
   const remoteUserIdRef = useRef<string | null>(null)
   const voiceChatStartedRef = useRef(false)
   const pendingConnectRef = useRef(false)
+  const audioContextRef = useRef<AudioContext | null>(null)
 
   useEffect(() => {
     rtcClient.setAiAnsMode(AnsMode.HIGH)
     rtcClient.setAiAnsEnabled(true)
+
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {})
+        audioContextRef.current = null
+      }
+    }
   }, [])
 
   const updateRemoteStream = useCallback(
@@ -123,6 +131,37 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
   /**
    * Decode Volc binary messages (subtitles, brief/status) for ASR/TTS callbacks.
    */
+  const playInterruptTone = useCallback(() => {
+    if (typeof window === 'undefined' || typeof window.AudioContext === 'undefined') {
+      return
+    }
+    try {
+      const ctx = audioContextRef.current ?? new window.AudioContext()
+      if (!audioContextRef.current) {
+        audioContextRef.current = ctx
+      }
+      const notes = [1400, 1650, 1900]
+      const now = ctx.currentTime
+      notes.forEach((freq, index) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.value = freq
+        gain.gain.value = 0.0001
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        const startTime = now + index * 0.09
+        const endTime = startTime + 0.18
+        gain.gain.setValueAtTime(0.25, startTime)
+        gain.gain.exponentialRampToValueAtTime(0.0001, endTime)
+        osc.start(startTime)
+        osc.stop(endTime + 0.02)
+      })
+    } catch (error) {
+      console.warn('Failed to play interrupt tone', error)
+    }
+  }, [])
+
   const handleBinaryMessage = useCallback((buffer: ArrayBuffer) => {
       const parsed = parseAigcBinaryMessage(buffer)
       if (!parsed) return
@@ -155,6 +194,9 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
               status,
             } as any)
           }
+          if (stage?.Code === AGENT_BRIEF_CODE.INTERRUPTED) {
+            playInterruptTone()
+          }
           const hasError =
             stage?.Description === 'errorOccurred' ||
             stage?.Code === AGENT_BRIEF_CODE.UNKNOWN ||
@@ -181,7 +223,7 @@ export function useVolcRtc({ sceneId, deviceId, onASRResponse, onTTSText, onMess
           break
       }
     },
-    [onASRResponse, onMessage, onTTSText],
+    [onASRResponse, onMessage, onTTSText, playInterruptTone],
   )
 
   useEffect(() => {

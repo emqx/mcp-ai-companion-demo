@@ -61,8 +61,8 @@ function App() {
         setShowVideo(false)
         appLogger.info('📷 Photo capture timeout reached, camera preview disabled')
         closePreviewTimeoutRef.current = null
-      }, 3000)
-      appLogger.info('📷 Photo captured, camera preview will close in 3 seconds')
+      }, 1500)
+      appLogger.info('📷 Photo captured, camera preview will close in 1.5 seconds')
       return result
     },
     [captureFromLocalCamera],
