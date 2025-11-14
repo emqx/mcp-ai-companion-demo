@@ -3,7 +3,7 @@
 Bun + TypeScript server that proxies VolcEngine AIGC real-time voice APIs.
 
 - Exposes `/getScenes` and `/proxy` endpoints matching the Web client contract
-- Loads configuration entirely from environment variables, no JSON config files needed
+- Keeps secrets in `.env` while the rest of the scene/voice tuning lives in `src/config.ts`
 - Autogenerates Room/User IDs and 24h RTC tokens
 - Signs VolcEngine TOP gateway requests and forwards `StartVoiceChat` / `StopVoiceChat`
 
@@ -12,15 +12,15 @@ Bun + TypeScript server that proxies VolcEngine AIGC real-time voice APIs.
 ```bash
 cd volc-server
 cp .env.example .env
-# Fill in all required configuration values:
-# VOLC_ACCESS_KEY_ID / VOLC_SECRET_KEY (required)
-# VOLC_RTC_APP_ID / VOLC_RTC_APP_KEY (required)
-# VOLC_ASR_APP_ID / VOLC_TTS_APP_ID (for speech services)
-# VOLC_LLM_ENDPOINT_ID (for LLM services)
-# Other optional configurations for voice, LLM, agent, and avatar settings
+# Fill in the credential-only .env:
+#   VOLC_ACCESS_KEY_ID / VOLC_SECRET_KEY
+#   VOLC_RTC_APP_ID / VOLC_RTC_APP_KEY
+#   VOLC_ASR_APP_ID / VOLC_TTS_APP_ID / VOLC_TTS_APP_TOKEN
+#   VOLC_LLM_URL / VOLC_LLM_API_KEY (when using CustomLLM)
+# Then edit src/config.ts for non-sensitive scene/voice/LLM parameters
 ```
 
-The server now loads all configuration from environment variables only. No JSON config files are needed, making it more secure and easier to manage across different environments.
+Secrets stay out of version control in `.env`, while `src/config.ts` carries shareable defaults you can commit alongside the proxy. The loader now validates only the environment secrets, so you can add or tweak config fields without touching `env.ts`.
 
 ## 2. Install Dependencies
 
@@ -61,15 +61,16 @@ curl -X POST 'http://localhost:3001/proxy?Action=StartVoiceChat' \
 volc-server/
 ├── src/
 │   ├── server.ts          # Bun HTTP server entry
-│   ├── env.ts             # Runtime environment validation with type conversion
+│   ├── config.ts          # Shared, non-sensitive runtime defaults
+│   ├── env.ts             # Runtime environment validation + credential merge
 │   ├── types.ts           # Scene / API typings
 │   ├── handlers.ts        # HTTP request handlers
 │   ├── lib/
 │   │   └── token.ts       # RTC token generator
 │   └── scenes/
 │       └── loader.ts      # Scene builder from environment variables
-├── .env.example           # Complete environment variable template
-├── .env                   # Your actual configuration (not in version control)
+├── .env.example           # Credential-only template
+├── .env                   # Actual secrets (gitignored)
 ├── package.json
 ├── bunfig.toml
 └── tsconfig.json
@@ -77,55 +78,85 @@ volc-server/
 
 ## 6. Configuration
 
-The server uses environment variables exclusively for configuration. Key categories:
+Runtime settings are now split between two files:
 
-- **Credentials**: `VOLC_ACCESS_KEY_ID`, `VOLC_SECRET_KEY`
-- **RTC**: `VOLC_RTC_APP_ID`, `VOLC_RTC_APP_KEY`
-- **Speech**: `VOLC_ASR_APP_ID`, `VOLC_TTS_APP_ID`, `VOLC_TTS_PROVIDER`, `VOLC_TTS_MODE`, `VOLC_TTS_VOICE_TYPE`
-- **Interrupts**: `VOLC_INTERRUPT_MODE`, `VOLC_INTERRUPT_SPEECH_DURATION`, `VOLC_INTERRUPT_SILENCE_TIME`, `VOLC_INTERRUPT_VOLUME_GAIN`, `VOLC_INTERRUPT_KEYWORDS`
-- **LLM**: `VOLC_LLM_ENDPOINT_ID`, `VOLC_LLM_SYSTEM_MESSAGE`
-- **Agent**: `VOLC_AGENT_USER_ID`, `VOLC_AGENT_WELCOME_MESSAGE`, `VOLC_AGENT_ANS_MODE` (default 2 = medium), `VOLC_AGENT_VOICEPRINT_MODE` (default 1 = realtime)
-- **Scene**: `VOLC_SCENE_NAME`, `VOLC_SCENE_ICON`
-- **Avatar**: `VOLC_AVATAR_ENABLED`, `VOLC_AVATAR_TYPE`
+- `.env`: **secrets only** (`VOLC_ACCESS_KEY_ID`, `VOLC_SECRET_KEY`, `VOLC_RTC_APP_ID`, `VOLC_RTC_APP_KEY`, `VOLC_ASR_APP_ID`, `VOLC_TTS_APP_ID`, `VOLC_TTS_APP_TOKEN`, `VOLC_TTS_RESOURCE_ID`, `VOLC_LLM_URL`, `VOLC_LLM_API_KEY`).
+- `src/config.ts`: **non-sensitive scene/voice/LLM parameters** expressed with the same field names used by Volc StartVoiceChat payloads (e.g. `ASRConfig.Provider`, `ASRConfig.VADConfig.SilenceTime`, `TTSConfig.Mode`, `LLMConfig.ModelName`, etc.), plus local metadata such as agent persona and scene details.
 
-See `.env.example` for all available options and their defaults.
+See `.env.example` plus the inline comments inside `src/config.ts` for the latest defaults. Because `src/config.ts` exports the same `VOLC_*` keys, the rest of this document still refers to each option by its familiar name.
 
-`VOLC_INTERRUPT_KEYWORDS` accepts either a comma-separated list or a JSON array string. The defaults cover common Chinese and English interrupt keywords, e.g. "谢谢", "停", "Stop".
+`VOLC_INTERRUPT_KEYWORDS` is now edited as a literal array inside `src/config.ts`. The stock list already covers common Chinese and English interrupt phrases such as "谢谢", "停", and "Stop".
+
+### ASRConfig quick reference
+
+`config.ts` follows the official ASR schema (see “语音识别配置” in the Volc docs). When you tweak ASR behavior, update the `asrConfig` block directly:
+
+```ts
+export const runtimeConfig = {
+  // ...
+  asrConfig: {
+    Provider: 'volcano',
+    ProviderParams: {
+      Mode: 'smallmodel',
+      Cluster: 'volcengine_streaming_common',
+      // AccessToken / ApiResourceId stay in .env if needed
+    },
+    VADConfig: {
+      SilenceTime: 600,
+      // PrefixTime / SuffixTime / AIVAD available if you need fine‑grained control
+    },
+    VolumeGain: 0.5,
+    TurnDetectionMode: 0,
+  },
+}
+```
+
+This maps 1‑to‑1 to the `StartVoiceChat.ASRConfig` payload, making it easy to copy snippets from the Volc documentation.
 
 ### CustomLLM integration
 
-Set `VOLC_LLM_MODE=CustomLLM` when you want VolcEngine to call a third-party agent instead of an Ark endpoint. The proxy fills the `StartVoiceChat` payload directly from environment variables:
+Set `llmConfig.Mode` to `CustomLLM` inside `src/config.ts` when you want VolcEngine to call a third-party agent instead of an Ark endpoint. Keep the actual endpoint and token in `.env`.
 
 - `VOLC_LLM_URL` (required): HTTPS endpoint of your agent (must support SSE and return `data: [DONE]`).
 - `VOLC_LLM_API_KEY` (optional): forwarded as `Authorization: Bearer <token>`.
-- `VOLC_LLM_MODEL_NAME`: copied to the `model` field of each request.
-- `VOLC_LLM_TEMPERATURE`, `VOLC_LLM_TOP_P`, `VOLC_LLM_MAX_TOKENS`: numeric sampling parameters.
-- `VOLC_LLM_HISTORY_LENGTH`: controls how many turns VolcEngine sends in `messages`.
-- `VOLC_LLM_EXTRA_HEADERS`, `VOLC_LLM_STREAM_OPTIONS`, `VOLC_LLM_USER_PROMPTS`: JSON strings for advanced options documented by VolcEngine.
+- `LLMConfig.ModelName`, `LLMConfig.Temperature`, `LLMConfig.TopP`, `LLMConfig.MaxTokens`, `LLMConfig.HistoryLength`, `LLMConfig.ExtraHeaders`, `LLMConfig.StreamOptions`, `LLMConfig.UserPrompts`: edit these fields in `src/config.ts` to control how the payload is built.
 
-Example snippet for a locally hosted agent:
+Config snippet for a locally hosted agent:
+
+```ts
+export const runtimeConfig = {
+  // ...
+  llmConfig: {
+    Mode: 'CustomLLM',
+    ModelName: 'qwen-flash',
+    Temperature: 0.7,
+    TopP: 0.9,
+    MaxTokens: 512,
+    HistoryLength: 5,
+    EnableRoundId: true,
+    StreamOptions: { include_usage: true },
+  },
+  // ...
+}
+```
+
+`.env` still carries the endpoint and key:
 
 ```env
-VOLC_LLM_MODE=CustomLLM
 VOLC_LLM_URL=https://demo.emqx.com:8081/chat-stream
 VOLC_LLM_API_KEY=4ecf5336172f1a715196f8bbd35df00d
-VOLC_LLM_MODEL_NAME=qwen-flash
-VOLC_LLM_TEMPERATURE=0.7
-VOLC_LLM_TOP_P=0.9
-VOLC_LLM_MAX_TOKENS=512
-VOLC_LLM_HISTORY_LENGTH=5
-VOLC_LLM_ENABLE_ROUND_ID=true
-VOLC_LLM_STREAM_OPTIONS={"include_usage":true}
 ```
 
 ### Selecting a natural TTS profile
 
-- `VOLC_TTS_MODE`:
+Head to `ttsConfig` inside `src/config.ts` to pick the voice profile that best matches your scene:
+
+- `TTSConfig.Mode`:
   - `standard` (default) uses the traditional Volc streaming TTS, which maps to `speed_ratio/pitch_ratio/volume_ratio`.
   - `bigtts` uses a large TTS synthesis model (more natural and expressive), automatically mapped to `speech_ratio/pitch_rate`.
-  - `bidirection` connects to a streaming large model and requires `VOLC_TTS_APP_TOKEN` and `VOLC_TTS_RESOURCE_ID`. Additional features can be toggled via `VOLC_TTS_DISABLE_MARKDOWN_FILTER` and `VOLC_TTS_ENABLE_LATEX_TN`.
-- `VOLC_TTS_IGNORE_BRACKET_TEXT` accepts a JSON array or a comma-separated list; e.g., `[1,2]` filters text inside brackets.
-- Optional emotion parameters: set `VOLC_TTS_EMOTION` and `VOLC_TTS_EMOTION_INTENSITY` (range 0–1) to add emotional coloring to the large-model voice.
+  - `bidirection` connects to a streaming large model and still requires `VOLC_TTS_APP_TOKEN` and `VOLC_TTS_RESOURCE_ID` in `.env`. Additional features can be toggled via `TTSConfig.DisableMarkdownFilter` and `TTSConfig.EnableLatexTn`.
+- `TTSConfig.IgnoreBracketText` remains an array; set `[1,2]` to filter bracketed text.
+- Optional emotion parameters: set `TTSConfig.Emotion` and `TTSConfig.EmotionIntensity` (range 0–1) to add emotional coloring to the large-model voice.
 
 VolcEngine docs for reference:
 

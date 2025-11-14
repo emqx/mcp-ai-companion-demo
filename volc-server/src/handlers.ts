@@ -3,6 +3,7 @@ import { loadScenes, summarizeScenes, getScene, prepareSceneForRequest } from '.
 import type { RuntimeEnv } from './env'
 import type { SceneFile, SceneSummary } from './types'
 import { serverLogger } from './logger'
+import { runtimeConfig } from './config'
 
 type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null
 
@@ -161,7 +162,7 @@ const callVolcApi = async (scene: SceneFile, env: RuntimeEnv, action: string, ve
   }
 
   const openApiRequestData = {
-    region: env.VOLC_API_REGION,
+    region: runtimeConfig.api.region,
     method: 'POST',
     params: {
       Action: action,
@@ -198,10 +199,13 @@ const makeSceneSummaries = (scenes: Map<string, SceneFile>): SceneSummary[] => s
  */
 export const createRequestHandler = (env: RuntimeEnv) => {
   const scenes = loadScenes(env)
-  serverLogger.info('Request handler initialized', { sceneCount: scenes.size, defaultScene: env.VOLC_SCENE_DEFAULT })
+  serverLogger.info('Request handler initialized', {
+    sceneCount: scenes.size,
+    defaultScene: runtimeConfig.scene.defaultSceneId,
+  })
 
   const resolveScene = (sceneId?: string): SceneFile => {
-    const id = sceneId && sceneId.trim().length ? sceneId : env.VOLC_SCENE_DEFAULT
+    const id = sceneId && sceneId.trim().length ? sceneId : runtimeConfig.scene.defaultSceneId
     serverLogger.debug('Resolving scene', { requestedSceneId: sceneId, resolvedId: id })
     const scene = getScene(scenes, id)
     if (!scene) {
@@ -233,7 +237,7 @@ export const createRequestHandler = (env: RuntimeEnv) => {
   const handleProxy = async (req: Request) => {
     const url = new URL(req.url)
     const action = url.searchParams.get('Action')
-    const version = url.searchParams.get('Version') ?? env.VOLC_API_VERSION
+    const version = url.searchParams.get('Version') ?? runtimeConfig.api.version
 
     serverLogger.info('Handling proxy request', { action, version })
 

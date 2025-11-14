@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { AccessToken } from '../lib/token'
+import { runtimeConfig } from '../config'
 import type { RuntimeEnv } from '../env'
 import type { SceneFile, SceneSummary, VoiceChatConfig } from '../types'
 
@@ -13,36 +14,9 @@ const asOptionalString = (value: unknown): string | undefined => {
   return trimmed.length ? trimmed : undefined
 }
 
-const toJsonObject = (value?: string): Record<string, unknown> | undefined => {
-  if (!value) {
-    return undefined
-  }
-  try {
-    const parsed = JSON.parse(value)
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>
-    }
-  } catch (error) {
-    // Ignore JSON parsing errors and fall back to undefined
-  }
-  return undefined
-}
-
-const toJsonArray = (value?: string): unknown[] | undefined => {
-  if (!value) {
-    return undefined
-  }
-  try {
-    const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed : undefined
-  } catch (error) {
-    // Ignore JSON parsing errors and fall back to undefined
-  }
-  return undefined
-}
-
 /**
- * Create the in-memory scene representation directly from environment variables.
+ * Create the in-memory scene representation by combining secrets from .env
+ * with the shareable defaults defined in runtimeConfig.
  */
 const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
   const roomId = randomUUID()
@@ -50,37 +24,52 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
 
   const agentConfig: VoiceChatConfig['AgentConfig'] = {
     TargetUserId: [userId],
-    WelcomeMessage: env.VOLC_AGENT_WELCOME_MESSAGE,
-    UserId: env.VOLC_AGENT_USER_ID,
-    EnableConversationStateCallback: env.VOLC_AGENT_ENABLE_CONVERSATION_CALLBACK,
-    AnsMode: env.VOLC_AGENT_ANS_MODE,
+    WelcomeMessage: runtimeConfig.agent.welcomeMessage,
+    UserId: runtimeConfig.agent.userId,
+    EnableConversationStateCallback: runtimeConfig.agent.enableConversationStateCallback,
+    AnsMode: runtimeConfig.agent.ansMode,
   }
 
-  if (env.VOLC_AGENT_VOICEPRINT_MODE > 0) {
+  if (runtimeConfig.agent.voiceprintMode > 0) {
     agentConfig.VoicePrint = {
-      Mode: env.VOLC_AGENT_VOICEPRINT_MODE,
+      Mode: runtimeConfig.agent.voiceprintMode,
     }
   }
 
   const interruptConfig: Record<string, unknown> = {}
-  if (env.VOLC_INTERRUPT_SPEECH_DURATION > 0) {
-    interruptConfig.InterruptSpeechDuration = env.VOLC_INTERRUPT_SPEECH_DURATION
+  if (runtimeConfig.interrupts.speechDuration > 0) {
+    interruptConfig.InterruptSpeechDuration = runtimeConfig.interrupts.speechDuration
   }
-  if (env.VOLC_INTERRUPT_KEYWORDS.length > 0) {
-    interruptConfig.InterruptKeywords = env.VOLC_INTERRUPT_KEYWORDS
+  if (runtimeConfig.interrupts.keywords.length > 0) {
+    interruptConfig.InterruptKeywords = runtimeConfig.interrupts.keywords
+  }
+
+  const asrProviderParams: Record<string, unknown> = {
+    ...runtimeConfig.asrConfig.ProviderParams,
+    AppId: env.VOLC_ASR_APP_ID || '',
   }
 
   const asrConfig: Record<string, unknown> = {
-    Provider: 'volcano',
-    ProviderParams: {
-      Mode: 'smallmodel',
-      AppId: env.VOLC_ASR_APP_ID || '',
-      Cluster: env.VOLC_ASR_CLUSTER,
-    },
-    VADConfig: {
-      SilenceTime: env.VOLC_INTERRUPT_SILENCE_TIME,
-    },
-    VolumeGain: env.VOLC_INTERRUPT_VOLUME_GAIN,
+    Provider: runtimeConfig.asrConfig.Provider,
+    ProviderParams: asrProviderParams,
+  }
+
+  const vadConfig: Record<string, unknown> = { ...(runtimeConfig.asrConfig.VADConfig ?? {}) }
+  if (vadConfig.SilenceTime === undefined) {
+    vadConfig.SilenceTime = runtimeConfig.interrupts.silenceTime
+  }
+  if (Object.keys(vadConfig).length > 0) {
+    asrConfig.VADConfig = vadConfig
+  }
+
+  if (runtimeConfig.asrConfig.VolumeGain !== undefined) {
+    asrConfig.VolumeGain = runtimeConfig.asrConfig.VolumeGain
+  } else {
+    asrConfig.VolumeGain = runtimeConfig.interrupts.volumeGain
+  }
+
+  if (runtimeConfig.asrConfig.TurnDetectionMode !== undefined) {
+    asrConfig.TurnDetectionMode = runtimeConfig.asrConfig.TurnDetectionMode
   }
 
   if (Object.keys(interruptConfig).length > 0) {
@@ -88,31 +77,31 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
   }
 
   const ttsAudioConfig: Record<string, unknown> = {
-    voice_type: env.VOLC_TTS_VOICE_TYPE,
+    voice_type: runtimeConfig.ttsConfig.VoiceType,
   }
 
-  switch (env.VOLC_TTS_MODE) {
+  switch (runtimeConfig.ttsConfig.Mode) {
     case 'bigtts':
-      ttsAudioConfig.speech_ratio = env.VOLC_TTS_SPEECH_RATIO
-      ttsAudioConfig.pitch_rate = env.VOLC_TTS_PITCH_RATE
-      ttsAudioConfig.volume_ratio = env.VOLC_TTS_VOLUME_RATIO
+      ttsAudioConfig.speech_ratio = runtimeConfig.ttsConfig.SpeechRatio
+      ttsAudioConfig.pitch_rate = runtimeConfig.ttsConfig.PitchRate
+      ttsAudioConfig.volume_ratio = runtimeConfig.ttsConfig.VolumeRatio
       break
     case 'bidirection':
-      ttsAudioConfig.speech_rate = env.VOLC_TTS_SPEECH_RATE
-      ttsAudioConfig.volume_ratio = env.VOLC_TTS_VOLUME_RATIO
-      ttsAudioConfig.pitch_ratio = env.VOLC_TTS_PITCH_RATIO
+      ttsAudioConfig.speech_rate = runtimeConfig.ttsConfig.SpeechRate
+      ttsAudioConfig.volume_ratio = runtimeConfig.ttsConfig.VolumeRatio
+      ttsAudioConfig.pitch_ratio = runtimeConfig.ttsConfig.PitchRatio
       break
     default:
-      ttsAudioConfig.speed_ratio = env.VOLC_TTS_SPEED_RATIO
-      ttsAudioConfig.pitch_ratio = env.VOLC_TTS_PITCH_RATIO
-      ttsAudioConfig.volume_ratio = env.VOLC_TTS_VOLUME_RATIO
+      ttsAudioConfig.speed_ratio = runtimeConfig.ttsConfig.SpeedRatio
+      ttsAudioConfig.pitch_ratio = runtimeConfig.ttsConfig.PitchRatio
+      ttsAudioConfig.volume_ratio = runtimeConfig.ttsConfig.VolumeRatio
       break
   }
 
-  if (env.VOLC_TTS_EMOTION) {
-    ttsAudioConfig.emotion = env.VOLC_TTS_EMOTION
-    if (env.VOLC_TTS_EMOTION_INTENSITY) {
-      ttsAudioConfig.emotion_strength = env.VOLC_TTS_EMOTION_INTENSITY
+  if (runtimeConfig.ttsConfig.Emotion) {
+    ttsAudioConfig.emotion = runtimeConfig.ttsConfig.Emotion
+    if (runtimeConfig.ttsConfig.EmotionIntensity) {
+      ttsAudioConfig.emotion_strength = runtimeConfig.ttsConfig.EmotionIntensity
     }
   }
 
@@ -123,10 +112,10 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
     audio: ttsAudioConfig,
   }
 
-  if (env.VOLC_TTS_PROVIDER === 'volcano') {
+  if (runtimeConfig.ttsConfig.Provider === 'volcano' && runtimeConfig.ttsConfig.Cluster) {
     ttsProviderParams.app = {
       ...(ttsProviderParams.app as Record<string, unknown>),
-      cluster: env.VOLC_TTS_CLUSTER,
+      cluster: runtimeConfig.ttsConfig.Cluster,
     }
   }
 
@@ -138,12 +127,12 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
     ttsProviderParams.ResourceId = env.VOLC_TTS_RESOURCE_ID
   }
 
-  if (env.VOLC_TTS_MODE === 'bidirection') {
+  if (runtimeConfig.ttsConfig.Mode === 'bidirection') {
     const additions: Record<string, unknown> = {}
-    if (env.VOLC_TTS_DISABLE_MARKDOWN_FILTER) {
+    if (runtimeConfig.ttsConfig.DisableMarkdownFilter) {
       additions.disable_markdown_filter = true
     }
-    if (env.VOLC_TTS_ENABLE_LATEX_TN) {
+    if (runtimeConfig.ttsConfig.EnableLatexTn) {
       additions.enable_latex_tn = true
     }
     if (Object.keys(additions).length > 0) {
@@ -152,39 +141,39 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
   }
 
   const ttsConfig: Record<string, unknown> = {
-    Provider: env.VOLC_TTS_PROVIDER,
+    Provider: runtimeConfig.ttsConfig.Provider,
     ProviderParams: ttsProviderParams,
   }
 
-  if (env.VOLC_TTS_IGNORE_BRACKET_TEXT.length > 0) {
-    ttsConfig.IgnoreBracketText = env.VOLC_TTS_IGNORE_BRACKET_TEXT
+  if (runtimeConfig.ttsConfig.IgnoreBracketText && runtimeConfig.ttsConfig.IgnoreBracketText.length > 0) {
+    ttsConfig.IgnoreBracketText = runtimeConfig.ttsConfig.IgnoreBracketText
   }
 
   const llmConfig: Record<string, unknown> = {
-    Mode: env.VOLC_LLM_MODE,
+    Mode: runtimeConfig.llmConfig.Mode,
     VisionConfig: {
-      Enable: env.VOLC_LLM_VISION_ENABLE,
+      Enable: Boolean(runtimeConfig.llmConfig.VisionEnable),
     },
   }
 
-  const systemMessage = asOptionalString(env.VOLC_LLM_SYSTEM_MESSAGE)
+  const systemMessage = asOptionalString(runtimeConfig.llmConfig.SystemMessage)
   if (systemMessage) {
     llmConfig.SystemMessages = [systemMessage]
   }
 
-  if (env.VOLC_LLM_ENDPOINT_ID) {
-    llmConfig.EndPointId = env.VOLC_LLM_ENDPOINT_ID
+  if (runtimeConfig.llmConfig.EndpointId) {
+    llmConfig.EndPointId = runtimeConfig.llmConfig.EndpointId
   }
 
-  if (env.VOLC_LLM_MODEL_NAME) {
-    llmConfig.ModelName = env.VOLC_LLM_MODEL_NAME
+  if (runtimeConfig.llmConfig.ModelName) {
+    llmConfig.ModelName = runtimeConfig.llmConfig.ModelName
   }
 
-  if (env.VOLC_LLM_HISTORY_LENGTH !== undefined) {
-    llmConfig.HistoryLength = env.VOLC_LLM_HISTORY_LENGTH
+  if (runtimeConfig.llmConfig.HistoryLength !== undefined) {
+    llmConfig.HistoryLength = runtimeConfig.llmConfig.HistoryLength
   }
 
-  if (env.VOLC_LLM_ENABLE_ROUND_ID) {
+  if (runtimeConfig.llmConfig.EnableRoundId) {
     llmConfig.EnableRoundId = true
   }
 
@@ -194,28 +183,25 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
     }
   }
 
-  setNumericConfig('Temperature', env.VOLC_LLM_TEMPERATURE)
-  setNumericConfig('TopP', env.VOLC_LLM_TOP_P)
-  setNumericConfig('MaxTokens', env.VOLC_LLM_MAX_TOKENS)
+  setNumericConfig('Temperature', runtimeConfig.llmConfig.Temperature)
+  setNumericConfig('TopP', runtimeConfig.llmConfig.TopP)
+  setNumericConfig('MaxTokens', runtimeConfig.llmConfig.MaxTokens)
 
-  const extraHeaders = toJsonObject(env.VOLC_LLM_EXTRA_HEADERS)
-  if (extraHeaders) {
-    llmConfig.ExtraHeader = extraHeaders
+  if (runtimeConfig.llmConfig.ExtraHeaders) {
+    llmConfig.ExtraHeader = runtimeConfig.llmConfig.ExtraHeaders
   }
 
-  const userPrompts = toJsonArray(env.VOLC_LLM_USER_PROMPTS)
-  if (userPrompts) {
-    llmConfig.UserPrompts = userPrompts
+  if (runtimeConfig.llmConfig.UserPrompts && runtimeConfig.llmConfig.UserPrompts.length > 0) {
+    llmConfig.UserPrompts = runtimeConfig.llmConfig.UserPrompts
   }
 
-  const streamOptions = toJsonObject(env.VOLC_LLM_STREAM_OPTIONS)
-  if (streamOptions) {
-    llmConfig.StreamOptions = streamOptions
+  if (runtimeConfig.llmConfig.StreamOptions) {
+    llmConfig.StreamOptions = runtimeConfig.llmConfig.StreamOptions
   }
 
-  if (env.VOLC_LLM_MODE === 'CustomLLM') {
+  if (runtimeConfig.llmConfig.Mode === 'CustomLLM') {
     if (!env.VOLC_LLM_URL) {
-      throw new Error('VOLC_LLM_URL is required when VOLC_LLM_MODE=CustomLLM')
+      throw new Error('VOLC_LLM_URL is required when llmConfig.Mode=CustomLLM')
     }
     llmConfig.Url = env.VOLC_LLM_URL
 
@@ -224,17 +210,17 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
     }
   }
 
-  const scene: SceneFile = {
+  const sceneFile: SceneFile = {
     SceneConfig: {
-      icon: env.VOLC_SCENE_ICON,
-      name: env.VOLC_SCENE_NAME,
-      id: 'emq-mcp-ai-companion',
-      botName: env.VOLC_AGENT_USER_ID,
-      isInterruptMode: env.VOLC_INTERRUPT_MODE === 0,
-      isVision: env.VOLC_LLM_VISION_ENABLE,
+      icon: runtimeConfig.scene.icon,
+      name: runtimeConfig.scene.name,
+      id: runtimeConfig.scene.defaultSceneId,
+      botName: runtimeConfig.agent.userId,
+      isInterruptMode: runtimeConfig.interrupts.mode === 0,
+      isVision: Boolean(runtimeConfig.llmConfig.VisionEnable),
       isScreenMode: false,
-      isAvatarScene: env.VOLC_AVATAR_ENABLED,
-      avatarBgUrl: env.VOLC_AVATAR_BACKGROUND_URL,
+      isAvatarScene: runtimeConfig.avatar?.enabled,
+      avatarBgUrl: runtimeConfig.avatar?.backgroundUrl,
     },
     AccountConfig: {
       accessKeyId: env.VOLC_ACCESS_KEY_ID,
@@ -245,32 +231,32 @@ const createSceneFromEnv = (env: RuntimeEnv): SceneFile => {
       AppKey: env.VOLC_RTC_APP_KEY,
       RoomId: roomId,
       UserId: userId,
-      Token: '', // Will be generated by buildToken
+      Token: '',
     },
     VoiceChat: {
       AppId: env.VOLC_RTC_APP_ID,
       RoomId: roomId,
-      TaskId: env.VOLC_TASK_ID,
+      TaskId: runtimeConfig.scene.taskId,
       AgentConfig: agentConfig,
       Config: {
         ASRConfig: asrConfig,
         TTSConfig: ttsConfig,
         LLMConfig: llmConfig,
         AvatarConfig: {
-          Enabled: env.VOLC_AVATAR_ENABLED,
-          AvatarType: env.VOLC_AVATAR_TYPE,
-          AvatarRole: env.VOLC_AVATAR_ROLE,
-          BackgroundUrl: env.VOLC_AVATAR_BACKGROUND_URL,
-          VideoBitrate: env.VOLC_AVATAR_VIDEO_BITRATE,
+          Enabled: runtimeConfig.avatar?.enabled,
+          AvatarType: runtimeConfig.avatar?.type,
+          AvatarRole: runtimeConfig.avatar?.role,
+          BackgroundUrl: runtimeConfig.avatar?.backgroundUrl,
+          VideoBitrate: runtimeConfig.avatar?.videoBitrate,
           AvatarAppID: '',
           AvatarToken: '',
         },
-        InterruptMode: env.VOLC_INTERRUPT_MODE,
+        InterruptMode: runtimeConfig.interrupts.mode,
       },
     },
   }
 
-  return scene
+  return sceneFile
 }
 
 /**
@@ -331,7 +317,7 @@ export const loadScenes = (env: RuntimeEnv) => {
   // Generate RTC token
   buildToken(scene.RTCConfig, env.VOLC_RTC_APP_KEY)
 
-  scenes.set('emq-mcp-ai-companion', scene)
+  scenes.set(runtimeConfig.scene.defaultSceneId, scene)
 
   return scenes
 }
