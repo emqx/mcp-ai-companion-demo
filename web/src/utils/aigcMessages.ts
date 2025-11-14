@@ -39,8 +39,26 @@ export interface BriefMessage {
   ErrorInfo?: Record<string, unknown>
 }
 
+export interface FunctionCallFunction {
+  name?: string
+  arguments?: unknown
+}
+
+export interface FunctionCallEntry {
+  id?: string
+  type?: string
+  function?: FunctionCallFunction
+  name?: string
+  arguments?: unknown
+  params?: unknown
+  payload?: unknown
+}
+
 export interface FunctionCallMessage {
-  tool_calls?: Array<{ id?: string; function?: { name?: string } }>
+  tool_calls?: FunctionCallEntry[]
+  calls?: FunctionCallEntry[]
+  tools?: FunctionCallEntry[]
+  actions?: FunctionCallEntry[]
 }
 
 export type ParsedAigcMessage =
