@@ -4,6 +4,7 @@ import { mcpLogger, mqttLogger } from '@/utils/logger'
 import { McpTools, createToolContext } from '@/tools'
 import { defaultMqttConfig } from '@/config/mqtt'
 import { generateRandomId } from '@/utils/id-generator'
+import { MCP_SERVER_NAME } from '@/constants/mcp'
 
 export class McpMqttServer {
   private mqttClient: BaseMqttClient | null = null
@@ -41,7 +42,7 @@ export class McpMqttServer {
     const clientId = `mcp-ai-web-ui-${randomId}`
 
     this.serverId = clientId
-    this.serverName = `${serverName || 'web-ui-hardware-controller'}/${randomId}`
+    this.serverName = `${serverName || MCP_SERVER_NAME}/${randomId}`
     this.callbacks = callbacks || {}
 
     this.connectionOptions = {
