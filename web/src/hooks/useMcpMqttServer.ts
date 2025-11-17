@@ -11,6 +11,7 @@ import { mcpServerConfig } from '@/config/mqtt'
 import { mcpLogger } from '@/utils/logger'
 import { McpTools, createToolContext } from '@/tools'
 import { generateRandomId } from '@/utils/id-generator'
+import { MCP_SERVER_NAME } from '@/constants/mcp'
 import type { MqttClient } from 'mqtt'
 
 export interface UseMqttOptions {
@@ -50,8 +51,9 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
 
   useEffect(() => {
     const randomId = generateRandomId(8)
+    const baseServerName = serverName || MCP_SERVER_NAME
     const serverId = `mcp-ai-web-ui-${randomId}`
-    const fullServerName = `${serverName || 'web-ui-hardware-controller'}/${randomId}`
+    const fullServerName = `${baseServerName}/${randomId}`
 
     const brokerUrl = mqttOptions.brokerUrl || mcpServerConfig.brokerUrl
 
@@ -121,7 +123,7 @@ export function useMcpMqttServer(options: UseMqttOptions = {}): UseMqttServerRet
       })
     })
 
-    mcpLogger.info(`📋 Registered ${tools.length} tools`)
+    mcpLogger.info(`📋 Initialized ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`)
 
     const serverWithCompat = Object.assign(server, {
       getClientId: () => serverId,

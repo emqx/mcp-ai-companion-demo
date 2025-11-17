@@ -1,4 +1,5 @@
 import { buildMqttWebSocketUrl } from '@/utils/host'
+import { MCP_SERVER_NAME } from '@/constants/mcp'
 
 export interface MqttBrokerConfig {
   brokerUrl: string
@@ -61,7 +62,7 @@ export const defaultMqttConfig: MqttBrokerConfig = {
 // MCP Server configuration
 export const mcpServerConfig: McpMqttConfig = {
   ...defaultMqttConfig,
-  serverName: 'web-ui-hardware-controller',
+  serverName: MCP_SERVER_NAME,
 }
 
 // WebRTC client configuration
