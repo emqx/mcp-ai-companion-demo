@@ -102,8 +102,8 @@ class ConversationWorkflow:
         enable_round_id = custom_options.enable_round_id if custom_options else self.llm_settings.enable_round_id
         custom_payload = custom_options.custom_payload if custom_options else {}
 
-        voice_api_key = self.llm_settings.api_key or os.getenv("LLM_API_KEY") or os.getenv("DASHSCOPE_API_KEY")
-        voice_api_base = self.llm_settings.api_base or os.getenv("LLM_API_BASE")
+        llm_api_key = self.llm_settings.api_key
+        llm_api_base = self.llm_settings.api_base
 
         self.voice_agent = VoiceAgent(
             temperature=self.llm_settings.temperature,
@@ -117,17 +117,17 @@ class ConversationWorkflow:
             custom_payload=custom_payload,
             device_id=device_id,
             model=self.llm_settings.model,
-            api_key=voice_api_key,
-            api_base=voice_api_base,
+            api_key=llm_api_key,
+            api_base=llm_api_base,
         )
 
         self.emotion_agent = EmotionAgent(
             system_prompt_file=tool_prompt_file,
             temperature=0.0,
             max_tokens=1000,
-            api_key=os.getenv("EMOTION_LLM_API_KEY") or os.getenv("DASHSCOPE_API_KEY"),
-            api_base=os.getenv("EMOTION_LLM_API_BASE") or os.getenv("LLM_API_BASE"),
-            model=os.getenv("EMOTION_LLM_MODEL") or os.getenv("LLM_MODEL"),
+            api_key=llm_api_key,
+            api_base=llm_api_base,
+            model=self.llm_settings.model,
         )
 
         self.mcp_client: Optional[McpMqttClient] = None
