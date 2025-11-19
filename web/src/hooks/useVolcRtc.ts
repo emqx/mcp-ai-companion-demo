@@ -4,7 +4,13 @@ import type { UseWebRTCReturn, ConnectionState } from '@/types/webrtc'
 import type { UseWebRTCMqttOptions } from '@/hooks/useWebRTCMqtt'
 import { fetchScenes, startVoiceChat, stopVoiceChat } from '@/api/aigc'
 import type { SceneSummary } from '@/types/aigc'
-import { parseAigcBinaryMessage, MESSAGE_TYPE, AGENT_BRIEF_CODE, type FunctionCallMessage, type FunctionCallEntry } from '@/utils/aigcMessages'
+import {
+  parseAigcBinaryMessage,
+  MESSAGE_TYPE,
+  AGENT_BRIEF_CODE,
+  type FunctionCallMessage,
+  type FunctionCallEntry,
+} from '@/utils/aigcMessages'
 import { MediaType } from '@volcengine/rtc'
 import { McpTools, createToolContext } from '@/tools'
 import type { ToolHandlerContext } from '@/tools/types'
@@ -12,8 +18,7 @@ import type { ToolHandlerContext } from '@/tools/types'
 /**
  * Hook options map directly to Volc StartVoiceChat metadata and UI callbacks.
  */
-export interface UseVolcRtcOptions
-  extends Pick<UseWebRTCMqttOptions, 'onASRResponse' | 'onTTSText' | 'onMessage'> {
+export interface UseVolcRtcOptions extends Pick<UseWebRTCMqttOptions, 'onASRResponse' | 'onTTSText' | 'onMessage'> {
   sceneId?: string
   deviceId?: string
   toolCallbacks?: ToolHandlerContext | null
@@ -106,7 +111,7 @@ export function useVolcRtc({
   }, [toolCallbacks])
 
   useEffect(() => {
-    rtcClient.setAiAnsMode(AnsMode.HIGH)
+    rtcClient.setAiAnsMode(AnsMode.MEDIUM)
     rtcClient.setAiAnsEnabled(true)
 
     return () => {
@@ -117,18 +122,15 @@ export function useVolcRtc({
     }
   }, [])
 
-  const updateRemoteStream = useCallback(
-    (userId?: string) => {
-      const targetUser = userId ?? remoteUserIdRef.current
-      if (!targetUser) return
+  const updateRemoteStream = useCallback((userId?: string) => {
+    const targetUser = userId ?? remoteUserIdRef.current
+    if (!targetUser) return
 
-      const stream = rtcClient.getRemoteMediaStream(targetUser)
-      if (stream && stream.getTracks().length > 0) {
-        setRemoteStream(stream)
-      }
-    },
-    [],
-  )
+    const stream = rtcClient.getRemoteMediaStream(targetUser)
+    if (stream && stream.getTracks().length > 0) {
+      setRemoteStream(stream)
+    }
+  }, [])
 
   /**
    * Lazily load the Volc scene configuration and cache it for reuse.
@@ -265,8 +267,7 @@ export function useVolcRtc({
         return
       }
       entries.forEach((entry) => {
-        const toolName =
-          entry?.function?.name ?? (typeof entry?.name === 'string' ? entry.name : undefined)
+        const toolName = entry?.function?.name ?? (typeof entry?.name === 'string' ? entry.name : undefined)
         if (!toolName) {
           return
         }
@@ -279,7 +280,8 @@ export function useVolcRtc({
     [executeToolCall],
   )
 
-  const handleBinaryMessage = useCallback((buffer: ArrayBuffer) => {
+  const handleBinaryMessage = useCallback(
+    (buffer: ArrayBuffer) => {
       const parsed = parseAigcBinaryMessage(buffer)
       if (!parsed) return
 
@@ -315,9 +317,7 @@ export function useVolcRtc({
             playInterruptTone()
           }
           const hasError =
-            stage?.Description === 'errorOccurred' ||
-            stage?.Code === AGENT_BRIEF_CODE.UNKNOWN ||
-            Boolean(errorInfo)
+            stage?.Description === 'errorOccurred' || stage?.Code === AGENT_BRIEF_CODE.UNKNOWN || Boolean(errorInfo)
           if (hasError) {
             const reason =
               (typeof errorInfo?.Reason === 'string' && errorInfo.Reason) ||

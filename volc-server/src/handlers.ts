@@ -98,7 +98,11 @@ const buildStartVoiceChatPayload = (scene: SceneFile, payload?: ProxyPayload) =>
     }
   }
 
-  serverLogger.info('Starting voice chat', { AppId: voiceChat.AppId, RoomId: voiceChat.RoomId, TaskId: voiceChat.TaskId })
+  serverLogger.info('Starting voice chat', {
+    AppId: voiceChat.AppId,
+    RoomId: voiceChat.RoomId,
+    TaskId: voiceChat.TaskId,
+  })
   return voiceChat
 }
 
