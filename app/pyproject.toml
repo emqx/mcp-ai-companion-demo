@@ -17,6 +17,7 @@ dependencies = [
     "requests>=2.32.4",
     "websockets>=15.0.1",
     "python-multipart>=0.0.9",
+    "uvicorn>=0.35.0",
 ]
 
 [[tool.uv.index]]

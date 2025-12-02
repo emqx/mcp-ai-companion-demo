@@ -107,13 +107,17 @@ bun run format   # Format code
 
 ### Docker Deployment
 
-```bash
-# Full stack (EMQX + app + web + volc-server)
-docker compose -f docker/docker-compose.yml up -d
+Compose files:
+- `docker/docker-compose.legacy.yml` — legacy self-hosted media stack (Postgres + media server + EMQX, non-VolcEngine RTC).
+- `docker/docker-compose.web-volc.yml` — Volc proxy + Web UI + app (recommended for local).
 
-# Volc server + Web UI only (for local development)
-docker compose up --build
-# Access web UI at http://localhost:8080, proxy at http://localhost:3002
+```bash
+# Legacy self-hosted media stack
+docker compose -f docker/docker-compose.legacy.yml up -d
+
+# Volc proxy + Web UI + app (local development)
+docker compose -f docker/docker-compose.web-volc.yml up --build
+# Access web UI at http://localhost:8080, app at http://localhost:8081, proxy at http://localhost:3002
 
 # Build individual images
 docker build -t volc-server:local ./volc-server

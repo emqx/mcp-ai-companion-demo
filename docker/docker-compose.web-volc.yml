@@ -1,0 +1,56 @@
+name: mqtt-mcp-ai-companion-demo
+
+services:
+  app: # AI Agent layer (Python SSE server)
+    image: app-ai-agent
+    build:
+      context: ../app
+    container_name: mcp-app
+    env_file:
+      - ../app/.env
+    environment:
+      PYTHONUNBUFFERED: "1"
+      APP_PORT: "8081"
+      # Default is HTTP; for production set APP_SSL_CERTFILE / APP_SSL_KEYFILE and mount certs below.
+      # Optional TLS: override via env or app/.env
+      APP_SSL_CERTFILE: ${APP_SSL_CERTFILE:-}
+      APP_SSL_KEYFILE: ${APP_SSL_KEYFILE:-}
+    labels:
+      app: ai-agent
+      project: mcp-ai-companion
+    ports:
+      - "8081:8081"
+    # Uncomment and point to your certs for HTTPS (paths are relative to this file)
+    # volumes:
+    #   - ../certs:/certs:ro
+
+  volc-server: # Volc proxy (WebRTC/voice bridge)
+    image: volc-server
+    build:
+      context: ../volc-server
+    container_name: mcp-volc-server
+    env_file:
+      - ../volc-server/.env
+    environment:
+      NODE_ENV: production
+    labels:
+      app: volc-server
+      project: mcp-ai-companion
+    ports:
+      - "3002:3002"
+
+  web: # Web UI (MCP server over MQTT, Chat Interface)
+    image: web
+    build:
+      context: ../web
+      args:
+        # Point to the Volc proxy server (default localhost:3002)
+        VITE_AIGC_PROXY_HOST: ${VITE_AIGC_PROXY_HOST:-http://localhost:3002}
+    depends_on:
+      - volc-server
+    container_name: mcp-web
+    labels:
+      app: web-ui
+      project: mcp-ai-companion
+    ports:
+      - "8080:80"

@@ -5,23 +5,33 @@ This guide covers building and running the demo entirely with Docker. You only n
 ## 1. Prerequisites
 
 1. Docker 24+ or Podman 4.6+ with Compose support.
-2. `volc-server/.env` populated with valid Volc credentials (copy from `.env.example` and fill in the required values).
-3. (Optional) override the frontend proxy host by exporting `VITE_AIGC_PROXY_HOST`. The default `http://localhost:3002` matches the local proxy container.
+2. `app/.env` populated with `DASHSCOPE_API_KEY`, `CUSTOM_LLM_API_KEY`, and optional upload settings (AI Agent layer, copy from `.env.example`).
+3. `volc-server/.env` populated with valid Volc credentials (copy from `.env.example`), plus `VOLC_LLM_URL=http://app:8081/chat-stream` and `VOLC_LLM_API_KEY` matching `CUSTOM_LLM_API_KEY`.
+4. (Optional) override the frontend proxy host by exporting `VITE_AIGC_PROXY_HOST`. The default `http://localhost:3002` matches the local proxy container.
+5. The legacy self-hosted RTC/media stack lives in `docker/docker-compose.legacy.yml` (Postgres + media server + EMQX). Use it only if you need that non-VolcEngine pipeline; otherwise prefer `docker/docker-compose.web-volc.yml`.
+6. Optional HTTPS for the app service: mount your certs into the container (e.g., `./certs:/certs:ro`) and set `APP_SSL_CERTFILE` / `APP_SSL_KEYFILE` in the `app` service environment to match the mounted paths.
 
 ## 2. One-Command Local Preview
 
-Build and start both the Volc proxy and the React UI:
+Default (all three services over HTTP): build and start the Volc proxy, the app service, and the React UI:
 
 ```bash
-docker compose up --build
+docker compose -f docker/docker-compose.web-volc.yml up --build
 ```
 
-The compose stack creates two containers:
+The compose stack creates three containers:
 
+- `mcp-app` (AI Agent layer, Python SSE server) listening on `http://localhost:8081`
 - `mcp-volc-server` (Volc proxy) listening on `http://localhost:3002`
 - `mcp-web` (UI) available at `http://localhost:8080`
 
-Use `docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"` to confirm both containers are healthy.
+Quick preview without app (UI + Volc proxy only; LLM calls will fail unless `VOLC_LLM_URL` points elsewhere):
+
+```bash
+docker compose -f docker/docker-compose.web-volc.yml up --build volc-server web
+```
+
+Use `docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"` to confirm containers are healthy.
 
 Stop the stack with:
 
@@ -47,6 +57,14 @@ docker build -t mcp-web:local ./web
 docker run -p 8080:80 --name mcp-web-local mcp-web:local
 ```
 
+### App (Python SSE server)
+
+```bash
+docker build -t mcp-app:local ./app
+docker run --env-file app/.env -p 8081:8081 --name mcp-app-local mcp-app:local \
+  python custom_llm_service.py --host 0.0.0.0 --port 8081
+```
+
 When running the frontend separately, ensure `VITE_AIGC_PROXY_HOST` was set to the correct backend URL during `docker build` (default matches the local proxy).
 
 ## 4. Working Without Bun or Node.js
@@ -54,7 +72,7 @@ When running the frontend separately, ensure `VITE_AIGC_PROXY_HOST` was set to t
 All Bun, pnpm, and Vite steps execute inside the container build stages. You can develop or preview the project on a clean machine by:
 
 1. Editing sources locally as usual.
-2. Running `docker compose up --build` to rebuild images with the latest changes.
+2. Running `docker compose -f docker/docker-compose.web-volc.yml up --build` to rebuild images with the latest changes.
 3. Refreshing the browser at `http://localhost:8080`.
 
 If you need to install new npm dependencies, update `web/package.json`/`pnpm-lock.yaml` locally, then rebuild the image. The Dockerfile runs `pnpm install --frozen-lockfile`, so lockfile changes must be committed before the build.
@@ -62,7 +80,7 @@ If you need to install new npm dependencies, update `web/package.json`/`pnpm-loc
 ## 5. Troubleshooting
 
 - **Missing credentials**: Ensure `volc-server/.env` contains all required Volc keys before building or starting the proxy container.
-- **Port conflicts**: Change the host ports in `docker-compose.yml` (e.g., `3002:3002` → `3003:3002`) and update `VITE_AIGC_PROXY_HOST` accordingly, then rebuild the web container.
+- **Port conflicts**: Change the host ports in `docker/docker-compose.web-volc.yml` (e.g., `3002:3002` → `3003:3002`) and update `VITE_AIGC_PROXY_HOST` accordingly, then rebuild the web container.
 - **Slow rebuilds**: Docker caches dependencies after the first build. Subsequent builds reuse the `bun install` and `pnpm install` layers unless package manifests change.
 
 For more background on the system architecture, see [`README.md`](../README.md).
