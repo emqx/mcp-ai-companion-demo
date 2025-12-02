@@ -23,7 +23,7 @@
 - **灵活扩展**：高度灵活的 Agent 实现，可接入各种第三方模型，支持自定义业务逻辑
 - **私有部署**：支持全球多地就近接入，提升安全性，有效控制成本
 
-## 快速开始
+## 快速开始（火山代理 + Web UI + app）
 
 1. 下载仓库代码
 
@@ -32,39 +32,42 @@ git clone https://github.com/emqx/mcp-ai-companion-demo.git
 cd mcp-ai-companion-demo
 ```
 
-2. 添加 `DASHSCOPE_API_KEY`
+2. 准备环境变量：
+   - 复制 `app/.env.example` 为 `app/.env`（AI Agent 层），填写 `DASHSCOPE_API_KEY`、`CUSTOM_LLM_API_KEY`，以及可选的上传配置。
+   - 复制 `volc-server/.env.example` 为 `volc-server/.env`，填写火山凭据；设置 `VOLC_LLM_URL=http://app:8081/chat-stream`，`VOLC_LLM_API_KEY` 与 `CUSTOM_LLM_API_KEY` 保持一致，便于代理调用 app。
+   - 在 `app/.env` 填写 MQTT Broker（默认 `localhost:1883`，如需变更则改 `MQTT_BROKER_HOST`/`MQTT_BROKER_PORT`，鉴权则填 `MQTT_USERNAME`/`MQTT_PASSWORD`）。
+   - 进阶可选：可在 `app/.env` 调整 MCP 发现/前缀（`MCP_SERVER_NAME_PREFIX`、`MCP_SERVER_DISCOVERY_FILTER`、`MCP_REGISTRY_CLIENT_NAME`，留空则使用默认）。
+   - 如需为 app 启用 HTTPS（生产建议），可将证书挂载到容器（例如 `./certs:/certs:ro`），并在 `app/.env` 或 compose 环境变量中设置 `APP_SSL_CERTFILE` / `APP_SSL_KEYFILE` 为挂载路径；默认本地为 HTTP。
 
-请在 `docker/.env` 中添加您的 `DASHSCOPE_API_KEY`:
-
-```env
-DASHSCOPE_API_KEY=your_dashscope_api_key
-```
-
-3. 启动服务
-
-```shell
-docker compose -f docker/docker-compose.yml up -d
-```
-
-4. 访问前端界面
-
-打开浏览器，访问 `http://localhost:4000/demo`，即可看到 demo 应用的前端界面。
-
-### 本地预览（Volc 代理 + Web UI）
-
-使用 Docker 同时启动 Volc 实时语音代理和 Web 界面：
-
-1. 确保 `volc-server/.env` 已存在（可从 `.env.example` 复制并补齐所需的 Volc 凭据）。
-2. （可选）通过设置环境变量 `VITE_AIGC_PROXY_HOST` 覆盖构建时的 Web 接口地址，默认值为 `http://localhost:3002`，与 compose 的端口映射一致。
-3. 构建并启动服务：
+3. 一键启动火山代理 + Web UI + app：
 
 ```bash
-docker compose up --build
+docker compose -f docker/docker-compose.web-volc.yml up --build
 ```
 
-4. 打开 `http://localhost:8080` 访问 Web 界面。Volc 代理服务监听 `http://localhost:3002`。
+4. 打开 `http://localhost:8080` 访问前端；app 服务运行在 `http://localhost:8081`，火山代理在 `http://localhost:3002`。
 
-Compose 启动后会生成 `mcp-volc-server` 与 `mcp-web` 两个容器名称，方便通过 `docker ps` 区分 Volc 代理。
+当前提供两套 Compose 文件：
+
+- `docker/docker-compose.web-volc.yml` —— 推荐，包含 Volc 代理 + Web UI + app（AI Agent 层）。
+- `docker/docker-compose.legacy.yml` —— 自建 RTC 旧版媒体栈（Postgres + media server + EMQX，非火山方案）。
+
+### 本地预览（Volc 代理 + Web UI + app）
+
+使用 Docker 启动 Volc 实时语音代理、Web 界面和 app：
+
+1. 确保 `app/.env` 已存在（复制 `.env.example`，填写 `DASHSCOPE_API_KEY`、`CUSTOM_LLM_API_KEY` 等）。
+2. 确保 `volc-server/.env` 已存在（复制 `.env.example`，填写火山凭据，并设置 `VOLC_LLM_URL=http://app:8081/chat-stream`，`VOLC_LLM_API_KEY` 与 `CUSTOM_LLM_API_KEY` 一致）。
+3. （可选）设置环境变量 `VITE_AIGC_PROXY_HOST` 覆盖 Web 构建时接口地址，默认值 `http://localhost:3002` 与端口映射一致。
+4. 构建并启动服务：
+
+```bash
+docker compose -f docker/docker-compose.web-volc.yml up --build
+```
+
+5. 打开 `http://localhost:8080` 访问 Web 界面。app 服务在 `http://localhost:8081`，Volc 代理在 `http://localhost:3002`。
+
+Compose 启动后会生成 `mcp-app`、`mcp-volc-server`、`mcp-web` 三个容器，方便通过 `docker ps` 区分各服务。
 
 ## 项目结构
 

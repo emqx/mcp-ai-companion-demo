@@ -150,11 +150,18 @@ class McpMqttClient:
                 self.server_name_filter,
             )
             result = await self._mqtt_client.start(timeout=timedelta(seconds=3))
-            if result is False or (isinstance(result, tuple) and result[0] == "error"):
-                logger.error("Failed to connect MCP MQTT transport: %s", result)
-            else:
-                logger.info("MQTT broker connection established")
-            return result
+            connected = False
+            mqtt_client = getattr(self._mqtt_client, "client", None)
+            if mqtt_client and hasattr(mqtt_client, "is_connected"):
+                try:
+                    connected = bool(mqtt_client.is_connected())
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.debug("MQTT is_connected check failed: %s", exc)
+            if result is False or (isinstance(result, tuple) and result and result[0] == "error") or not connected:
+                logger.error("Failed to connect MCP MQTT transport: %s (connected=%s)", result, connected)
+                return False
+            logger.info("MQTT broker connection established")
+            return True
         else:
             return False
 
@@ -507,8 +514,8 @@ class McpServerRegistry:
             self._tg_entered = True
             self._tg.start_soon(self.client.start)
             result = await self.client.connect()
-            if result is False:
-                raise RuntimeError("Failed to connect to MCP MQTT transport")
+            if result is False or (isinstance(result, tuple) and result and result[0] == "error"):
+                raise RuntimeError(f"Failed to connect to MCP MQTT transport: {result}")
             logger.info("MCP server registry connected to MQTT broker %s:%s", self.mqtt_options.host, self.mqtt_options.port)
             self._started = True
 

@@ -1,4 +1,6 @@
-########
+# Legacy self-hosted media stack (non-VolcEngine RTC): Postgres + media server + EMQX
+name: mcp-ai-companion-legacy
+
 services:
   postgres:
     image: postgres:17.6-alpine3.22

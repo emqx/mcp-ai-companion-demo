@@ -25,48 +25,51 @@ This project implements a fully functional intelligent agent that enables users 
 - **Flexible Expansion**: Highly flexible Agent implementation, supports integration with various third-party models and custom business logic
 - **Private Deployment**: Supports global access with local proximity, enhancing security and effectively controlling costs
 
-## Quick Start
+## Quick Start (Volc proxy + Web UI + app)
 
-1. Download the repository code
+1. Clone the repo:
 
 ```shell
 git clone https://github.com/emqx/mcp-ai-companion-demo.git
 cd mcp-ai-companion-demo
 ```
 
-2. Add `DASHSCOPE_API_KEY`
+2. Prepare env files:
+   - `cp app/.env.example app/.env` (AI Agent layer) and fill `DASHSCOPE_API_KEY`, `CUSTOM_LLM_API_KEY`, and optional upload settings.
+   - `cp volc-server/.env.example volc-server/.env` and fill Volc credentials. Set `VOLC_LLM_URL=http://app:8081/chat-stream` and `VOLC_LLM_API_KEY` to match `CUSTOM_LLM_API_KEY` so the proxy can call the app.
+   - Set MQTT broker for the app: defaults are `localhost:1883`; override `MQTT_BROKER_HOST`/`MQTT_BROKER_PORT` and optional `MQTT_USERNAME`/`MQTT_PASSWORD` in `app/.env` if needed.
+   - Advanced (optional): adjust MCP discovery/prefix via `MCP_SERVER_NAME_PREFIX`, `MCP_SERVER_DISCOVERY_FILTER`, `MCP_REGISTRY_CLIENT_NAME` in `app/.env` (blank = defaults).
+   - Optional HTTPS for app (recommended in production): mount certs into the app container (e.g., `./certs:/certs:ro`) and set `APP_SSL_CERTFILE`/`APP_SSL_KEYFILE` (in `app/.env` or via compose env) to the mounted paths. Defaults to HTTP for local runs.
 
-Please add your `DASHSCOPE_API_KEY` in `docker/.env`:
-
-```env
-DASHSCOPE_API_KEY=your_dashscope_api_key
-```
-
-3. Start the services
-
-```shell
-docker compose -f docker/docker-compose.yml up -d
-```
-
-4. Access the frontend interface
-
-Open your browser and visit `http://localhost:4000/demo` to see the demo app's frontend interface.
-
-### Local Preview (Volc proxy + Web UI)
-
-Bring up the Volc real-time voice proxy together with the web interface via Docker:
-
-1. Ensure `volc-server/.env` exists (copy from `.env.example` and fill in the required Volc credentials).
-2. (Optional) export `VITE_AIGC_PROXY_HOST` to override the web build-time API endpoint. It defaults to `http://localhost:3002`, which matches the compose port mapping.
-3. Build and start both services:
+3. Start Volc proxy + Web UI + app:
 
 ```bash
-docker compose up --build
+docker compose -f docker/docker-compose.web-volc.yml up --build
 ```
 
-4. Open `http://localhost:8080` for the web UI. The Volc proxy is available at `http://localhost:3002`.
+4. Open `http://localhost:8080` for the web UI. The app listens on `http://localhost:8081`, Volc proxy on `http://localhost:3002`.
 
-The compose stack exposes containers named `mcp-volc-server` and `mcp-web`, making it easy to identify the Volc proxy in `docker ps`.
+Compose files:
+
+- `docker/docker-compose.web-volc.yml` — Volc proxy + Web UI + app (AI Agent layer, recommended).
+- `docker/docker-compose.legacy.yml` — legacy self-hosted media stack (Postgres + media server + EMQX, non-VolcEngine RTC).
+
+### Local Preview (Volc proxy + Web UI + app)
+
+Bring up the Volc real-time voice proxy together with the web interface and app via Docker:
+
+1. Ensure `app/.env` exists (copy from `.env.example` and fill `DASHSCOPE_API_KEY`, `CUSTOM_LLM_API_KEY`, etc.).
+2. Ensure `volc-server/.env` exists (copy from `.env.example`, fill Volc credentials, set `VOLC_LLM_URL=http://app:8081/chat-stream`, `VOLC_LLM_API_KEY` to match `CUSTOM_LLM_API_KEY`).
+3. (Optional) export `VITE_AIGC_PROXY_HOST` to override the web build-time API endpoint. It defaults to `http://localhost:3002`, which matches the compose port mapping.
+4. Build and start all services:
+
+```bash
+docker compose -f docker/docker-compose.web-volc.yml up --build
+```
+
+5. Open `http://localhost:8080` for the web UI. The app is at `http://localhost:8081`, Volc proxy at `http://localhost:3002`.
+
+The compose stack exposes containers named `mcp-app`, `mcp-volc-server`, and `mcp-web`, making it easy to identify services in `docker ps`.
 
 Need more detail (including per-image builds or running without local Bun/Node.js)? See [docs/docker-build.md](docs/docker-build.md).
 

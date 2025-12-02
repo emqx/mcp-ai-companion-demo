@@ -55,7 +55,7 @@ export const runtimeConfig: RuntimeConfig = {
     SpeechRatio: 0.8,
     PitchRate: 0,
     SpeechRate: 0.4,
-    Emotion: 'happy',
+    // Emotion: 'happy',
     EmotionIntensity: 0.8,
     IgnoreBracketText: [],
     DisableMarkdownFilter: false,
@@ -76,7 +76,7 @@ export const runtimeConfig: RuntimeConfig = {
       { Role: 'assistant', Content: '嗨～我是 EMQ，很高兴见到你！' },
       { Role: 'user', Content: '你好' },
     ],
-    StreamOptions: { include_usage: true },
+    // StreamOptions: { include_usage: true },
     ExtraHeaders: undefined,
   },
   api: {
