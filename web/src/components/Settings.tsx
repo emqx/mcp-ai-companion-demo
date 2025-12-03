@@ -61,7 +61,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
       reconnectPeriod: 1000,
     },
   )
-  const [tempLanguage, setTempLanguage] = useState<string>(getEffectiveLanguage())
+  const [tempLanguage, setTempLanguage] = useState<string>(() => getEffectiveLanguage())
   // const [currentVoice] = useState<string>('longhua_v2')
   // const [tempVoice, setTempVoice] = useState<string>('longhua_v2')
   const [iceServersConfig, setIceServersConfig] = useState<IceServersConfig>(() => {
@@ -77,10 +77,6 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
       setTempConfig(config)
     }
   }, [config])
-
-  useEffect(() => {
-    setTempLanguage(getEffectiveLanguage())
-  }, [getEffectiveLanguage])
 
   // useEffect(() => {
   //   const fetchCurrentVoice = async () => {
@@ -174,7 +170,9 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
   }
 
   const handleOpenChange = (open: boolean) => {
-    if (!open) {
+    if (open) {
+      setTempLanguage(getEffectiveLanguage())
+    } else {
       // Reset temp values when closing without saving
       setTempLanguage(getEffectiveLanguage())
       // setTempVoice(currentVoice)
