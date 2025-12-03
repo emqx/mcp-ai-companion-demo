@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Settings as SettingsIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -38,6 +38,20 @@ const languages = [
 
 export function Settings({ config, onConfigChange, className }: SettingsProps) {
   const { t, i18n } = useTranslation()
+  const getEffectiveLanguage = useCallback(() => {
+    const candidates = [
+      i18n.language,
+      i18n.resolvedLanguage,
+      typeof navigator !== 'undefined' ? navigator.language : undefined,
+    ].filter(Boolean) as string[]
+
+    for (const lang of candidates) {
+      const base = lang.toLowerCase().split('-')[0]
+      if (base === 'zh') return 'zh'
+      if (base === 'en') return 'en'
+    }
+    return 'en'
+  }, [i18n.language, i18n.resolvedLanguage])
   const [tempConfig, setTempConfig] = useState<MqttConfig>(
     config || {
       brokerUrl: '',
@@ -47,7 +61,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
       reconnectPeriod: 1000,
     },
   )
-  const [tempLanguage, setTempLanguage] = useState<string>(i18n.language)
+  const [tempLanguage, setTempLanguage] = useState<string>(getEffectiveLanguage())
   // const [currentVoice] = useState<string>('longhua_v2')
   // const [tempVoice, setTempVoice] = useState<string>('longhua_v2')
   const [iceServersConfig, setIceServersConfig] = useState<IceServersConfig>(() => {
@@ -65,8 +79,8 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
   }, [config])
 
   useEffect(() => {
-    setTempLanguage(i18n.language)
-  }, [i18n.language])
+    setTempLanguage(getEffectiveLanguage())
+  }, [getEffectiveLanguage])
 
   // useEffect(() => {
   //   const fetchCurrentVoice = async () => {
@@ -123,7 +137,6 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
     toast.success(t('settings.configSaved'))
     setIsOpen(false)
     setShowSaveDialog(false)
-    // 延迟刷新让用户看到提示
     setTimeout(() => {
       window.location.reload()
     }, 1000)
@@ -163,7 +176,7 @@ export function Settings({ config, onConfigChange, className }: SettingsProps) {
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       // Reset temp values when closing without saving
-      setTempLanguage(i18n.language)
+      setTempLanguage(getEffectiveLanguage())
       // setTempVoice(currentVoice)
     }
     setIsOpen(open)
