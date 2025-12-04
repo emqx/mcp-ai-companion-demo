@@ -184,7 +184,7 @@ This project uses **CustomLLM mode**, where VolcEngine callbacks to the app's cu
 **Important**: To fully experience the MCP over MQTT functionality of this project, the app service's `/chat-stream` endpoint **must be deployed to a publicly accessible HTTPS environment** for VolcEngine service callbacks.
 
 - **Production Deployment** (Recommended): Deploy app to public HTTPS address (e.g., `https://your-domain.com/chat-stream`), ensure SSE responses end correctly with `data: [DONE]`
-- **Local Testing**: Non-public environments can only test LLM inference and MQTT over MCP tool calls via API, cannot fully experience VolcEngine voice interaction.
+- **Local Testing**: Non-public environments can only test LLM inference and MCP over MQTT tool calls via API, cannot fully experience VolcEngine voice interaction.
 
 ## Quick Tutorial: 10-Minute Voice Interaction + Device Control Demo
 
@@ -233,7 +233,7 @@ CUSTOM_LLM_API_KEY=your-strong-random-secret-key-here
 
 # ===== MQTT Broker Configuration =====
 # Source: Prerequisite "2. MQTT Broker"
-# Purpose: Connect to EMQX Broker for MQTT over MCP protocol communication
+# Purpose: Connect to EMQX Broker for MCP over MQTT protocol communication
 MQTT_BROKER_HOST=localhost        # EMQX Broker address
 MQTT_BROKER_PORT=1883             # MQTT port
 
