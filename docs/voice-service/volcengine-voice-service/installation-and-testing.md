@@ -6,7 +6,7 @@
 
 ## 前置准备
 
-开始集成前，请确保已完成火山引擎服务开通和凭证配置。详细步骤参考 [快速开始 - 火山引擎配置](../quickstart.md#火山引擎配置)。
+开始集成前，请确保已完成火山引擎服务开通和凭证配置。详细步骤参考[快速开始 - 火山引擎凭证](../../quickstart-emq-volc.md#4-火山引擎凭证)。
 
 需要准备的凭证：
 
@@ -246,6 +246,8 @@ if (supported) {
 订阅远端流后，可获取 MediaStream 用于播放：
 
 ```typescript
+import { StreamIndex } from '@volcengine/rtc'
+
 // 获取远端用户的音频轨道
 const audioTrack = engine.getRemoteStreamTrack(userId, StreamIndex.STREAM_INDEX_MAIN, 'audio')
 
