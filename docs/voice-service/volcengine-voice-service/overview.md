@@ -76,7 +76,7 @@ EMQX MCP AI 语音助手使用 CustomLLM 模式，以便实现 MCP 工具调用�
 | **实时字幕** | 实时返回 ASR 识别结果和 LLM 回复文本 |
 | **上下文管理** | 支持短期记忆和长期记忆（接入向量数据库） |
 
-详细功能说明参见 [火山引擎实时对话式 AI 文档](https://www.volcengine.com/docs/6348/1315560)。
+详细功能说明参见 [火山引擎实时对话式 AI 文档](https://www.volcengine.com/docs/6348/1310537)。
 
 ---
 
@@ -96,7 +96,4 @@ EMQX MCP AI 语音助手使用 CustomLLM 模式，以便实现 MCP 工具调用�
 
 ## 相关资源
 
-- [火山引擎实时对话式 AI 文档](https://www.volcengine.com/docs/6348/1315560)
-- [火山引擎 RTC 文档](https://www.volcengine.com/docs/6348)
-- [火山引擎 ASR/TTS 文档](https://www.volcengine.com/docs/6561)
-- [接入第三方大模型或 Agent](https://www.volcengine.com/docs/6348/1399966)
+- [火山引擎实时对话式 AI 文档](https://www.volcengine.com/docs/6348/1310537)

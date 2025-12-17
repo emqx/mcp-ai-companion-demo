@@ -319,14 +319,39 @@ AI 回复会通过远端音频流播放。确保：
 
 ### 常见问题
 
+#### 连接与认证
+
 | 问题 | 可能原因 | 解决方案 |
 |------|----------|----------|
-| Token 无效 | Token 过期或参数不匹配 | 检查 AppId、RoomId、UserId 是否与 Token 生成时一致 |
+| Token 无效 (`token_error`) | Token 过期或参数不匹配 | 检查生成 Token 时的 UserId、RoomId 是否与使用时一致，或重新生成 Token |
 | 无法加入房间 | 网络问题或 AppId 错误 | 检查网络连接，确认 AppId 正确 |
-| ASR 无识别结果 | 麦克风未授权或 ASR 服务未开通 | 检查浏览器麦克风权限，确认 ASR 服务已开通 |
-| TTS 无声音 | 未订阅远端音频 | 确保调用了 `subscribeStream` 订阅远端音频流 |
-| StartVoiceChat 失败 | 签名错误或参数缺失 | 检查服务端 API 签名，确认必需参数已填写 |
+| `Invalid 'Authorization' header` | AK/SK 配置错误 | 检查服务端的 AccessKeyId 和 SecretKey 是否正确 |
 | 跨服务调用失败 | 未配置跨服务授权 | 在 RTC 控制台完成跨服务授权配置 |
+
+#### 智能体启动
+
+| 问题 | 可能原因 | 解决方案 |
+|------|----------|----------|
+| StartVoiceChat 失败 | 签名错误或参数缺失 | 检查服务端 API 签名，确认必需参数已填写 |
+| `The task has been started` 报错 | RoomId/UserId 固定时重复调用 | 先调用 StopVoiceChat，再重新调用 StartVoiceChat |
+| 一直停留在 "AI 准备中" | 权限未授予 / 参数错误 / 服务欠费 | 1. 检查控制台权限配置<br>2. 检查参数大小写、类型<br>3. 确认服务已开通且余额充足 |
+| 数字人一直停留在准备中 | 并发限制或配置错误 | 1. 检查数字人 AppId/Token 是否正确<br>2. 确认未超过并发限制 |
+
+#### 设备与媒体
+
+| 问题 | 可能原因 | 解决方案 |
+|------|----------|----------|
+| 麦克风/摄像头开启失败 | 非安全上下文 | 确保页面使用 `localhost` 或 `https` 协议访问 |
+| 设备权限获取失败 | 浏览器未授权 | 参考 [Web 排查设备权限问题](https://www.volcengine.com/docs/6348/1169947) |
+| ASR 无识别结果 | 麦克风未授权或服务未开通 | 检查浏览器麦克风权限，确认 ASR 服务已开通 |
+| TTS 无声音 | 未订阅远端音频 | 确保调用了 `subscribeStream` 订阅远端音频流 |
+
+#### 模型配置
+
+| 问题 | 解决方案 |
+|------|----------|
+| 如何使用第三方模型 / Coze Bot | 在 LLMConfig 中配置对应的模型参数，Mode 设为 `CustomLLM` 并填写回调地址 |
+| 对话无反馈 | 检查 LLM 配置是否正确，CustomLLM 模式需确保回调服务正常运行 |
 
 ---
 
@@ -334,13 +359,12 @@ AI 回复会通过远端音频流播放。确保：
 
 - [API 文档](./api.md) - 详细接口说明
 - [场景示例](./scenarios/) - 典型应用场景
-- [火山引擎实时对话式 AI 文档](https://www.volcengine.com/docs/6348/1315560) - 官方完整文档
 
 ---
 
 ## 相关资源
 
-- [火山引擎 RTC 快速入门](https://www.volcengine.com/docs/6348/1310553)
+- [火山引擎实时音视频快速入门](https://www.volcengine.com/docs/6348/1310553)
 - [火山引擎 OpenAPI 签名规范](https://www.volcengine.com/docs/6369/67269)
 - [RTC SDK 下载](https://www.volcengine.com/docs/6348/75707)
-- [实时对话式 AI Demo](https://github.com/volcengine/rtc-aigc-demo)
+- [火山引擎官方实时对话式 AI Demo](https://github.com/volcengine/rtc-aigc-demo)

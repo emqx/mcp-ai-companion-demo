@@ -1,315 +1,444 @@
-# Volc-Server API 参考文档
+# API 参考文档
 
-本文档提供 volc-server HTTP API 的完整参考，以及火山引擎服务集成说明。
-
-## 概述
-
-volc-server 是一个**辅助工具**，提供以下功能：
-
-- **Token 生成**: 生成火山引擎 RTC 访问令牌（客户端加入 RTC 房间必需）
-- **场景配置**: 返回预配置的语音场景参数（ASR/TTS/LLM 配置）
-- **API 代理**: 代理调用火山引擎 AIGC API（StartVoiceChat、StopVoiceChat）
-
-**重要说明**: volc-server **不处理**语音数据流。实际的语音交互流程：
-
-1. 客户端 → 火山引擎 RTC（WebRTC 音频流）
-2. 火山引擎 → app 服务（CustomLLM HTTP 回调）
-3. app → 客户端（通过 MQTT 工具调用）
-
-**认证方式**: 内部服务，无需认证（由容器网络或反向代理控制访问）
+本文档介绍火山引擎实时对话式 AI 的核心 API，包括 StartVoiceChat、UpdateVoiceChat、StopVoiceChat 及相关配置参数。
 
 ---
 
-## API 端点
+## StartVoiceChat
 
-### 1. 获取场景列表
+启动语音会话，返回 RTC 连接凭证。
 
-获取所有可用的语音场景配置，包括 RTC 连接凭证。
+**请求地址**：`POST https://rtc.volcengineapi.com?Action=StartVoiceChat&Version=2024-12-01`
 
-**端点**: `POST /getScenes`
+**请求头**：需要使用 AccessKey 进行签名，参考 [认证代理服务](./installation-and-testing.md#认证代理服务)。
 
-**请求示例**:
-
-```bash
-curl -X POST http://localhost:3002/getScenes \
-  -H "Content-Type: application/json"
-```
-
-**请求体**: 空 JSON `{}` 或无请求体
-
-**响应示例**:
-
-```json
-{
-  "ResponseMetadata": {
-    "Action": "getScenes"
-  },
-  "Result": {
-    "scenes": [
-      {
-        "scene": {
-          "id": "emq-mcp-ai-companion",
-          "name": "EMQ 陪伴助手",
-          "icon": "https://example.com/icon.png",
-          "botName": "EMQ",
-          "isInterruptMode": true,
-          "isVision": true,
-          "isScreenMode": false,
-          "isAvatarMode": false
-        },
-        "rtc": {
-          "AppId": "671234567890123456789012",
-          "RoomId": "room-a1b2c3d4-e5f6-4789-abcd-ef0123456789",
-          "UserId": "user-x1y2z3w4-a5b6-4c78-def9-0123456789ab",
-          "Token": "001671234567890123456789012base64encodedtoken..."
-        }
-      }
-    ]
-  }
-}
-```
-
-**响应字段说明**:
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `scene.id` | string | 场景唯一标识符 |
-| `scene.name` | string | 场景显示名称 |
-| `scene.icon` | string | 场景图标 URL |
-| `scene.botName` | string | Bot 显示名称 |
-| `scene.isInterruptMode` | boolean | 是否启用语义打断功能 |
-| `scene.isVision` | boolean | 是否支持视觉理解（VLM） |
-| `scene.isScreenMode` | boolean | 是否支持屏幕共享 |
-| `scene.isAvatarMode` | boolean | 是否支持虚拟形象 |
-| `rtc.AppId` | string | 火山引擎 RTC 应用 ID（24 位字符） |
-| `rtc.RoomId` | string | RTC 房间 ID（UUID 格式） |
-| `rtc.UserId` | string | RTC 用户 ID（UUID 格式） |
-| `rtc.Token` | string | RTC 访问令牌（有效期 24 小时） |
-
-**错误响应**:
-
-```json
-{
-  "ResponseMetadata": {
-    "Action": "getScenes",
-    "Error": {
-      "Code": -1,
-      "Message": "场景加载失败"
-    }
-  }
-}
-```
-
----
-
-### 2. 启动语音会话
-
-初始化一个新的语音交互会话，返回 RTC 连接参数。
-
-**端点**: `POST /proxy?Action=StartVoiceChat`
-
-**请求示例**:
-
-```bash
-curl -X POST "http://localhost:3002/proxy?Action=StartVoiceChat" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "SceneID": "emq-mcp-ai-companion",
-    "LLMCustom": {
-      "device_id": "web-ui-hardware-controller/demo-device"
-    }
-  }'
-```
-
-**请求参数**:
+### 请求参数
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `SceneID` | string | 否 | 场景 ID，默认 `emq-mcp-ai-companion` |
-| `LLMCustom` | object | 否 | 自定义参数，传递给 CustomLLM 服务 |
-| `LLMCustom.device_id` | string | 推荐 | 设备 ID，用于 MCP 工具调用 |
+| `AppId` | string | 是 | RTC 应用 ID |
+| `RoomId` | string | 是 | 房间 ID |
+| `TaskId` | string | 是 | 任务 ID，用于标识会话 |
+| `AgentConfig` | object | 是 | 智能体配置 |
+| `Config` | object | 是 | 会话配置，包含 ASR、TTS、LLM 等参数 |
 
-**LLMCustom.device_id 说明**:
+### AgentConfig
 
-- 格式: `web-ui-hardware-controller/{randomId}`
-- 用途: 关联 MCP Server 名称，用于 MQTT 主题路由
-- 必须与 Web UI 的 MCP Server 名称一致
+智能体配置：
 
-**响应示例**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `TargetUserId` | string[] | 是 | 目标用户 ID 列表 |
+| `UserId` | string | 是 | 智能体用户 ID |
+| `WelcomeMessage` | string | 否 | 欢迎语 |
+| `EnableConversationStateCallback` | boolean | 否 | 启用会话状态回调 |
+| `AnsMode` | number | 否 | 降噪模式（0-3） |
+| `VoicePrint` | object | 否 | 声纹识别配置 |
+
+**VoicePrint 配置**：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `Mode` | number | 声纹识别模式（0: 关闭, 1: 开启） |
+| `IdList` | string[] | 声纹 ID 列表 |
+
+### Config
+
+会话配置，包含以下子配置：
+
+```json
+{
+  "ASRConfig": { ... },
+  "TTSConfig": { ... },
+  "LLMConfig": { ... },
+  "InterruptMode": 0
+}
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `ASRConfig` | object | 语音识别配置 |
+| `TTSConfig` | object | 语音合成配置 |
+| `LLMConfig` | object | 大模型配置 |
+| `InterruptMode` | number | 打断模式（0: 语义打断, 1: 手动打断） |
+
+### 响应
 
 ```json
 {
   "ResponseMetadata": {
-    "Action": "StartVoiceChat",
     "RequestId": "20250104123456789abcdef01234567",
-    "Region": "cn-north-1",
-    "Service": "rtc"
+    "Action": "StartVoiceChat",
+    "Version": "2024-12-01",
+    "Service": "rtc",
+    "Region": "cn-north-1"
   },
   "Result": {
-    "RoomId": "room-uuid-from-volcengine",
-    "UserId": "user-uuid-from-volcengine",
-    "Token": "001671234567890123456789012...",
-    "AppId": "671234567890123456789012"
+    "AppId": "your-app-id",
+    "RoomId": "room-uuid",
+    "UserId": "user-uuid",
+    "Token": "rtc-token..."
   }
 }
 ```
 
-**响应字段说明**:
+| 字段 | 说明 |
+|------|------|
+| `Result.AppId` | RTC 应用 ID |
+| `Result.RoomId` | RTC 房间 ID |
+| `Result.UserId` | RTC 用户 ID |
+| `Result.Token` | RTC 访问令牌（24 小时有效） |
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `ResponseMetadata.RequestId` | string | 请求唯一标识 |
-| `Result.RoomId` | string | RTC 房间 ID |
-| `Result.UserId` | string | RTC 用户 ID |
-| `Result.Token` | string | RTC 访问令牌（24 小时有效） |
-| `Result.AppId` | string | RTC 应用 ID |
-
-**客户端集成流程**:
-
-1. 调用 `StartVoiceChat` 获取 RTC 凭证
-2. 使用 `@volcengine/rtc` SDK 加入房间
-3. 发布本地音频/视频流
-4. 订阅远程流（TTS 语音输出）
-5. 监听二进制消息（字幕、工具调用、状态更新）
-
-**错误响应**:
-
-```json
-{
-  "ResponseMetadata": {
-    "Action": "StartVoiceChat",
-    "Error": {
-      "Code": -1,
-      "Message": "场景不存在或配置错误"
-    }
-  }
-}
-```
+官方文档：[StartVoiceChat](https://www.volcengine.com/docs/6348/1404673)
 
 ---
 
-### 3. 停止语音会话
+## StopVoiceChat
 
-终止当前语音会话，释放资源。
+停止语音会话，释放资源。
 
-**端点**: `POST /proxy?Action=StopVoiceChat`
+**请求地址**：`POST https://rtc.volcengineapi.com?Action=StopVoiceChat&Version=2024-12-01`
 
-**请求示例**:
-
-```bash
-curl -X POST "http://localhost:3002/proxy?Action=StopVoiceChat" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "SceneID": "emq-mcp-ai-companion"
-  }'
-```
-
-**请求参数**:
+### 请求参数
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `SceneID` | string | 否 | 场景 ID，默认 `emq-mcp-ai-companion` |
+| `AppId` | string | 是 | RTC 应用 ID |
+| `RoomId` | string | 是 | 房间 ID |
+| `TaskId` | string | 是 | 任务 ID |
 
-**响应示例**:
+### 响应
 
 ```json
 {
   "ResponseMetadata": {
+    "RequestId": "20250104123456789abcdef01234567",
     "Action": "StopVoiceChat",
-    "RequestId": "20250104123456789abcdef01234567"
+    "Version": "2024-12-01"
   },
   "Result": {}
 }
 ```
 
-**客户端操作**:
-
-1. 调用 `StopVoiceChat` API
-2. 停止发布本地流
-3. 取消订阅远程流
-4. 离开 RTC 房间
-5. 销毁 RTC Engine 实例
+官方文档：[StopVoiceChat](https://www.volcengine.com/docs/6348/1404672)
 
 ---
 
-## 火山引擎 RTC Token
+## UpdateVoiceChat
 
-### Token 结构
+更新进行中的语音会话，支持打断、Function calling、自定义播报等操作。
 
-volc-server 生成的 RTC Token 遵循火山引擎 RTC 规范：
+**请求地址**：`POST https://rtc.volcengineapi.com?Action=UpdateVoiceChat&Version=2024-12-01`
 
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `AppId` | string | 是 | RTC 应用 ID |
+| `RoomId` | string | 是 | 房间 ID |
+| `TaskId` | string | 是 | 任务 ID |
+| `Command` | string | 是 | 操作命令 |
+| `Message` | string | 否 | 播报内容（最长 200 字符） |
+| `InterruptMode` | number | 否 | 播报优先级 |
+
+### Command 命令类型
+
+| Command | 说明 |
+|---------|------|
+| `Interrupt` | 打断当前智能体输出 |
+| `ExternalTextToSpeech` | 自定义文本转语音播报 |
+| `FunctionCallResult` | 返回 Function calling 结果 |
+
+### InterruptMode 优先级
+
+用于 `ExternalTextToSpeech` 命令时指定播报优先级：
+
+| 值 | 说明 |
+|----|------|
+| 1 | 高优先级：终止当前交互，立即播放 |
+| 2 | 中优先级：等待当前交互结束后播放 |
+| 3 | 低优先级：如果正在交互则丢弃 |
+
+### 使用示例
+
+**打断智能体**：
+
+```json
+{
+  "AppId": "your-app-id",
+  "RoomId": "room-uuid",
+  "TaskId": "task-id",
+  "Command": "Interrupt"
+}
 ```
-Token = Version + AppId + Base64(Message + Signature)
+
+**自定义播报**：
+
+```json
+{
+  "AppId": "your-app-id",
+  "RoomId": "room-uuid",
+  "TaskId": "task-id",
+  "Command": "ExternalTextToSpeech",
+  "Message": "您有一条新消息",
+  "InterruptMode": 1
+}
 ```
 
-**组成部分**:
+### 响应
 
-- **Version**: `001` 固定值
-- **AppId**: 24 位应用标识符
-- **Message**: 二进制编码的负载
-- **Signature**: HMAC-SHA256 签名
+```json
+{
+  "ResponseMetadata": {
+    "RequestId": "20250104123456789abcdef01234567",
+    "Action": "UpdateVoiceChat",
+    "Version": "2024-12-01"
+  },
+  "Result": {}
+}
+```
 
-### Token 权限
-
-自动授予的权限：
-
-- `PrivPublishStream` - 发布流权限（包括视频、音频、数据流）
-- `PrivSubscribeStream` - 订阅流权限
-
-### Token 有效期
-
-- **默认有效期**: 24 小时（86400 秒）
-- **计算方式**: `expireAt = issuedAt + 86400`
-- **建议**: Token 过期前重新调用 `getScenes` 或 `StartVoiceChat` 获取新 Token
-
-### 实现参考
-
-Token 生成逻辑位于 `volc-server/src/lib/token.ts`。
+官方文档：[UpdateVoiceChat](https://www.volcengine.com/docs/6348/1404671)
 
 ---
 
-## 火山引擎 CustomLLM 集成
+## ASRConfig
 
-### CustomLLM 模式说明
+语音识别配置：
 
-本 demo 使用火山引擎的 **CustomLLM 模式**：火山引擎 RTC 服务直接回调自定义后端服务（app/custom_llm_service.py）来获取 LLM 响应。
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `Provider` | string | 是 | 服务提供商，固定 `volcano` |
+| `ProviderParams` | object | 是 | 提供商参数 |
+| `VADConfig` | object | 否 | 语音活动检测配置 |
+| `VolumeGain` | number | 否 | 音量增益（0.0-1.0），默认 `0.5` |
+| `TurnDetectionMode` | number | 否 | 轮次检测模式 |
+| `InterruptConfig` | object | 否 | 打断配置 |
 
-**重要**: volc-server 仅用于生成 RTC Token 和配置场景参数，**不在**语音对话的数据流路径上。
+### ProviderParams
 
-**配置要求**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `AppId` | string | ASR 应用 ID |
+| `Mode` | string | 识别模式：`smallmodel`（小模型）、`bigmodel`（大模型） |
+| `Cluster` | string | 服务集群，默认 `volcengine_streaming_common` |
+| `context` | string | 热词上下文（JSON 格式） |
+| `boosting_table_id` | string | 热词表 ID |
+| `correct_table_id` | string | 纠错表 ID |
 
-```bash
-# volc-server/.env（配置回调 URL，告诉火山引擎调用哪个地址）
-VOLC_LLM_URL=http://app:8081/chat-stream  # 指向 app 服务
-VOLC_LLM_API_KEY=your-secret-key           # 认证密钥
+### VADConfig
 
-# app/.env（app 服务验证来自火山引擎的请求）
-CUSTOM_LLM_API_KEY=your-secret-key  # 必须与上面一致
+语音活动检测配置：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `SilenceTime` | number | 静音判定时长（毫秒），默认 `600` |
+| `SpeechTime` | number | 语音判定时长（毫秒） |
+| `PrefixTime` | number | 前缀时长（毫秒） |
+| `SuffixTime` | number | 后缀时长（毫秒） |
+| `Sensitivity` | number | 灵敏度 |
+| `AIVAD` | boolean | 是否启用 AI VAD |
+
+### InterruptConfig
+
+打断配置：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `InterruptSpeechDuration` | number | 打断语音时长（毫秒），默认 `400` |
+| `InterruptKeywords` | string[] | 语义打断关键词列表 |
+
+**示例配置**：
+
+```json
+{
+  "Provider": "volcano",
+  "ProviderParams": {
+    "AppId": "your-asr-app-id",
+    "Mode": "smallmodel",
+    "Cluster": "volcengine_streaming_common"
+  },
+  "VADConfig": {
+    "SilenceTime": 600
+  },
+  "VolumeGain": 0.5,
+  "TurnDetectionMode": 0,
+  "InterruptConfig": {
+    "InterruptSpeechDuration": 400,
+    "InterruptKeywords": ["停", "暂停", "等一下", "stop", "wait"]
+  }
+}
 ```
 
-### CustomLLM 请求流程
+---
 
-```text
-用户语音 → ASR → 火山引擎
-              ↓
-    HTTP POST /chat-stream (SSE)
-              ↓
-  app/custom_llm_service.py
-              ↓
-    SSE 流式响应 (OpenAI 格式)
-              ↓
-    火山引擎 TTS 合成
-              ↓
-    RTC 推送音频到客户端
+## TTSConfig
+
+语音合成配置：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `Provider` | string | 是 | 服务提供商，固定 `volcano` |
+| `ProviderParams` | object | 是 | 提供商参数 |
+| `IgnoreBracketText` | number[] | 否 | 忽略的括号类型 |
+
+### ProviderParams
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `app` | object | 应用配置 |
+| `audio` | object | 音频配置 |
+| `ResourceId` | string | TTS 资源 ID |
+| `Additions` | object | 附加配置 |
+
+**app 配置**：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `appid` | string | TTS 应用 ID |
+| `token` | string | TTS 应用 Token |
+| `cluster` | string | 服务集群，默认 `volcano_tts` |
+
+**audio 配置**：
+
+| 参数 | 类型 | 说明 | 范围 |
+|------|------|------|------|
+| `voice_type` | string | 音色类型 | 见下方音色列表 |
+| `speed_ratio` | number | 语速比例 | 0.5-2.0，默认 `1.0` |
+| `pitch_ratio` | number | 音调比例 | 0.5-2.0，默认 `1.0` |
+| `volume_ratio` | number | 音量比例 | 0.5-2.0，默认 `1.0` |
+| `emotion` | string | 情感类型 | `happy`、`sad`、`angry`、`neutral` |
+| `emotion_strength` | number | 情感强度 | 0.0-1.0，默认 `0.8` |
+
+**常用音色**：
+
+| 音色 ID | 说明 |
+|---------|------|
+| `BV033_streaming` | 女声，温柔 |
+| `BV001_streaming` | 男声，磁性 |
+| `BV700_streaming` | 女声，甜美 |
+| `BV406_streaming` | 男声，沉稳 |
+
+更多音色参考：[火山引擎 TTS 音色列表](https://www.volcengine.com/docs/6561)
+
+**示例配置**：
+
+```json
+{
+  "Provider": "volcano",
+  "ProviderParams": {
+    "app": {
+      "appid": "your-tts-app-id",
+      "token": "your-tts-token",
+      "cluster": "volcano_tts"
+    },
+    "audio": {
+      "voice_type": "BV033_streaming",
+      "speed_ratio": 1.2,
+      "pitch_ratio": 1.1,
+      "volume_ratio": 1.0,
+      "emotion": "happy",
+      "emotion_strength": 0.8
+    },
+    "ResourceId": "your-resource-id"
+  }
+}
 ```
 
-### CustomLLM 请求格式
+---
+
+## LLMConfig
+
+大模型配置：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `Mode` | string | 是 | 模式：`ArkV3`（方舟）或 `CustomLLM`（自定义） |
+| `Url` | string | CustomLLM 必填 | CustomLLM 回调地址 |
+| `APIKey` | string | 否 | API 认证密钥 |
+| `EndPointId` | string | ArkV3 必填 | 方舟模型端点 ID |
+| `ModelName` | string | 否 | 模型名称 |
+| `SystemMessages` | string[] | 否 | 系统提示词列表 |
+| `UserPrompts` | object[] | 否 | 预设对话历史 |
+| `Temperature` | number | 否 | 采样温度（0.0-1.0），默认 `0.5` |
+| `TopP` | number | 否 | 核采样概率（0.0-1.0），默认 `0.9` |
+| `MaxTokens` | number | 否 | 最大生成 token 数，默认 `256` |
+| `HistoryLength` | number | 否 | 保留的历史轮数，默认 `15` |
+| `EnableRoundId` | boolean | 否 | 启用轮次 ID |
+| `VisionConfig` | object | 否 | 视觉理解配置 |
+| `Custom` | string | 否 | 自定义参数（JSON 字符串），透传给 CustomLLM |
+
+### VisionConfig
+
+视觉理解配置：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `Enable` | boolean | 是否启用视觉理解 |
+| `SnapshotConfig` | object | 截图配置 |
+
+### UserPrompts
+
+预设对话历史，用于引导对话风格：
+
+```json
+[
+  { "Role": "assistant", "Content": "你好！有什么可以帮助你的？" },
+  { "Role": "user", "Content": "你好" }
+]
+```
+
+**CustomLLM 模式示例**：
+
+```json
+{
+  "Mode": "CustomLLM",
+  "Url": "https://your-server.com/chat-stream",
+  "APIKey": "your-api-key",
+  "ModelName": "qwen-flash",
+  "Temperature": 0.5,
+  "TopP": 0.9,
+  "MaxTokens": 256,
+  "HistoryLength": 15,
+  "EnableRoundId": true,
+  "VisionConfig": {
+    "Enable": false
+  },
+  "UserPrompts": [
+    { "Role": "assistant", "Content": "嗨～我是助手，很高兴见到你！" }
+  ]
+}
+```
+
+**ArkV3 模式示例**：
+
+```json
+{
+  "Mode": "ArkV3",
+  "EndPointId": "your-endpoint-id",
+  "Temperature": 0.7,
+  "MaxTokens": 512
+}
+```
+
+---
+
+## CustomLLM 回调
+
+使用 CustomLLM 模式时，火山引擎会将用户语音识别结果回调到自定义服务。
+
+### 回调流程
+
+```
+用户语音 → 火山引擎 ASR → CustomLLM 服务 → 火山引擎 TTS → 用户
+```
+
+### 请求格式
 
 火山引擎发送到 CustomLLM 服务的请求：
 
 ```http
 POST /chat-stream HTTP/1.1
-Host: your-domain.com
 Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 
@@ -318,24 +447,28 @@ Content-Type: application/json
     {"role": "system", "content": "你是一个智能助手"},
     {"role": "user", "content": "你好"}
   ],
-  "device_id": "web-ui-hardware-controller/demo-device",
-  "temperature": 0.5,
-  "top_p": 0.9,
+  "stream": true,
+  "temperature": 0.7,
   "max_tokens": 256,
-  "stream": true
+  "device_id": "custom-device-id"
 }
 ```
 
-**关键字段**:
+**请求字段**：
 
-- `device_id`: 从 `StartVoiceChat` 的 `LLMCustom` 传递
-- `stream`: 必须为 `true`（支持流式响应）
+| 字段 | 说明 |
+|------|------|
+| `messages` | 对话历史，OpenAI 格式 |
+| `stream` | 固定 `true`，流式响应 |
+| `temperature` | 采样温度 |
+| `max_tokens` | 最大生成长度 |
+| `device_id` | 自定义参数，从 `LLMConfig.Custom` 透传 |
 
-### CustomLLM 响应格式
+### 响应格式
 
-响应必须遵循 OpenAI SSE 格式：
+响应需遵循 OpenAI SSE 格式：
 
-```text
+```
 data: {"id":"resp-1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}],"model":"qwen-flash","created":1704355200}
 
 data: {"id":"resp-1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"你好"},"finish_reason":null}],"model":"qwen-flash","created":1704355200}
@@ -345,204 +478,113 @@ data: {"id":"resp-1","object":"chat.completion.chunk","choices":[{"index":0,"del
 data: [DONE]
 ```
 
----
+**响应要点**：
 
-## 场景配置详解
+- 必须返回 SSE 流式响应
+- Content-Type: `text/event-stream`
+- 每行以 `data: ` 开头
+- 最后一行为 `data: [DONE]`
 
-### 配置文件结构
-
-场景配置分为两部分：
-
-- **环境变量** (`.env`): 敏感凭证，不提交到代码库
-- **代码配置** (`src/config.ts`): 可共享参数，提交到代码库
-
-### ASR 配置
-
-位于 `volc-server/src/config.ts` → `asrConfig`
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `Provider` | ASR 提供商 | volcano |
-| `Mode` | 识别模式（smallmodel/largemodel） | smallmodel |
-| `Cluster` | 服务集群 | volcengine_streaming_common |
-| `Language` | 识别语言（zh-CN/en-US） | zh-CN |
-| `SilenceTime` | 静音判定时长（毫秒） | 600 |
-| `VolumeGain` | 音量增益（0.0-1.0） | 0.5 |
-| `SemanticContext.EnableHotword` | 启用热词识别 | true |
-
-### TTS 配置
-
-位于 `volc-server/src/config.ts` → `ttsConfig`
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `Provider` | TTS 提供商 | volcano |
-| `VoiceType` | 音色类型 | BV033_streaming |
-| `SpeedRatio` | 语速比例（0.5-2.0） | 1.2 |
-| `PitchRatio` | 音调比例（0.5-2.0） | 1.1 |
-| `VolumeRatio` | 音量比例（0.5-2.0） | 1.0 |
-| `Emotion` | 情感类型 | happy |
-| `EmotionIntensity` | 情感强度（0.0-1.0） | 0.8 |
-
-**可用音色**:
-
-- `BV033_streaming` - 女声，温柔
-- `BV001_streaming` - 男声，磁性
-- 更多音色请参考[火山引擎 TTS 文档](https://www.volcengine.com/docs/6561)
-
-### LLM 配置
-
-位于 `volc-server/src/config.ts` → `llmConfig`
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `Mode` | LLM 模式 | CustomLLM |
-| `ModelName` | 模型名称 | qwen-flash |
-| `Temperature` | 采样温度（0.0-1.0） | 0.5 |
-| `TopP` | 核采样概率（0.0-1.0） | 0.9 |
-| `MaxTokens` | 最大生成 token 数 | 256 |
-| `HistoryLength` | 保留的历史轮数 | 15 |
-
-### 语义打断配置
-
-位于 `volc-server/src/config.ts` → `interrupts`
-
-**内置关键词**（80+ 中英文）:
-
-- 中文: '暂停', '停止', '别说了', '闭嘴', '等一下'
-- 英文: 'stop talking', 'pause', 'enough', 'shut up', 'wait'
-
-**礼貌变体**:
-
-- 前缀: '好', '好的', 'OK'
-- 后缀: '吧', '啦', '了'
-
-自动生成 500+ 关键词变体。
+官方文档：[CustomLLM 接入](https://www.volcengine.com/docs/6348/1399966)
 
 ---
 
-## 错误处理
+## RTC Token
 
-### 错误响应格式
+客户端加入 RTC 房间需要 Token。Token 由服务端使用 AppKey 生成。
 
-所有错误遵循统一格式：
+### Token 结构
+
+```
+Token = Version + AppId + Base64(Message + Signature)
+```
+
+- **Version**：固定值 `001`
+- **AppId**：24 位应用标识符
+- **Message**：二进制编码的负载（RoomId、UserId、过期时间、权限等）
+- **Signature**：使用 AppKey 进行 HMAC-SHA256 签名
+
+### Token 权限
+
+| 权限 | 说明 |
+|------|------|
+| `PrivPublishStream` | 发布音视频流 |
+| `PrivSubscribeStream` | 订阅音视频流 |
+
+### 有效期
+
+默认 24 小时（86400 秒）。过期后需重新生成。
+
+### 生成示例
+
+```typescript
+import { AccessToken } from './rtctoken'
+
+const token = new AccessToken(appId, appKey, roomId, userId)
+const expireAt = Math.floor(Date.now() / 1000) + 24 * 3600
+token.addPrivilege('PrivPublishStream', expireAt)
+token.addPrivilege('PrivSubscribeStream', expireAt)
+token.expireTime(expireAt)
+const tokenString = token.serialize()
+```
+
+Token 生成库参考 [安装与测试 - 生成 RTC Token](./installation-and-testing.md#生成-rtc-token)。
+
+---
+
+## 错误码
+
+### 响应格式
 
 ```json
 {
   "ResponseMetadata": {
+    "RequestId": "xxx",
     "Action": "StartVoiceChat",
     "Error": {
-      "Code": -1,
-      "Message": "错误描述"
+      "Code": "InvalidParameter",
+      "Message": "参数 AppId 不能为空"
     }
   }
 }
 ```
 
-### HTTP 状态码
+### 公共错误码
 
-| 状态码 | 说明 | 原因 |
-|--------|------|------|
-| 200 | Success | 请求成功 |
-| 204 | No Content | OPTIONS 预检请求 |
-| 400 | Bad Request | 参数错误或缺失 |
-| 404 | Not Found | 场景 ID 不存在 |
-| 500 | Internal Server Error | 场景配置构建失败 |
-| 502 | Bad Gateway | 火山引擎 API 调用失败 |
+| 错误码 | HTTP 状态码 | 说明 |
+|--------|------------|------|
+| `MissingParameter` | 400 | 缺少必要参数（如 Action、Version） |
+| `InvalidParameter` | 400 | 参数格式错误或无效 |
+| `MissingRequestInfo` | 400 | 缺少请求信息（如 X-Date 头） |
+| `InvalidTimestamp` | 400 | 请求过期或时间戳无效，检查 UTC 时间格式 |
+| `InvalidAuthorization` | 400 | Authorization 头格式错误 |
+| `InvalidCredential` | 400 | Credential 格式错误 |
+| `InvalidAccessKey` | 401 | AccessKey 无效或格式错误 |
+| `SignatureDoesNotMatch` | 401 | 签名验证失败，检查 SecretKey |
+| `InvalidSecretToken` | 401 | STS 临时凭证过期或无效 |
+| `AccessDenied` | 403 | IAM 权限不足 |
+| `ServiceNotFound` | 404 | 服务不存在 |
+| `InvalidActionOrVersion` | 404 | API Action 或 Version 不存在 |
+| `FlowLimitExceeded` | 429 | 请求频率超限，降低 QPS |
+| `InternalError` | 500 | 内部错误 |
+| `InternalServiceError` | 502 | 服务网关错误 |
+| `ServiceUnavailableTemp` | 503 | 服务暂时不可用 |
+| `InternalServiceTimeout` | 504 | 服务超时 |
 
-### 调试建议
+### 业务错误码
 
-1. **启用详细日志**:
+| 错误码 | 说明 |
+|--------|------|
+| `RoomNotExist` | 房间不存在 |
+| `TaskNotExist` | 任务不存在 |
+| `InvalidToken` | RTC Token 无效或过期 |
 
-   ```bash
-   VOLC_LOG_LEVEL=debug
-   ```
-
-2. **查看请求/响应**: 日志中包含完整的 HTTP 请求和响应
-
-3. **验证凭证**: 确认所有环境变量正确配置
-
----
-
-## 客户端集成示例
-
-### TypeScript + React
-
-参考实现: `web/src/hooks/useVolcRtc.ts`
-
-```typescript
-import { fetchScenes, startVoiceChat } from '@/api/aigc'
-import { createRTCClient } from '@/lib/rtcClient'
-
-// 1. 获取场景配置
-const scenes = await fetchScenes()
-const scene = scenes[0]
-
-// 2. 加入 RTC 房间
-const rtcClient = createRTCClient()
-await rtcClient.joinRoom({
-  appId: scene.rtc.AppId,
-  roomId: scene.rtc.RoomId,
-  userId: scene.rtc.UserId,
-  token: scene.rtc.Token,
-})
-
-// 3. 发布本地流
-await rtcClient.startAudioCapture()
-await rtcClient.publishStream('audio')
-
-// 4. 启动语音会话
-await startVoiceChat(scene.scene.id, {
-  device_id: 'web-ui-hardware-controller/your-device-id'
-})
-
-// 5. 监听消息
-rtcClient.on('onUserBinaryMessageReceived', (message) => {
-  // 处理字幕、工具调用等
-})
-```
-
-### Python
-
-```python
-import requests
-
-# 1. 获取场景
-resp = requests.post('http://localhost:3002/getScenes')
-scene = resp.json()['Result']['scenes'][0]
-
-# 2. 启动语音会话
-requests.post(
-    'http://localhost:3002/proxy?Action=StartVoiceChat',
-    json={'SceneID': scene['scene']['id']}
-)
-```
+官方文档：[公共错误码](https://www.volcengine.com/docs/6369/68677)
 
 ---
 
-## 性能优化
+## 相关资源
 
-### 缓存策略
-
-1. **Token 缓存**: Token 有效期 24 小时，客户端可缓存复用
-2. **场景配置缓存**: `getScenes` 响应可缓存 1 小时
-
-### 并发限制
-
-- 单个 volc-server 实例建议最大支持 **100 并发会话**
-- 根据实际负载调整容器资源
-
-### 日志级别
-
-- 生产环境使用 `info` 或 `warn`
-- 开发环境使用 `debug`
-
----
-
-## 相关文档
-
-- [安装与测试指南](./installation-and-testing.md)
-- [场景示例](./scenarios.md)
-- [快速开始指南](../../quickstart-emq-volc.md)
-- [火山引擎 RTC 文档](https://www.volcengine.com/docs/6348)
-- [火山引擎 ASR/TTS 文档](https://www.volcengine.com/docs/6561)
+- [安装与测试](./installation-and-testing.md)
+- [火山引擎实时对话式 API 文档](https://www.volcengine.com/docs/6348/1315560) - 官方完整文档
+- [火山引擎实时音视频文档](https://www.volcengine.com/docs/6348)
