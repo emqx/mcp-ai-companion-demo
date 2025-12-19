@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>gpt-realtime-demo</title>
+  </head>
+  <body>
+    <style>
+      * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      }
+      body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px;
+      }
+      #app {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      padding: 32px;
+      max-width: 480px;
+      width: 100%;
+      }
+      button, select {
+      font-size: 14px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      }
+      button {
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      font-weight: 500;
+      }
+      button:hover {
+      background: #4338ca;
+      transform: translateY(-1px);
+      }
+      select {
+      background: #fff;
+      margin: 0 10px;
+      min-width: 120px;
+      }
+      select:focus {
+      outline: none;
+      border-color: #4f46e5;
+      }
+      #token-usage, #total-token-usage, #total-price {
+      margin-top: 20px;
+      padding: 12px 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #495057;
+      line-height: 1.6;
+      }
+      #token-usage:empty, #total-token-usage:empty, #total-price:empty {
+      display: none;
+      }
+      strong {
+      color: #212529;
+      }
+    </style>
+    <div id="app">
+      <button id="button">Connect</button>
+      <select id="voice">
+      <option value="cedar">cedar</option>
+      <option value="marin">marin</option>
+      <option value="alloy">alloy</option>
+      <option value="ash">ash</option>
+      <option value="ballad">ballad</option>
+      <option value="coral">coral</option>
+      <option value="echo">echo</option>
+      <option value="sage">sage</option>
+      <option value="shimmer">shimmer</option>
+      <option value="verse">verse</option>
+      </select>
+      <button id="send">Send</button>
+      <input type="text" id="text-input" placeholder="Please enter your message" style="margin: 10px 0; padding: 10px; width: 100%; border-radius: 8px; border: 1px solid #ddd; font-size: 14px;">
+      <div id="token-usage"></div>
+      <div id="total-token-usage"></div>
+      <div id="total-price"></div>
+    </div>
+    <script>
+      const model_name = "gpt-realtime";
+      //const model_name = "gpt-realtime-mini";
+      const EPHEMERAL_KEY = "ek_xxxxxxxxx"; // Replace with your ephemeral key
+      // Create a peer connection
+      const pc = new RTCPeerConnection();
+      // Set up data channel for sending and receiving events
+      const dc = pc.createDataChannel("oai-events");
+      const tokenUsageElm = document.getElementById("token-usage");
+      const totalTokenUsageElm = document.getElementById("total-token-usage");
+      const totalPrice = document.getElementById("total-price");
+      let totalTokenUsed = 0;
+      let totalPriceUsed = 0;
+      function calculate_token_usage(response) {
+        const usage = response.usage;
+        totalTokenUsed += usage.total_tokens;
+        totalPriceUsed += calculate_price(usage.input_token_details, usage.output_token_details);
+        tokenUsageElm.innerHTML += `<br>
+          <strong>Tokens used:</strong> ${usage.total_tokens} (
+          <span id="input-tokens">${usage.input_tokens}</span> input [details: ${JSON.stringify(usage.input_token_details)}],
+          <span id="output-tokens">${usage.output_tokens}</span> output [details: ${JSON.stringify(usage.output_token_details)}])
+        `;
+        totalTokenUsageElm.innerHTML = `<strong>Total tokens used:</strong> ${totalTokenUsed}`;
+        totalPrice.innerHTML = `<strong>Total price:</strong> $${totalPriceUsed.toFixed(6)}`;
+      }
+      function calculate_price(input_token_details, output_token_details) {
+        if (model_name === "gpt-realtime") {
+          return calculate_price_max(input_token_details, output_token_details);
+        } else if (model_name === "gpt-realtime-mini") {
+          return calculate_price_mini(input_token_details, output_token_details);
+        } else {
+          throw new Error(`Unknown model name: ${model_name}`);
+        }
+      }
+      function calculate_price_max(input_token_details, output_token_details) {
+        i = input_token_details,
+        o = output_token_details;
+        // Text tokens price (per 1M tokens): input: $4, output: $16, cached_input: $0.5
+        // Audio tokens price (per 1M tokens): input: $32, output: $64, cached_input: $0.5
+        // Image tokens price (per 1M tokens): input: $5, cached_input: $0.5
+        return i.text_tokens * uprice(4) + o.text_tokens * uprice(16) + i.cached_tokens_details.text_tokens * uprice(0.5)
+             + i.audio_tokens * uprice(32) + o.audio_tokens * uprice(64) + i.cached_tokens_details.audio_tokens * uprice(0.5)
+             + i.image_tokens * uprice(5) + i.cached_tokens_details.image_tokens * uprice(0.5);
+      }
+      function calculate_price_mini(input_token_details, output_token_details) {
+        i = input_token_details,
+        o = output_token_details;
+        // Text tokens price (per 1M tokens): input: $0.6, output: $2.40, cached_input: $0.06
+        // Audio tokens price (per 1M tokens): input: $10, output: $20, cached_input: $0.30
+        // Image tokens price (per 1M tokens): input: $0.80, cached_input: $0.08
+        return i.text_tokens * uprice(0.6) + o.text_tokens * uprice(2.40) + i.cached_tokens_details.text_tokens * uprice(0.06)
+             + i.audio_tokens * uprice(10) + o.audio_tokens * uprice(20) + i.cached_tokens_details.audio_tokens * uprice(0.30)
+             + i.image_tokens * uprice(0.80) + i.cached_tokens_details.image_tokens * uprice(0.08);
+      }
+      function uprice(price_per_million_tokens) {
+        return price_per_million_tokens / 1000000;
+      }
+      function handle_event(event) {
+        if (event.type === "session.created") {
+          // Send client events
+          const session_update_event = {
+              "type": "session.update",
+              session: {
+                type: "realtime",
+                model: model_name,
+                // can be set to "text"
+                output_modalities: ["audio"],
+                tools: [
+                  {
+                    type: "mcp",
+                    server_label: "mqtt_mcp",
+                    server_url: "https://demo.emqx.com:8092/mcp",
+                    require_approval: "never",
+                  }
+                ],
+                tool_choice: "auto",
+                audio: {
+                  // input: {
+                  //   format: {
+                  //     type: "audio/pcm",
+                  //     rate: 24000,
+                  //   },
+                  //   turn_detection: {
+                  //     type: "semantic_vad"
+                  //   }
+                  // },
+                  output: {
+                    // format: {
+                    //   type: "audio/pcmu",
+                    // },
+                    // Current voice options are alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, and cedar. We recommend marin and cedar for best quality.
+                    voice: document.getElementById("voice").value,
+                  }
+                },
+                // You can still set direct session fields; these override prompt fields if they overlap:
+                instructions: "请说中文。在执行工具前，先询问用户确认。",
+              }
+          };
+          dc.send(JSON.stringify(session_update_event));
+        } else if (event.type === "response.done") {
+          console.log("Received response done:", event);
+          calculate_token_usage(event.response);
+        } else {
+          console.log("Received event:", event);
+        }
+      }
+      const connectRTC = async () => {
+        console.log("Starting WebRTC connection...");
+        // Set up to play remote audio from the model
+        const audioElement = { current: document.createElement("audio") };
+        audioElement.current.autoplay = true;
+        pc.ontrack = (e) => (
+          console.log("Received remote track:", e.streams[0]),
+          audioElement.current.srcObject = e.streams[0]
+        );
+
+        // Add local audio track for microphone input in the browser
+        const ms = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+        });
+        pc.addTrack(ms.getTracks()[0]);
+
+        // Start the session using the Session Description Protocol (SDP)
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
+            method: "POST",
+            body: offer.sdp,
+            headers: {
+                Authorization: `Bearer ${EPHEMERAL_KEY}`,
+                "Content-Type": "application/sdp",
+            },
+        });
+
+        const answer = {
+            type: "answer",
+            sdp: await sdpResponse.text(),
+        };
+        await pc.setRemoteDescription(answer);
+        console.log("WebRTC connection established.");
+
+        // Listen for server events
+        dc.addEventListener("message", (e) => {
+            const event = JSON.parse(e.data);
+            handle_event(event);
+        });
+      };
+      const button = document.getElementById("button");
+      button.addEventListener("click", connectRTC);
+
+      const send = document.getElementById("send");
+      send.addEventListener("click", () => {
+        let text_to_send = document.getElementById("text-input").value;
+        const event = {
+            type: "conversation.item.create",
+            item: {
+                type: "message",
+                role: "user",
+                content: [
+                    {
+                        type: "input_text",
+                        text: text_to_send,
+                    },
+                ],
+            },
+        };
+        dc.send(JSON.stringify(event));
+        console.log("Sent text message:", event);
+      });
+    </script>
+  </body>
+</html>
