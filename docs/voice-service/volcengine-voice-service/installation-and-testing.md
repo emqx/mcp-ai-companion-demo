@@ -2,11 +2,9 @@
 
 本文档介绍如何集成火山云语音服务并完成基础测试。火山引擎提供多端 SDK，本文以 Web 端（`@volcengine/rtc`）为例说明集成流程。
 
----
-
 ## 前置准备
 
-开始集成前，请确保已完成火山引擎服务开通和凭证配置。详细步骤参考[快速开始 - 火山引擎凭证](../../quickstart-emq-volc.md#4-火山引擎凭证)。
+开始集成前，请确保已完成火山引擎服务开通和凭证配置。详细步骤参考[快速开始 - 火山引擎凭证](./quick-start.md#4-火山引擎凭证)。
 
 需要准备的凭证：
 
@@ -17,8 +15,6 @@
 | `ASR AppId` | 语音识别服务 |
 | `TTS AppId` / `TTS Token` / `TTS ResourceId` | 语音合成服务 |
 
----
-
 ## 认证代理服务
 
 客户端加入 RTC 房间需要 Token，而 Token 由 `AppKey` 生成；启动语音会话需要调用 `StartVoiceChat` API，而该 API 需要 `AccessKey` 签名。这些密钥都不能暴露给客户端，因此需要搭建一个代理服务来处理认证。
@@ -26,16 +22,14 @@
 代理服务负责：
 - 使用 `AppKey` 生成 RTC Token
 - 使用 `AccessKey` 调用火山引擎 OpenAPI
-- 将 Token 和房间信息返回给客户端
+- 将 `Token` 和房间信息返回给客户端
 
 ### 生成 RTC Token
 
-Token 使用 `AppKey` 通过 HMAC-SHA256 算法生成。火山引擎提供各语言的生成库：
+`Token` 使用 `AppKey` 通过 HMAC-SHA256 算法生成：
 
 | 语言 | 参考实现 |
 |------|----------|
-| Go | [AccessToken.go](https://github.com/volcengine/rtc-aigc-demo/blob/main/server/rtc-aigc-demo/internal/pkg/rtctoken/token.go) |
-| Python | [access_token.py](https://github.com/volcengine/rtc-aigc-demo/blob/main/server/rtc-aigc-demo-python/src/rtctoken/access_token.py) |
 | Node.js / Bun | [token.ts](https://github.com/emqx/mcp-ai-companion-demo/tree/volcengine/rtc/volc-server/src/lib/token.ts) |
 
 ```typescript
@@ -48,7 +42,7 @@ const tokenString = token.serialize()  // 返回给客户端
 
 ### 调用火山引擎 OpenAPI
 
-`StartVoiceChat`、`StopVoiceChat` 等 API 需要使用 `AccessKeyId` 和 `SecretKey` 签名。使用官方 OpenAPI SDK 可以自动处理签名：
+`StartVoiceChat`、`StopVoiceChat` 等 API 需要使用 `AccessKeyId` 和 `SecretKey` 进行 V4 签名。官方 OpenAPI SDK 提供 `Signer` 类帮助生成签名头：
 
 ```bash
 # Node.js / Bun
@@ -65,17 +59,39 @@ go get github.com/volcengine/volc-sdk-golang
 // Node.js 示例
 import { Signer } from '@volcengine/openapi'
 
-const signer = new Signer({
+const body = { AppId: appId, RoomId: roomId, /* ... */ }
+
+// 构造请求数据
+const openApiRequestData = {
+  region: 'cn-north-1',
+  method: 'POST',
+  params: {
+    Action: 'StartVoiceChat',
+    Version: '2024-12-01',
+  },
+  headers: {
+    Host: 'rtc.volcengineapi.com',
+    'Content-Type': 'application/json',
+  },
+  body,
+}
+
+// 创建 Signer 并添加认证头
+const signer = new Signer(openApiRequestData, 'rtc')
+signer.addAuthorization({
   accessKeyId: process.env.ACCESS_KEY_ID,
   secretKey: process.env.SECRET_KEY,
-}, 'rtc')
-
-const response = await signer.fetch('https://rtc.volcengineapi.com', {
-  method: 'POST',
-  query: { Action: 'StartVoiceChat', Version: '2024-12-01' },
-  body: { AppId: appId, RoomId: roomId, ... },
 })
-// response 包含 Token、RoomId、UserId 等信息，返回给客户端
+
+// 发起请求（headers 已包含签名）
+const response = await fetch(
+  'https://rtc.volcengineapi.com?Action=StartVoiceChat&Version=2024-12-01',
+  {
+    method: 'POST',
+    headers: openApiRequestData.headers,
+    body: JSON.stringify(body),
+  }
+)
 ```
 
 详细签名规范参考：[火山引擎 V4 签名算法](https://www.volcengine.com/docs/6369/67269)
@@ -85,20 +101,31 @@ const response = await signer.fetch('https://rtc.volcengineapi.com', {
 代理服务需要暴露接口供客户端调用：
 
 ```typescript
-// 启动语音会话 - 返回 Token 和房间信息
+// 获取场景配置 - 返回 Token 和房间信息
+GET /api/scenes
+Response: {
+  scenes: [{
+    id: string,
+    rtcConfig: { appId: string, roomId: string, userId: string, token: string }
+  }]
+}
+
+// 启动语音会话
 POST /api/voice/start
 Request:  { sceneId: string }
-Response: { roomId: string, token: string, userId: string, appId: string }
+Response: { success: boolean }
 
 // 停止语音会话
 POST /api/voice/stop
-Request:  { roomId: string }
+Request:  { sceneId: string }
 Response: { success: boolean }
 ```
 
-服务端实现中，这些接口内部调用火山引擎 OpenAPI（`StartVoiceChat`、`StopVoiceChat`），并将返回的 Token 等信息透传给客户端。
+服务端实现说明：
 
----
+- **场景配置**：服务端在初始化时为每个场景生成 `roomId`（UUID）和 `userId`，并使用 `AppKey` 生成对应的 RTC Token（24 小时有效）。客户端通过 `/api/scenes` 获取这些信息用于加入 RTC 房间。
+- **Token 用途**：客户端调用 RTC SDK 的 `joinRoom` 方法时需要传入 Token 进行身份认证。
+- **启动/停止语音会话**：服务端根据 `sceneId` 查找对应的场景配置，获取 `roomId` 等参数后调用火山引擎 OpenAPI（`StartVoiceChat`、`StopVoiceChat`）。
 
 ## Web 端集成
 
@@ -116,19 +143,18 @@ npm install @volcengine/rtc
 
 ### 基础集成流程
 
-#### 1. 调用服务端 API 获取 Token
+#### 1. 获取场景配置
 
-使用 RTC SDK 前，先调用服务端接口启动语音会话，获取 Token 和房间信息：
+使用 RTC SDK 前，先调用服务端接口获取场景配置，包含 Token 和房间信息：
 
 ```typescript
-// 调用服务端 API 获取认证信息
-const response = await fetch('/api/voice/start', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ sceneId: 'your-scene-id' }),
-})
+// 调用服务端 API 获取场景配置
+const response = await fetch('/api/scenes')
+const { scenes } = await response.json()
 
-const { appId, roomId, token, userId } = await response.json()
+// 选择目标场景
+const scene = scenes.find(s => s.id === 'your-scene-id') || scenes[0]
+const { appId, roomId, token, userId } = scene.rtcConfig
 ```
 
 #### 2. 创建 RTC 引擎
@@ -195,9 +221,22 @@ await engine.startAudioCapture()
 await engine.publishStream(MediaType.AUDIO)
 ```
 
+#### 6. 启动语音会话
+
+发布音频流后，调用服务端 API 启动 AI 语音会话：
+
+```typescript
+// 启动语音会话
+await fetch('/api/voice/start', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ sceneId: scene.id }),
+})
+```
+
 此时语音交互已经开始，用户说话会被 ASR 识别，LLM 处理后通过 TTS 播放回复。
 
-#### 6. 离开房间
+#### 7. 离开房间
 
 ```typescript
 // 停止发布
@@ -216,7 +255,7 @@ VERTC.destroyEngine(engine)
 await fetch('/api/voice/stop', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ roomId }),
+  body: JSON.stringify({ sceneId: scene.id }),
 })
 ```
 
@@ -262,8 +301,6 @@ const audioElement = document.querySelector('audio')
 audioElement.srcObject = stream
 ```
 
----
-
 ## 其他端 SDK
 
 火山引擎 RTC SDK 支持软件应用和硬件设备两类场景。
@@ -288,8 +325,6 @@ audioElement.srcObject = stream
 详见：[集成实时对话式 AI（嵌入式硬件）](https://www.volcengine.com/docs/6348/1438400)
 
 支持嵌入式 Linux、RTOS、Android 等硬件平台。硬件端 SDK 需联系火山引擎技术支持获取。
-
----
 
 ## 测试验证
 
@@ -354,15 +389,6 @@ AI 回复会通过远端音频流播放。确保：
 |------|----------|
 | 如何使用第三方模型 / Coze Bot | 在 LLMConfig 中配置对应的模型参数，Mode 设为 `CustomLLM` 并填写回调地址 |
 | 对话无反馈 | 检查 LLM 配置是否正确，CustomLLM 模式需确保回调服务正常运行 |
-
----
-
-## 下一步
-
-- [API 文档](./api.md) - 详细接口说明
-- [场景示例](./scenarios/) - 典型应用场景
-
----
 
 ## 相关资源
 
